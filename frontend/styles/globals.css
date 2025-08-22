@@ -1,0 +1,57 @@
+/* styles/globals.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Two-line clamp for ticket preview */
+@import "tailwindcss";
+
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;       /* wrap lines */
+  word-break: break-word;    /* break long words */
+}
+
+/* Sidebar tab styles */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+.tabs button {
+  flex: 1;
+  min-width: 0;
+  padding: 1rem 0.5rem;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tabs .active {
+  font-weight: bold;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-bottom: 3px solid #3730a3;
+}
+
+/* Utility for 2-line clamp (import in ThreadList.jsx or globals.css) */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Highlight for mentioned message */
+.chat-highlight {
+  background-color: #FEF3C7 !important; /* yellow-100 */
+  border: 2px solid #F59E42 !important; /* yellow-400 */
+  transition: background 0.3s, border 0.3s;
+}
+
+
+
+@custom-variant dark (&:where(.dark, .dark *));

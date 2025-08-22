@@ -1,0 +1,78 @@
+[
+  {
+    "ticket_id": "TICKET0001",
+    "chunk": "Your request has been received. Please allow some time for processing or contact support for urgent issues."
+  },
+  {
+    "ticket_id": "TICKET0002",
+    "chunk": "Your request has been received. Please allow some time for processing or contact support for urgent issues."
+  },
+  {
+    "ticket_id": "TICKET0003",
+    "chunk": "Meeting request acknowledged. Please check your calendar for the scheduled time and location."
+  },
+  {
+    "ticket_id": "TICKET0004",
+    "chunk": "Please follow the password reset procedure or contact IT support for assistance."
+  },
+  {
+    "ticket_id": "TICKET0005",
+    "chunk": "Email issue detected. Please check your spam settings or contact the email administrator."
+  },
+  {
+    "ticket_id": "TICKET0006",
+    "chunk": "Email issue detected. Please check your spam settings or contact the email administrator."
+  },
+  {
+    "ticket_id": "TICKET0007",
+    "chunk": "Server tunneling issue identified. Please verify the host configuration and network settings."
+  },
+  {
+    "ticket_id": "TICKET0008",
+    "chunk": "Access request noted. Please ensure the necessary approvals are in place and contact the admin team."
+  },
+  {
+    "ticket_id": "TICKET0009",
+    "chunk": "Please follow the password reset procedure or contact IT support for assistance."
+  },
+  {
+    "ticket_id": "TICKET0010",
+    "chunk": "Report issue noted. Please verify the data source and ensure all required fields are completed."
+  },
+  {
+    "ticket_id": "TICKET0011",
+    "chunk": "Your request has been received. Please allow some time for processing or contact support for urgent issues."
+  },
+  {
+    "ticket_id": "TICKET0012",
+    "chunk": "Report issue noted. Please verify the data source and ensure all required fields are completed."
+  },
+  {
+    "ticket_id": "TICKET0013",
+    "chunk": "New starter process initiated. Please complete the onboarding form and submit required documents."
+  },
+  {
+    "ticket_id": "TICKET0014",
+    "chunk": "License request received. Please verify your eligibility and submit a formal request through the portal."
+  },
+  {
+    "ticket_id": "TICKET0015",
+    "chunk": "Device issue noted. Please check the hardware connections and ensure the drivers are up to date."
+  },
+  {
+    "ticket_id": "TICKET0016",
+    "chunk": "Access request noted. Please ensure the necessary approvals are in place and contact the admin team."
+  },
+  {
+    "ticket_id": "TICKET0017",
+    "chunk": "Your request has been received. Please allow some time for processing or contact support for urgent issues."
+  },
+  {
+    "ticket_id": "TICKET0018",
+    "chunk": "Access request noted. Please ensure the necessary approvals are in place and contact the admin team."
+  },
+  {
+    "ticket_id": "TICKET0019",
+    "chunk": "Meeting request acknowledged. Please check your calendar for the scheduled time and location."
+  }
+]

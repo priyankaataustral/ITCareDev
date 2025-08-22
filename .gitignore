@@ -1,0 +1,47 @@
+﻿# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+.npm/
+
+# Package locks (optional—keep one if your team prefers)
+pnpm-lock.yaml
+yarn.lock
+
+# Python / Flask
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+instance/
+
+# Local databases / data
+*.sqlite
+*.db
+data/
+
+# Logs, coverage, caches
+logs/
+coverage/
+.pytest_cache/
+
+# Env & local config
+.env
+.env.*
+*.local
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Frontend/Backend artifacts (if any)
+*.zip
+*.tar
+*.gz
+# Backups mistakenly added
+backup-*.git/
