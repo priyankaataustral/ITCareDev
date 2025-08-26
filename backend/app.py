@@ -21,8 +21,8 @@ from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
+from extensions import db
 from category_map import LABELS, TEAM_MAP
 import smtplib
 from email.mime.text import MIMEText
@@ -42,9 +42,18 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 app = Flask(__name__)
 # CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
 
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # set True in prod behind HTTPS:
+    SESSION_COOKIE_SECURE=False,
+)
+
 load_dotenv()
 
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me-dev-secret")
+
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_KEY:
@@ -55,9 +64,18 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 # Always use the root tickets.db, never the instance folder
 db_path = os.path.join(os.path.dirname(__file__), '..', 'tickets.db')
 db_path = os.path.abspath(db_path)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+db.init_app(app)
+
+# --- Auth / Licensing wiring ---
+from routes_auth import bp as auth_bp, init_auth
+from routes_license import bp as license_bp
+from license_gate import license_gate
+
+
+import models_license
 migrate = Migrate(app, db)
 
 # ─── SMTP / Email config ──────────────────────────────────────────────────────
@@ -649,6 +667,14 @@ with app.app_context():
         db.session.add_all([Department(name=n) for n in ['ERP','CRM','SRM','Network','Security']])
         db.session.commit()
 
+# --- OIDC / SSO ---
+init_auth(app)                 # sets up Authlib client & session settings
+
+# --- Blueprints ---
+app.register_blueprint(auth_bp)     # /auth/login, /auth/callback, /auth/me, /auth/logout
+app.register_blueprint(license_bp)  # /license/check
+
+
 # ─── OpenAI & FAISS setup ──────────────────────────────────────────────────────
 # Create FAISS index for KB articles
 def create_faiss_index():
@@ -1189,8 +1215,16 @@ def login():
     return resp
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/embed")
+@license_gate(required_feature="kb")   # requires features: {"kb": "on"}
+def embed_widget():
+    return {"ok": True, "msg": "licensed & kb feature enabled"}
+
+
 @app.route("/threads", methods=["GET"])
 @require_role("L1","L2","L3","MANAGER")
+# @license_gate()
 def list_threads():
 
     df = load_df()
@@ -1303,6 +1337,7 @@ def list_threads():
 
 @app.route("/threads/<thread_id>", methods=["GET"])
 @require_role("L1","L2","L3","MANAGER")
+# @license_gate()
 def get_thread(thread_id):
     t = db.session.get(Ticket, thread_id)
 
@@ -1800,6 +1835,7 @@ def get_mentions(agent_name):
 
 @app.route("/me", methods=["GET"])
 @require_role()
+@license_gate()
 def get_current_agent():
     return jsonify(getattr(request, "agent_ctx", {})), 200
     
