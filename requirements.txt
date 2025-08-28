@@ -35,3 +35,4 @@ gunicorn
 flask_sqlalchemy
 pymysql
 flask-migrate
+cryptography
