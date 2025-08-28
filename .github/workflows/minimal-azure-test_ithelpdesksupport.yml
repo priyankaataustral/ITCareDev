@@ -1,72 +1,47 @@
 name: Build and deploy Python app to Azure Web App
 
 env:
-  AZURE_WEBAPP_NAME: ITHelpDeskSupport   # set this to your application's name
-  PYTHON_VERSION: '3.12'               # set this to the Python version to use
+  AZURE_WEBAPP_NAME: ITHelpDeskSupport
+  PYTHON_VERSION: '3.12'
 
 on:
   push:
-    branches:
-      - minimal-azure-test
+    branches: [ minimal-azure-test ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python version
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Create and start virtual environment
+      - name: Install deps (backend)
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
-      - name: Set up dependency caching for faster installs
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+      - name: Debug show what will be deployed
+        run: |
+          echo "Root:"
+          ls -la
+          echo "Backend:"
+          ls -la backend || true
+          echo "Top of backend/app.py:"
+          sed -n '1,80p' backend/app.py || true
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # Optional: Add a step to run tests here (PyTest, Django test suites, etc.)
-
-      - name: Upload artifact for deployment jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-app
-          path: |
-            .
-            !venv/
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    environment:
-      name: 'production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
-          path: .
+      - uses: actions/checkout@v4
 
-      - name: 'Deploy to Azure Web App'
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@85270a1854658d167ab239bce43949edb336fa7c
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: backend
-          
-
-
