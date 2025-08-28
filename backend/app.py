@@ -5,6 +5,9 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+from flask_cors import CORS
+CORS(app, resources={r"/*": {"origins": "*"}})  
+
 
 # -------------------------
 # Database configuration

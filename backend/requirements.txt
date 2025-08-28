@@ -36,3 +36,4 @@ Flask-SQLAlchemy==3.1.1
 PyMySQL==1.1.1
 cryptography==43.0.1
 gunicorn==23.0.0
+flask-cors==3.0.10
