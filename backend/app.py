@@ -14,7 +14,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")  # set in Azure App Settings
 if DATABASE_URL:
     # Azure MySQL (Flexible Server) via PyMySQL with TLS
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"ssl": {}}}
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "connect_args": {
+        "ssl": {"ca": "/etc/ssl/certs/ca-certificates.crt"} 
+    }
+    }
 else:
     # Fallback: SQLite in /home/data (persistent on Azure App Service)
     data_dir = os.path.join("/home", "data")
