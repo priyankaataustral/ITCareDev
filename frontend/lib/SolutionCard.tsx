@@ -18,21 +18,33 @@ export default function SolutionCard({ solutionId, text, status, onPromoted }: P
       await apiPost(`/solutions/${solutionId}/send_confirmation_email`);
       setState("sent_for_confirm");
       alert("Confirmation email sent.");
-    } catch (e:any) {
-      alert(e?.message || "Failed to send confirmation.");
-    } finally { setBusy(null); }
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        alert(e.message);
+      } else {
+        alert("Failed to send confirmation.");
+      }
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function promote() {
     setBusy("promote");
     try {
-      const r = await apiPost<{article_id:number}>(`/solutions/${solutionId}/promote`);
+      const r = await apiPost<{ article_id: number }>(`/solutions/${solutionId}/promote`);
       setState("published");
       alert("Promoted to KB.");
       onPromoted?.(r.article_id);
-    } catch (e:any) {
-      alert(e?.message || "Promote failed");
-    } finally { setBusy(null); }
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        alert(e.message);
+      } else {
+        alert("Promote failed");
+      }
+    } finally {
+      setBusy(null);
+    }
   }
 
   const canPromote = state === "confirmed_by_user" || state === "published";
