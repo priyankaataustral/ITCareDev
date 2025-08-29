@@ -138,8 +138,27 @@ function CollapsibleSection({ title, children, isOpen, onToggle }) {
 
 function TicketInfoCard({ ticket }) {
   if (!ticket) return null;
+  // Download summary handler
+  const handleDownloadSummary = () => {
+    if (!ticket.id) return;
+    const url = `${API_BASE}/threads/${ticket.id}/download-summary`;
+    // Use browser fetch to get the file and trigger download
+    fetch(url, {
+      method: 'GET',
+      headers: authHeaders(),
+    })
+      .then(response => response.blob())
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `ticket_${ticket.id}_summary.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+  };
   return (
-    <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-4 border-l-4 border-yellow-500 shadow-md mb-4 mx-4 flex items-start gap-4 w-full">
+    <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-4 border-l-4 border-yellow-500 shadow-md mb-4 mx-4 flex items-start gap-4">
       <span className="text-yellow-500 dark:text-yellow-300 text-3xl mt-1">📄</span>
       <div>
         <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-base mb-1">Ticket Summary</div>
@@ -147,6 +166,12 @@ function TicketInfoCard({ ticket }) {
           {(ticket.created || ticket.created_at) && <div>🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
           {ticket.text && <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{ticket.text}</div>}
         </div>
+        <button
+          onClick={handleDownloadSummary}
+          className="mt-3 px-3 py-1 rounded-full bg-indigo-500 text-white text-sm shadow hover:bg-indigo-600"
+        >
+          ⬇️ Download Summary
+        </button>
       </div>
     </div>
   );
@@ -174,7 +199,7 @@ function ProposedSolutionBox({ text, onDraft, onDismiss }) {
         <button onClick={onDraft} className="px-3 py-1 rounded-full bg-indigo-600 text-white text-sm">
           ✉️ Draft email
         </button>
-        <button onClick={onDismiss} className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-sm">
+        <button onClick={() => onDismiss(text)} className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-sm">
           Dismiss
         </button>
       </div>
@@ -292,13 +317,21 @@ function SuggestedPrompts({
   const labelFor = (p) =>
     typeof p === "string" ? p : p.kind === "ask_user" ? p.text : p.label || p.intent;
 
+  // Filter out 'Should I escalate this?' from prompts
+  const filteredPrompts = Array.isArray(prompts)
+    ? prompts.filter(p => {
+        const label = labelFor(p).trim().toLowerCase();
+        return label !== 'should i escalate this?';
+      })
+    : prompts;
+
   return (
     <CollapsibleSection title={<span>💡 Suggested Prompts</span>} isOpen={open} onToggle={onToggle}>
       <div className="max-h-48 overflow-y-auto space-y-2">
-        {prompts.length === 0 ? (
+        {filteredPrompts.length === 0 ? (
           <div className="text-sm text-gray-400">No suggestions available.</div>
         ) : (
-          prompts.map((p, i) => (
+          filteredPrompts.map((p, i) => (
             <button
               key={i}
               type="button"
@@ -407,7 +440,10 @@ function TimelinePanel({ events, loading, error, openSections, toggleSection }) 
     }
   };
 
-const safeEvents = Array.isArray(events) ? events : [];
+const safeEvents = Array.isArray(events)
+  ? [...events].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  : [];
+
 const dedupedEvents = [];
 let prevType = null, prevLabel = null;
 
@@ -481,6 +517,56 @@ function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus
     </div>
   );
 }
+
+// function RightTopPanel({
+//   tid,
+//   API_BASE,
+//   panelOpen,
+//   setPanelOpen,
+//   suggestedPrompts,
+//   suggestedPromptsLoading,
+//   suggestedPromptsError,
+//   relatedTickets,
+//   relatedTicketsLoading,
+//   relatedTicketsError,
+//   handleRelatedTicketClick,
+//   stepInfo,
+//   timeline,
+//   timelineLoading,
+//   timelineError,
+//   openSections,
+//   toggleSection,
+// }) {
+//   return (
+//     <aside className="flex flex-col gap-2 w-full md:w-80 max-w-xs">
+//       {/* Activity collapsible at the top */}
+//       <TimelinePanel
+//         events={timeline}
+//         loading={timelineLoading}
+//         error={timelineError}
+//         openSections={openSections}
+//         toggleSection={toggleSection}
+//       />
+//       <SuggestedPrompts
+//         threadId={tid}
+//         prompts={suggestedPrompts}
+//         open={panelOpen}
+//         onToggle={() => setPanelOpen((v) => !v)}
+//         apiBase={API_BASE}
+//       />
+//       <RelatedTicketList
+//         tickets={relatedTickets}
+//         loading={relatedTicketsLoading}
+//         error={relatedTicketsError}
+//         onClick={handleRelatedTicketClick}
+//         openSections={openSections}
+//         toggleSection={toggleSection}
+//       />
+//       <StepProgressBar stepInfo={stepInfo} />
+//     </aside>
+//   );
+// }
+
 
 // =========================
 // Main Component
@@ -1106,25 +1192,80 @@ const draftFromBackendOrBuild = async (solutionLike) => {
   // Track the last user intent for the current send
   const lastUserIntentRef = useRef('normal'); // 'normal' | 'explicit_solution' | 'suggested'
 
-  // --- Utilities for solution/email ---
+
+  // --- User-friendly solution/email utilities ---
+  function makeUserFriendly(text) {
+    if (!text) return '';
+    // Replace technical jargon with simple language
+    let friendly = text
+      .replace(/\btroubleshoot\b/gi, 'check')
+      .replace(/\bdiagnose\b/gi, 'look into')
+      .replace(/\bissue\b/gi, 'problem')
+      .replace(/\bresolve\b/gi, 'fix')
+      .replace(/\bconfiguration\b/gi, 'settings')
+      .replace(/\bparameters?\b/gi, 'details')
+      .replace(/\bexecute\b/gi, 'run')
+      .replace(/\bfunction\b/gi, 'feature')
+      .replace(/\bscript\b/gi, 'step')
+      .replace(/\bserver\b/gi, 'system')
+      .replace(/\bapplication\b/gi, 'app')
+      .replace(/\binterface\b/gi, 'screen')
+      .replace(/\bAPI\b/gi, 'connection')
+      .replace(/\bdeploy\b/gi, 'set up')
+      .replace(/\bcredentials?\b/gi, 'login info')
+      .replace(/\bauthenticate\b/gi, 'log in')
+      .replace(/\bvalidate\b/gi, 'check')
+      .replace(/\berror\b/gi, 'problem')
+      .replace(/\bexception\b/gi, 'unexpected problem')
+      .replace(/\bsyntax\b/gi, 'writing')
+      .replace(/\bcommand\b/gi, 'instruction')
+      .replace(/\bterminal\b/gi, 'window')
+      .replace(/\bconsole\b/gi, 'window')
+      .replace(/\bdebug\b/gi, 'check')
+      .replace(/\bcompile\b/gi, 'prepare')
+      .replace(/\bbuild\b/gi, 'prepare')
+      .replace(/\bframework\b/gi, 'tool')
+      .replace(/\blibrary\b/gi, 'tool')
+      .replace(/\bdependency\b/gi, 'needed tool')
+      .replace(/\bupdate\b/gi, 'refresh')
+      .replace(/\bupgrade\b/gi, 'refresh')
+      .replace(/\bpatch\b/gi, 'fix')
+      .replace(/\bversion\b/gi, 'type')
+      .replace(/\bplatform\b/gi, 'system')
+      .replace(/\bnetwork\b/gi, 'connection')
+      .replace(/\bprotocol\b/gi, 'method')
+      .replace(/\bport\b/gi, 'connection point')
+      .replace(/\baccess\b/gi, 'open')
+      .replace(/\bpermission\b/gi, 'access')
+      .replace(/\bprivilege\b/gi, 'access')
+      .replace(/\broot\b/gi, 'main')
+      .replace(/\badmin\b/gi, 'manager')
+      .replace(/\buser\b/gi, 'you')
+      .replace(/\bsudo\b/gi, 'special access')
+      .replace(/\bscript\b/gi, 'step')
+      .replace(/\bexecute\b/gi, 'run')
+      .replace(/\bterminal\b/gi, 'window');
+    // Add a friendly tone
+    friendly = friendly.replace(/\bplease\b/gi, 'please');
+    // Add a suggestion if not present
+    if (!/let me know|feel free|reach out|happy to help|hope this helps|if you need anything else/i.test(friendly)) {
+      friendly += '\n\nIf you need anything else, feel free to ask!';
+    }
+    return friendly;
+  }
+
   const getLastSolutionText = () => {
-    if (pendingSolution) return pendingSolution;
+    if (pendingSolution) return makeUserFriendly(pendingSolution);
     const s = [...messages].reverse().find(
       m => m.type === 'solution' && (m.text || m.content)
     );
-    return (s?.text || s?.content || '').toString();
+    return makeUserFriendly((s?.text || s?.content || '').toString());
   };
-
-  
 
   const buildEmailFromSolution = (solution) => {
     const greeting = ticket?.requester_name ? `Hi ${ticket.requester_name},` : 'Hi there,';
     return `${greeting}
-
-${solution}
-
-Best regards,
-Support Team`;
+  \n${makeUserFriendly(solution)}\n\nBest regards,\nSupport Team`;
   };
 
 
@@ -1282,19 +1423,7 @@ const openDraftEditor = (prefill) => {
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
         setTicket(data);
-        // Normalize: if backend returns a single reply/text, wrap as a message array
-        let msgs = [];
-        if (Array.isArray(data.messages)) {
-          msgs = data.messages;
-        } else if (data.reply || data.text) {
-          msgs = [{
-            id: `init-${data.ticketId || data.id || Date.now()}`,
-            sender: 'assistant',
-            content: data.reply || data.text,
-            timestamp: data.created || new Date().toISOString(),
-          }];
-        }
-        let normalized = msgs.map((m) => {
+        const normalized = (Array.isArray(data.messages) ? data.messages : []).map((m) => {
           const c = m?.content;
           return {
             ...m,
@@ -1302,20 +1431,6 @@ const openDraftEditor = (prefill) => {
             content: toDisplayString(c),
           };
         });
-        // Inject summary bot message if not present
-        const hasSummary = normalized.some(m => (m.sender === 'assistant' || m.sender === 'bot') && m.type === 'summary');
-        if (!hasSummary && data?.text) {
-          normalized = [
-            {
-              id: `summary-${data.id || Date.now()}`,
-              sender: 'assistant',
-              type: 'summary',
-              content: `The user is requesting assistance with: ${data.text}`,
-              timestamp: data.created || new Date().toISOString(),
-            },
-            ...normalized
-          ];
-        }
         setMessages(normalized);
       })
       .catch(() => setError('Failed to load thread'))
@@ -1437,19 +1552,17 @@ const openDraftEditor = (prefill) => {
   }, [tid, API_BASE]);
 
 
-  const showPendingSolutionAsChatAndClear = () => {
-    const solution = getLastSolutionText();
+  const showPendingSolutionAsChatAndClear = (solutionText) => {
     // Clear the panel either way
     setPendingSolution(null);
-    if (!solution) return;
-
+    if (!solutionText) return;
     setMessages(prev => [
       ...prev,
       {
         id: `temp-${tempIdRef.current++}`,
-        sender: 'bot',            // keep consistent with your other bot bubbles
-        content: solution,
-        // type: 'solution_shown', // optional tag if you want to distinguish
+        sender: 'bot',
+        content: solutionText,
+        type: 'solution_shown',
         timestamp: new Date().toISOString(),
       },
     ]);
@@ -1540,6 +1653,56 @@ const openDraftEditor = (prefill) => {
 
     if (!text) return;
 
+
+
+    // If user types 'escalate this ticket', trigger escalation
+    if (/^escalate this ticket$/i.test(text.trim())) {
+      setNewMsg('');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `temp-${tempIdRef.current++}`,
+          sender: 'user',
+          content: text,
+          source: options.source || 'typed',
+          timestamp: new Date().toISOString()
+        }
+      ]);
+      // Call the escalate endpoint
+      try {
+        const resp = await fetch(`${API_BASE}/threads/${tid}/escalate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          credentials: 'include',
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to escalate');
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `temp-${Date.now()}-escalate`,
+              sender: 'bot',
+              content: 'Ticket escalated to L2 support.',
+              type: 'info',
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          setPendingSolution(null); // Hide solution box if open
+        setTimelineRefresh(x => x + 1);
+      } catch (e) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `temp-${Date.now()}-escalate-error`,
+            sender: 'bot',
+              content: `Failed to escalate: ${e.message || e}`,
+              type: 'error',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+      return;
+    }
 
     // If user types a draft email request, open only the editor (no solution box)
     if (DRAFT_EMAIL_OPEN_EMPTY_RE.test(text) || DRAFT_EMAIL_WITH_SOLUTION_RE.test(text) || GENERIC_DRAFT_EMAIL_RE.test(text)) {
@@ -2018,77 +2181,152 @@ const openDraftEditor = (prefill) => {
   // =========================
   // Render
   // =========================
-return (
-  <>
-    {showKB && <KBDashboard open={showKB} onClose={() => setShowKB(false)} />}
+  return (
+    <>
+      {showKB && <KBDashboard open={showKB} onClose={() => setShowKB(false)} />}
 
-    <div
-      className={`flex flex-col h-full min-h-screen w-full ${darkMode ? "dark" : ""} ${className} bg-white dark:bg-black transition-colors`}
-    >
-      <TicketHeader
-        ticket={ticket}
-        showKB={showKB}
-        setShowKB={setShowKB}
-        onBack={
-          parentThreadId
-            ? () => {
-                setActiveThreadId(parentThreadId);
-                setParentThreadId(null);
-              }
-            : onBack
-        }
-        onEscalate={() => handleAction("escalate")}
-        onClose={() => handleAction("close")}
-        actionLoading={actionLoading}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-      />
+      <div className={`flex flex-col h-full min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+        <TicketHeader
+          ticket={ticket}
+          showKB={showKB}
+          setShowKB={setShowKB}
+          onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
+          onEscalate={() => handleAction('escalate')}
+          onClose={() => handleAction('close')}
+          actionLoading={actionLoading}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
 
-      {/* Two columns: Left (Summary + Chat) | Right (Sidebar) */}
-      <div className="flex flex-col md:flex-row w-full max-w-[1600px] mx-auto md:gap-4">
-        {/* LEFT COLUMN */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Ticket Summary spans entire left column */}
-          <div className="flex-shrink-0 flex flex-col items-start w-full">
+        <div className="mx-4 md:mx-4 mt-0 md:grid md:grid-cols-12 md:gap-4">
+          {/* LEFT: Ticket + Chat */}
+          <div className="md:col-span-8 flex flex-col">
             <TicketInfoCard ticket={ticket} />
-          </div>
 
-          {/* Chat below summary */}
-          <div className="flex-1 flex flex-col relative min-w-0">
-            {/* Messages */}
-            <div
-              ref={scrollRef}
-              className="overflow-y-auto p-2 sm:p-4 space-y-4 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-              style={{
-                paddingBottom: "var(--composer-height, 120px)",
-                maxHeight: "calc(100vh - 260px)",
-                minHeight: "200px",
-              }}
-            >
-              {displayMessages.map((msg, i) => {
-                // ⬇️ keep your existing message rendering logic here (unchanged)
-                // return (...) for bot/system and user messages exactly as before
+            {/* CHAT PANEL (moved here) */}
+            <div className="flex-1 flex flex-col relative min-w-0">
+              {/* Messages */}
+              <div
+                ref={scrollRef}
+                className="overflow-y-auto p-2 sm:p-4 space-y-4 bg-[#F9FAFB] dark:bg-black scroll-smooth max-h-[calc(100vh-260px)] min-h-[200px]"
+                style={{ paddingBottom: 'var(--composer-height, 120px)' }}
+              >
+                {displayMessages.map((msg, i) => {
+                // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
+                if ((msg.sender === 'bot' || msg.sender === 'assistant' || msg.type === 'email') && typeof msg.content === 'string' && msg.content.trim().startsWith('Subject:')) {
+                  return null;
+                }
+                if (msg.type === 'solution') {
+                  // While the Proposed Solution panel is visible, keep solutions out of the stream.
+                  if (pendingSolution) return null;
+                  // After you dismiss (pendingSolution is null), show solution messages in-stream.
+                  // fall through and render like normal
+                }
+
+                const isUser = msg.sender === 'user';
+                const isBot = msg.sender === 'bot' || msg.sender === 'assistant';
+                const isSystem = msg.sender === 'system';
+                const isSystemEvent = [
+                  'not_fixed_feedback',
+                  'system',
+                  'diagnostics',
+                  'email_sent',
+                  'escalated',
+                  'closed',
+                  'deescalated',
+                  'step',
+                  'info',
+                  'event',
+                ].includes(msg.type);
+
+                let displayContent = toDisplayString(msg.content);
+                if (msg.downloadUrl && msg.downloadName) {
+                  displayContent = (
+                    <a href={msg.downloadUrl} download={msg.downloadName} className="underline text-blue-600">
+                      {msg.downloadName}
+                    </a>
+                  );
+                }
+
+                // Left-aligned for bot/system
+                if (isBot || isSystem || isSystemEvent) {
+                  let icon = '🤖';
+                  if (msg.type === 'not_fixed_feedback') icon = '🚫';
+                  if (msg.type === 'diagnostics') icon = '🧪';
+                  if (msg.type === 'email_sent') icon = '✉️';
+                  if (msg.type === 'escalated') icon = '🛠';
+                  if (msg.type === 'closed') icon = '🚫';
+                  if (msg.type === 'deescalated') icon = '↩️';
+                  if (msg.type === 'step') icon = '🪜';
+                  if (msg.type === 'info') icon = 'ℹ️';
+                  if (msg.type === 'event') icon = '📌';
+                  return (
+                    <div
+                      key={msg.id ?? i}
+                      ref={el => { if (el && msg.id) messageRefs.current[msg.id] = el; }}
+                      className="flex w-full group justify-start"
+                    >
+                      <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-3xl rounded-br-3xl rounded-tl-xl rounded-tr-lg border border-gray-200 dark:border-gray-700" style={{ padding: '12px 20px', margin: '4px 0', maxWidth: '75vw', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                        <div className="font-medium text-xs flex items-center gap-2 mb-1">
+                          <span>{icon}</span>
+                          <span className="inline-block align-middle text-[13px]">
+                            {typeof displayContent === 'string'
+                              ? renderListOrText(displayContent, (s) => renderContentWithMentions(s, handleMentionClick))
+                              : displayContent}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-400 dark:text-gray-300 text-right mt-2">
+                          {msg.timestamp ? dayjs(msg.timestamp).format('HH:mm') : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Right-aligned user messages
+                return (
+                  <div
+                    key={msg.id ?? i}
+                    ref={el => { if (el && msg.id) messageRefs.current[msg.id] = el; }}
+                    className={["flex w-full group", isUser ? 'justify-end' : 'justify-start'].join(' ')}
+                  >
+                    <div className={
+                      isUser
+                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 rounded-tr-3xl rounded-bl-3xl rounded-tl-xl rounded-br-lg'
+                        : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-3xl rounded-br-3xl rounded-tl-xl rounded-tr-lg'
+                    } style={{ padding: '12px 20px', margin: '4px 0', maxWidth: '75vw', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                      <div className="font-medium text-xs">
+                        <span className="inline-block align-middle text-[13px]">
+                          {typeof displayContent === 'string'
+                            ? renderListOrText(displayContent, (s) => renderContentWithMentions(s, handleMentionClick))
+                            : displayContent}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 dark:text-gray-300 text-right mt-2">
+                        {msg.timestamp ? dayjs(msg.timestamp).format('HH:mm') : ''}
+                      </div>
+                    </div>
+                  </div>
+                );
               })}
 
-              {/* Proposed Solution panel */}
-              <div ref={solutionPanelRef}>
-                <ProposedSolutionBox
-                  text={pendingSolution}
-                  onDraft={async () => {
-                    const sol =
-                      (await ensureSolutionThenGet()) ||
-                      getLastSolutionText() ||
-                      "";
-                    const emailBody = await draftFromBackendOrBuild(sol);
-                    setPendingSolution(null);
-                    openDraftEditor(emailBody);
-                  }}
-                  onDismiss={showPendingSolutionAsChatAndClear}
-                />
-              </div>
 
-              <div ref={scrollBottomRef} />
-            </div>
+                {/* Proposed Solution panel */}
+                <div ref={solutionPanelRef}>
+                  <ProposedSolutionBox
+                    text={pendingSolution}
+                    onDraft={async () => {
+                      const sol = (await ensureSolutionThenGet()) || getLastSolutionText() || '';
+                      const emailBody = await draftFromBackendOrBuild(sol);
+                      setPendingSolution(null);
+                      openDraftEditor(emailBody);
+                    }}
+                    onDismiss={showPendingSolutionAsChatAndClear}
+                  />
+                </div>
+
+                <div ref={scrollBottomRef} />
+              </div>
 
               {/* Draft Email Editor */}
               <DraftEmailEditor
@@ -2103,7 +2341,21 @@ return (
                 aiDraft={aiDraft}
                 showAIDisclaimer={showAIDisclaimer}
                 setShowAIDisclaimer={setShowAIDisclaimer}
-                onCancel={() => setShowDraftEditor(false)}
+                onCancel={() => {
+                  setShowDraftEditor(false);
+                  if (draftEditorBody) {
+                    setMessages(prev => [
+                      ...prev,
+                      {
+                        id: `temp-${tempIdRef.current++}`,
+                        sender: 'bot',
+                        content: draftEditorBody,
+                        type: 'draft_email',
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
+                  }
+                }}
               />
 
               {/* Composer */}
@@ -2118,36 +2370,38 @@ return (
             </div>
           </div>
 
-          {/* RIGHT SIDEBAR (sibling, not nested) */}
-          <aside className="hidden md:flex md:w-80 max-w-xs p-2 sticky top-0 flex-col gap-2">
-            <TimelinePanel
-              events={timeline}
-              loading={timelineLoading}
-              error={timelineError}
-              openSections={openSections}
-              toggleSection={toggleSection}
-            />
-            <RelatedTicketList
-              tickets={relatedTickets}
-              loading={relatedTicketsLoading}
-              error={relatedTicketsError}
-              onClick={handleRelatedTicketClick}
-              openSections={openSections}
-              toggleSection={toggleSection}
-            />
-            <SuggestedPrompts
-              threadId={tid}
-              prompts={suggestedPrompts}
-              open={panelOpen}
-              onToggle={() => setPanelOpen((v) => !v)}
-              apiBase={API_BASE}
-            />
-            <StepProgressBar stepInfo={stepInfo} />
-          </aside>
+          {/* RIGHT: Collapsibles */}
+          <div className="md:col-span-4 flex flex-col gap-2">
+            <div className="md:sticky md:top-20">
+              <TimelinePanel
+                events={timeline}
+                loading={timelineLoading}
+                error={timelineError}
+                openSections={openSections}
+                toggleSection={toggleSection}
+              />
+              <SuggestedPrompts
+                threadId={tid}
+                prompts={suggestedPrompts}
+                open={panelOpen}
+                onToggle={() => setPanelOpen(v => !v)}
+                apiBase={API_BASE}
+              />
+              <RelatedTicketList
+                tickets={relatedTickets}
+                loading={relatedTicketsLoading}
+                error={relatedTicketsError}
+                onClick={handleRelatedTicketClick}
+                openSections={openSections}
+                toggleSection={toggleSection}
+              />
+              <StepProgressBar stepInfo={stepInfo} />
+            </div>
+          </div>
         </div>
       </div>
     </>
   );
-
 }
+
 export default React.memo(ChatHistory);
