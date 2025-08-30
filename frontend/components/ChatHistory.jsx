@@ -10,7 +10,7 @@ dayjs.extend(relativeTime);
 // =========================
 // Config & helpers
 // =========================
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 
 
 const authHeaders = () => {
@@ -292,7 +292,7 @@ function SuggestedPrompts({
   prompts = [],
   open,
   onToggle,
-  apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000",
+  apiBase = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000",
 }) {
   const postChat = (body) =>
     fetch(`${apiBase}/threads/${threadId}/chat`, {

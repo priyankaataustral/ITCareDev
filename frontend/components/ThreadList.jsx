@@ -1,5 +1,5 @@
 // Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 // frontend/components/ThreadList.jsx
 import React, { useEffect, useState } from 'react';
 import Gate from './Gate';
@@ -73,7 +73,7 @@ export default function ThreadList({
       const out = {};
       for (const t of threads) {
         try {
-          const resp = await fetch('http://localhost:5000/summarize', {
+          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/summarize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: t.text || t.subject || '' }),

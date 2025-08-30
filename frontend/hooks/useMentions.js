@@ -8,7 +8,7 @@ export function useMentions(agentId) {
   useEffect(() => {
     if (!agentId) return;
     setLoading(true);
-    fetch(`http://localhost:5000/inbox/mentions/${agentId}`)
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/inbox/mentions/${agentId}`)
       .then(res => res.json())
       .then(data => {
         setMentions(data);
