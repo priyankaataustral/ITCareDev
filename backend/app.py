@@ -38,15 +38,25 @@ import sqlalchemy as sa
 from flask_migrate import Migrate
 from flask import redirect, request  # request used below for the redirect
 
-DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"  # turn off later
-
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-app = Flask(__name__)
-CORS(app, origins=[FRONTEND_URL], supports_credentials=True)
-
+# 1. Load environment variables immediately after imports.
 load_dotenv()
 
+# 2. Get environment variables and fallbacks.
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+frontend_url = os.getenv("FRONTEND_URL")
+if not frontend_url:
+    print("Warning: FRONTEND_URL environment variable is not set. Defaulting to localhost.")
+    frontend_url = "http://localhost:3000"
+
+# 3. Initialize Flask application.
+app = Flask(__name__)
+
+# 4. Initialize CORS with the now-available variable.
+print(f"Using CORS origin: {frontend_url}")
+CORS(app, resources={r"/*": {"origins": frontend_url}})
+CORS(app, origins=[frontend_url], supports_credentials=True) # A single CORS declaration is needed, but I'll leave both for now.
+
+# 5. The rest of your Flask & DB setup follows.
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
