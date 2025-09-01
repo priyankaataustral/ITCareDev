@@ -23,6 +23,10 @@ def create_app():
 
     # Load environment variables
     load_dotenv()
+
+    # Get environment variables
+    FRONTEND_URL = os.environ.get("FRONTEND_URL")
+    OPENAI_KEY = os.environ.get("OPENAI_KEY")
     
     # --- Application Configuration ---
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tickets.db')

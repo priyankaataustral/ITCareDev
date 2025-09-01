@@ -1,17 +1,30 @@
 import os
 from dotenv import load_dotenv
 
-# 1. Load environment variables immediately after imports.
+# Load environment variables immediately after imports.
 load_dotenv()
 
-# 2. Get environment variables and fallbacks.
+# Get environment variables and fallbacks.
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 if not FRONTEND_URL:
     print("Warning: FRONTEND_URL environment variable is not set. Defaulting to localhost.")
     FRONTEND_URL = "http://localhost:3000"
 
-# 5. The rest of your Flask & DB setup follows.
+# ─── Database Configuration ───────────────────────────────────────────────────
+# Use the DATABASE_URL environment variable for production (Azure MySQL)
+# Fallback to local SQLite for development
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    print("Using production MySQL database from environment variable.")
+else:
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tickets.db')
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.abspath(db_path)}"
+    print("Using local development SQLite database.")
+
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
