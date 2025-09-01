@@ -30,9 +30,12 @@ jobs:
           cd backend
           zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
 
-      - name: Debug zip contents
-        run: |
-          unzip -l site.zip | tail -n 40
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site.zip
+          retention-days: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -40,12 +43,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+            name: site
+            path: .
 
-      # (Re)create the flat zip from backend
-      - name: Package backend (flat zip)
+      - name: Debug downloaded artifact
         run: |
-          cd backend
-          zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
+          unzip -l site.zip | tail -n 40
+
+
 
       - name: Deploy to Azure Web App (ZipDeploy)
         uses: azure/webapps-deploy@v3
