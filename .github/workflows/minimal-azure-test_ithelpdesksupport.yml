@@ -40,16 +40,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # bring the artifact from build job (because we created site.zip there)
-      - name: Re-create zip (same as build)
+      # (Re)create the flat zip from backend
+      - name: Package backend (flat zip)
         run: |
           cd backend
           zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
 
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure Web App (ZipDeploy)
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: site.zip
+          type: zip            # 👈 force ZipDeploy instead of OneDeploy
           clean: true
+          restart: true        # 👈 restart app after deploy
