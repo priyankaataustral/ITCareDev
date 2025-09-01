@@ -19,19 +19,20 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # optional CI sanity (doesn't affect Azure build)
       - name: Install deps (backend)
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Debug show what will be deployed
+      - name: Package backend (flat zip)
         run: |
-          echo "Root:"
-          ls -la
-          echo "Backend:"
-          ls -la backend || true
-          echo "Top of backend/app.py:"
-          sed -n '1,80p' backend/app.py || true
+          cd backend
+          zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
+
+      - name: Debug zip contents
+        run: |
+          unzip -l site.zip | tail -n 40
 
   deploy:
     runs-on: ubuntu-latest
@@ -39,11 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # bring the artifact from build job (because we created site.zip there)
+      - name: Re-create zip (same as build)
+        run: |
+          cd backend
+          zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./backend
-          enable-oryx-build: true
-          startup-command: "gunicorn --bind=0.0.0.0:8000 'app:create_app()'"
+          package: site.zip
+          clean: true
