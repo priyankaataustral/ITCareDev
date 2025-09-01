@@ -206,7 +206,7 @@ def get_thread(thread_id):
 
     # Update last activity timestamp to now
     from datetime import datetime, timezone
-    t.updated_at = datetime.now(timezone.utc).isoformat()
+    t.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     ticket = {
         "id": thread_id,
@@ -304,7 +304,7 @@ def post_chat(thread_id):
         insert_message_with_mentions(thread_id, "user", text)
         user_msg_inserted = True
         from datetime import datetime, timezone
-        t.updated_at = datetime.now(timezone.utc).isoformat()
+        t.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
     # Greeting detection
@@ -562,7 +562,7 @@ def escalate_ticket(thread_id):
     to_level = 2 if old == 1 else 3
     ticket.level = to_level
     ticket.status = 'escalated'
-    ticket.updated_at = datetime.now(timezone.utc).isoformat()
+    ticket.updated_at = datetime.now(timezone.utc)
     add_event(ticket.id, 'ESCALATED', actor_agent_id=None, from_level=old, to_level=to_level)
     db.session.commit()
     insert_message_with_mentions(thread_id, "assistant", f"🚀 Ticket escalated to L{to_level} support.")
@@ -704,7 +704,7 @@ def claim_ticket(thread_id):
 
     # 4) set owner field (legacy UI)
     ticket.owner = agent_name
-    ticket.updated_at = datetime.utcnow().isoformat()
+    ticket.updated_at = datetime.utcnow()
     db.session.commit()
 
     # 5) log event + system message
@@ -1206,7 +1206,7 @@ def override_department(thread_id):
     t = db.session.get(Ticket, thread_id) or abort(404)
     old = t.department_id
     t.department_id = d.id
-    t.updated_at = datetime.utcnow().isoformat()
+    t.updated_at = datetime.utcnow()
     db.session.commit()
 
     actor = getattr(getattr(request, "agent_ctx", {}), "get", lambda _:"")( "email")
@@ -1234,7 +1234,7 @@ def auto_route(thread_id):
         return jsonify(routed=False, reason="no mapping"), 200
 
     t.department_id = dep_id
-    t.updated_at = datetime.utcnow().isoformat()
+    t.updated_at = datetime.utcnow()
     db.session.commit()
     log_event(thread_id, "ROUTED", {"department_id": dep_id, "mode": "auto"})
     return jsonify(routed=True, department_id=dep_id)
@@ -1409,7 +1409,7 @@ def confirm_solution_via_link():
             old = t.level or 1
             t.level = max(old, nxt.get("to_level", old+1))
             t.status = "escalated"
-            t.updated_at = datetime.utcnow().isoformat()
+            t.updated_at = datetime.utcnow()
             db.session.commit()
             log_event(s.ticket_id, "ESCALATED", {"auto": True, "policy": "after_not_fixed", "from_level": old, "to_level": t.level})
             _inject_system_message(s.ticket_id, f"Auto-escalated to L{t.level} after Not fixed.")
@@ -1638,7 +1638,7 @@ def submit_feedback(thread_id):
         t = db.session.get(Ticket, thread_id)
         if t:
             t.status = "open"
-            t.updated_at = datetime.utcnow().isoformat()
+            t.updated_at = datetime.utcnow()
 
     db.session.commit()
     return jsonify(ok=True), 200

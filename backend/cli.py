@@ -58,8 +58,8 @@ def register_cli_commands(app):
                         impact_level=row.get("impact_level", ""),
                         urgency_level=row.get("urgency_level", ""),
                         requester_email=row.get("email", ""),
-                        created_at=row.get("created_at", datetime.now(timezone.utc).isoformat()),
-                        updated_at=row.get("updated_at", datetime.now(timezone.utc).isoformat())
+                        created_at=row.get("created_at", datetime.now(timezone.utc)),
+                        updated_at=row.get("updated_at", datetime.now(timezone.utc))
                     )
                     db.session.add(t)
                     hydrated_count += 1

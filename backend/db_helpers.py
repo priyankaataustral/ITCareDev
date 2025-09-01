@@ -410,7 +410,7 @@ def log_event(ticket_id: str, event_type: str, details: dict | None = None, acto
         event_type=event_type,
         actor_agent_id=actor_agent_id,
         details=json.dumps(details or {}),
-        created_at=datetime.utcnow().isoformat()
+    created_at=datetime.utcnow()
     )
     db.session.add(ev)
     db.session.commit()

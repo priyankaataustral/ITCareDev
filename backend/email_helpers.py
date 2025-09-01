@@ -41,7 +41,7 @@ def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
         subject=subject,
         body=body,
         status='PENDING',
-        created_at=datetime.utcnow().isoformat()
+    created_at=datetime.utcnow()
     )
     db.session.add(q)
     db.session.commit()

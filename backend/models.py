@@ -223,7 +223,7 @@ class TicketEvent(db.Model):
     event_type = db.Column(db.String, nullable=False)
     actor_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
     details = db.Column(db.Text)
-    created_at = db.Column(db.String, default=lambda: datetime.now(timezone.utc).isoformat())
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     __table_args__ = (
         db.Index('ix_ticket_events_ticket_created', 'ticket_id', 'created_at'),
     )
