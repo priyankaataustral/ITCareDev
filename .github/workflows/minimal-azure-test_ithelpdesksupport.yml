@@ -40,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+
       # (Re)create the flat zip from backend
       - name: Package backend (flat zip)
         run: |
@@ -55,3 +56,4 @@ jobs:
           type: zip            # 👈 force ZipDeploy instead of OneDeploy
           clean: true
           restart: true        # 👈 restart app after deploy
+          startup-command: gunicorn --bind=0.0.0.0:8000 "run:app"
