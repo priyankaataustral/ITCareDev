@@ -25,7 +25,7 @@ project-root/
 │   ├── requirements.txt      # Python dependencies
 │   ├── extensions.py         # db, migrate, and other extensions
 │   ├── models.py             # SQLAlchemy models
-│   ├── routes_*.py           # Flask blueprints/routes
+│   ├── routes_*.py           # licensing schema routes
 │   ├── urls.py               # Main blueprint and API endpoints
 │   ├── db_helpers.py         # DB helper functions
 │   ├── openai_helpers.py     # OpenAI integration
