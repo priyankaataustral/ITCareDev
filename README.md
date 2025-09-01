@@ -46,7 +46,7 @@ project-root/
 ## Setup Instructions
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.12
 - Node.js 16+
 - (Optional) OpenAI API key
 
