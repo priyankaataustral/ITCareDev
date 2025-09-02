@@ -12,12 +12,18 @@ if not FRONTEND_URL:
     FRONTEND_URL = "http://localhost:3000"
 
 # ─── Database Configuration ───────────────────────────────────────────────────
+
+# Example Azure MySQL Flexible Server connection string:
+# mysql+pymysql://<username>:<password>@<hostname>:3306/<database>?ssl_mode=REQUIRED
+# Example:
+# mysql+pymysql://szdqtomhah:your-password@ithelpdesksupport-server.mysql.database.azure.com:3306/your-db-name?ssl_mode=REQUIRED
+
 # Use the DATABASE_URL environment variable for production (Azure MySQL)
 # Fallback to local SQLite for development
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
-    print("Using production MySQL database from environment variable.")
+    print(f"Using production database from environment variable: {DATABASE_URL}")
 else:
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tickets.db')
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.abspath(db_path)}"
