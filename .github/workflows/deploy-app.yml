@@ -30,8 +30,8 @@ jobs:
           ls -la
           echo "Backend:"
           ls -la backend || true
-          echo "Top of backend/app.py:"
-          sed -n '1,80p' backend/app.py || true
+          echo "Top of backend/run.py:"
+          sed -n '1,80p' backend/run.py || true
 
   deploy:
     runs-on: ubuntu-latest
