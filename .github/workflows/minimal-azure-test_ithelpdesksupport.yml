@@ -20,7 +20,7 @@ jobs:
         working-directory: backend
         run: rm -rf .python_packages
 
-      # Install PyTorch CPU wheel that exists for Py 3.12
+      # ✅ Install a known-good PyTorch CPU wheel for Py3.12
       - name: Preinstall torch (CPU) into .python_packages
         working-directory: backend
         run: |
@@ -30,16 +30,24 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             torch==2.2.2
 
-      # Install the rest as portable manylinux wheels (avoid GLIBC issues)
+      # ✅ Create a constraints file so resolver keeps torch at 2.2.2
+      - name: Write constraints
+        working-directory: backend
+        run: |
+          echo "torch==2.2.2" > constraints.txt
+
+      # ✅ Install the rest with portable wheels; include PyTorch index so resolver can find torch if needed
       - name: Install deps into .python_packages (manylinux_2_17)
         working-directory: backend
         run: |
           pip install --upgrade --no-cache-dir --only-binary=:all: \
             --platform manylinux_2_17_x86_64 --implementation cp --python-version 3.12 --abi cp312 \
+            --extra-index-url https://download.pytorch.org/whl/cpu \
+            --constraint constraints.txt \
             --target ./.python_packages/lib/site-packages \
             -r requirements.txt
 
-      # Safety: ensure no Python2 uuid backport slipped in
+      # Safety: ensure no Python2 'uuid' backport sneaks in
       - name: Remove uuid backport if present
         working-directory: backend
         run: |
