@@ -20,7 +20,7 @@ jobs:
         working-directory: backend
         run: rm -rf .python_packages
 
-      # ✅ Install a known-good PyTorch CPU wheel for Py3.12
+      # 1) Preinstall a known-good PyTorch CPU wheel for Py3.12
       - name: Preinstall torch (CPU) into .python_packages
         working-directory: backend
         run: |
@@ -30,31 +30,29 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             torch==2.2.2
 
-      # ✅ Create a constraints file so resolver keeps torch at 2.2.2
+      # 2) Lock torch so the resolver doesn't try to touch it
       - name: Write constraints
         working-directory: backend
-        run: |
-          echo "torch==2.2.2" > constraints.txt
+        run: echo "torch==2.2.2" > constraints.txt
 
-      # ✅ Install the rest with portable wheels; include PyTorch index so resolver can find torch if needed
-      - name: Install deps into .python_packages (manylinux_2_17)
+      # 3) Install the rest (NO --platform/--abi flags), still allow the torch index
+      - name: Install deps into .python_packages
         working-directory: backend
         run: |
           pip install --upgrade --no-cache-dir --only-binary=:all: \
-            --platform manylinux_2_17_x86_64 --implementation cp --python-version 3.12 --abi cp312 \
             --extra-index-url https://download.pytorch.org/whl/cpu \
             --constraint constraints.txt \
             --target ./.python_packages/lib/site-packages \
             -r requirements.txt
 
-      # Safety: ensure no Python2 'uuid' backport sneaks in
+      # Safety: ensure no Python-2 uuid backport slipped in
       - name: Remove uuid backport if present
         working-directory: backend
         run: |
           rm -f ./.python_packages/lib/site-packages/uuid.py \
                 ./.python_packages/lib/site-packages/uuid.pyc || true
 
-      # Zip the *contents* of backend so run.py, requirements.txt, .python_packages are at ZIP ROOT
+      # 4) Create deployable zip with backend contents at the ZIP ROOT
       - name: Create deployment zip
         working-directory: backend
         run: zip -r ../app.zip .
