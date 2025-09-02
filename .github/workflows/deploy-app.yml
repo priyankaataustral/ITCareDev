@@ -28,6 +28,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Create package directory
+        run: mkdir -p build_package
+
+      - name: Copy backend files
+        run: |
+            cp -R backend/. ./build_package
+            cp -R backend/.* ./build_package || true
+
       - name: Package backend (flat zip)
         run: |
           cd backend
