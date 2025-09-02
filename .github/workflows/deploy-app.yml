@@ -31,9 +31,7 @@ jobs:
       - name: Package backend (flat zip)
         run: |
           cd backend
-          # This command now zips the *contents* of the backend folder,
-          # not the folder itself.
-          zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
+          zip -r ../site.zip . -x "venv/*" "__pycache__/*" ".git/*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -47,17 +45,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
-
+      
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: site
           path: .
-
-      - name: Debug downloaded artifact
-        run: |
-          unzip -l site.zip | tail -n 40
 
       - name: Deploy to Azure Web App (ZipDeploy)
         uses: azure/webapps-deploy@v3
@@ -67,5 +60,4 @@ jobs:
           package: site.zip
           clean: true
           restart: true
-          # The startup-command and type: zip inputs are not supported
-          # for publish-profile authentication.
+
