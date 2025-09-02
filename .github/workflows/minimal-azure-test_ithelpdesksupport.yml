@@ -21,19 +21,17 @@ jobs:
         working-directory: backend
         run: rm -rf .python_packages
 
-      # IMPORTANT: Vendor ONLY portable manylinux wheels (no local glibc tie)
-      # This avoids the GLIBC_2.33 error from cryptography/_rust.abi3.so
-      - name: Install deps as manylinux wheels into .python_packages
+      # Vendor compatible wheels (avoid GLIBC issues)
+      - name: Install deps into .python_packages (manylinux_2_17)
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          # Use cross-platform install so pip downloads manylinux_2_28 wheels
-          pip install --upgrade --only-binary=:all: \
-            --platform manylinux_2_28_x86_64 --implementation cp --python-version 3.12 --abi cp312 \
+          pip install --upgrade --no-cache-dir --only-binary=:all: \
+            --platform manylinux_2_17_x86_64 --implementation cp --python-version 3.12 --abi cp312 \
             --target ./.python_packages/lib/site-packages \
             -r requirements.txt
 
-      # Safety: ensure no Python2 'uuid' backport shadows stdlib
+      # Safety: ensure no Python-2 uuid backport shadows stdlib
       - name: Remove uuid backport if present
         working-directory: backend
         run: |
