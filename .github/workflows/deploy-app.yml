@@ -1,16 +1,14 @@
-name: Build and deploy Python app to Azure Web App
 
+name: Build and deploy Python app to Azure Web App
 
 env:
   AZURE_WEBAPP_NAME: ITHelpDeskSupport
   PYTHON_VERSION: '3.12'
 
-
 on:
   push:
     branches: [ minimal-azure-test ]
   workflow_dispatch:
-
 
 jobs:
   build:
@@ -22,24 +20,14 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # optional CI sanity (doesn't affect Azure build)
-      - name: Install deps (backend)
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Create package directory
-        run: mkdir -p build_package
-
-      - name: Copy backend files
+      - name: Package backend
         run: |
-            cp -R backend/. ./build_package
-            cp -R backend/.* ./build_package || true
-
-      - name: Package backend (flat zip)
-        run: |
-          cd backend
-          zip -r ../site.zip . -x "venv/*" "__pycache__/*" ".git/*"
+          zip -j site.zip backend/*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -48,12 +36,10 @@ jobs:
           path: site.zip
           retention-days: 1
 
-
   deploy:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
