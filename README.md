@@ -42,6 +42,7 @@ project-root/
 ├── static/                   # Frontend static files
 └── README.md
 ```
+llll
 
 ## Setup Instructions
 
