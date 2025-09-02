@@ -20,7 +20,7 @@ jobs:
         working-directory: backend
         run: rm -rf .python_packages
 
-      # 1) Preinstall a known-good PyTorch CPU wheel
+      # 1) Install a known-good PyTorch CPU wheel for Py3.12
       - name: Preinstall torch (CPU) into .python_packages
         working-directory: backend
         run: |
@@ -30,14 +30,29 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             torch==2.2.2
 
-      # 2) Lock torch so resolver doesn’t try to change it
+      # 2) Lock torch so the resolver won't try to change it
       - name: Write constraints
         working-directory: backend
         run: echo "torch==2.2.2" > constraints.txt
 
-      # 3) Install the rest as **portable** manylinux_2_17 wheels
-      #    Keep the PyTorch index + constraint so sentence-transformers stays happy
-      - name: Install deps into .python_packages (manylinux_2_17)
+      # 3) Install sentence-transformers WITHOUT deps (so it won't re-pull torch)
+      - name: Install sentence-transformers (no-deps)
+        working-directory: backend
+        run: |
+          pip install --no-cache-dir --only-binary=:all: \
+            --target ./.python_packages/lib/site-packages \
+            sentence-transformers==5.0.0 --no-deps
+
+      # 4) Install the REST of requirements (exclude torch & sentence-transformers),
+      #    as manylinux_2_17 wheels to avoid GLIBC issues from cryptography
+      - name: Make filtered requirements (exclude torch & sentence-transformers)
+        working-directory: backend
+        run: |
+          grep -viE '^(torch|sentence-transformers)(==|>=|<=|~=|>|<)' requirements.txt > req.filtered.txt
+          echo "Using filtered requirements:"
+          cat req.filtered.txt
+
+      - name: Install remaining deps into .python_packages (manylinux_2_17)
         working-directory: backend
         run: |
           pip install --upgrade --no-cache-dir --only-binary=:all: \
@@ -45,16 +60,16 @@ jobs:
             --extra-index-url https://download.pytorch.org/whl/cpu \
             --constraint constraints.txt \
             --target ./.python_packages/lib/site-packages \
-            -r requirements.txt
+            -r req.filtered.txt
 
-      # Safety: ensure no Python2 uuid backport sneaks in
+      # Safety: ensure no Python2 'uuid' backport ever sneaks in
       - name: Remove uuid backport if present
         working-directory: backend
         run: |
           rm -f ./.python_packages/lib/site-packages/uuid.py \
                 ./.python_packages/lib/site-packages/uuid.pyc || true
 
-      # 4) Zip the *contents* of backend so files are at ZIP ROOT
+      # 5) Zip the *contents* of backend so files are at the ZIP ROOT
       - name: Create deployment zip
         working-directory: backend
         run: zip -r ../app.zip .
