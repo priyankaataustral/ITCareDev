@@ -43,8 +43,27 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             sentence-transformers==5.0.0 --no-deps
 
-      # 4) Install the REST of requirements (exclude torch & sentence-transformers),
-      #    as manylinux_2_17 wheels to avoid GLIBC issues from cryptography
+      # Ensure Flask-Cors is present (the missing import you saw)
+      - name: Ensure Flask-Cors is vendored
+        working-directory: backend
+        run: |
+          pip install --no-cache-dir --only-binary=:all: \
+            --target ./.python_packages/lib/site-packages \
+            flask-cors==6.0.1
+
+      - name: Verify flask_cors present
+        working-directory: backend
+        shell: bash
+        run: |
+          python - <<'PY'
+            import os
+            p = ".python_packages/lib/site-packages/flask_cors"
+            print("flask_cors:", "FOUND" if os.path.isdir(p) else "MISSING")
+            PY
+          ls -ld ./.python_packages/lib/site-packages/flask_cors || true
+
+      # 4) Install the REST of requirements (exclude torch & sentence-transformers)
+      #    as portable manylinux_2_17 wheels to avoid GLIBC issues
       - name: Make filtered requirements (exclude torch & sentence-transformers)
         working-directory: backend
         run: |
@@ -81,3 +100,9 @@ jobs:
           slot-name: 'production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: app.zip
+          startup-command: >-
+            python -m gunicorn
+            --chdir /home/site/wwwroot
+            --pythonpath /home/site/wwwroot/.python_packages/lib/site-packages
+            -w 2 -k gthread --threads 8 --timeout 120
+            -b 0.0.0.0:8000 run:app
