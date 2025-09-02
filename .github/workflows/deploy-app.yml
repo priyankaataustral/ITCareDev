@@ -36,7 +36,8 @@ jobs:
       - name: Package backend (ZipDeploy)
         run: |
           cd backend
-          zip -r ../site.zip . -x "**/.git/**" "**/__pycache__/**"
+          zip -r ../site.zip . \
+            -x "**/.git/**" "**/__pycache__/**" "*.tar.gz" "*.zip" "*.db" "*.pkl" "data/large_folder/**" "faiss_index.bin" "faiss_meta.json" "classifier.pkl"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
