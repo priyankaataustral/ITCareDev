@@ -11,32 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # Install ALL backend deps into the app folder (portable)
-      - name: Vendor dependencies into .python_packages
+      # Vendor deps into the package (no Oryx required)
+      - name: Install deps into .python_packages
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install --target ./.python_packages/lib/site-packages -r requirements.txt
 
-      # Create a single deployable zip where the ZIP ROOT contains run.py, app.py, requirements.txt, and .python_packages
+      # Zip the *contents* of backend so run.py, app.py, requirements.txt, .python_packages are at ZIP ROOT
       - name: Create deployment zip
         working-directory: backend
         run: |
-          zip -r ../app.zip .  # zips the *contents* of backend (good)
+          zip -r ../app.zip .
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_15FD0CEF8FBA4AA484B5AAADADC11B41 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F0F24001AF8D434FA7EC3E96B1C3DE60 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_657C17FD236742CD93B8BAFEDF472CEA }}
-
-      - name: Deploy to Azure Web App (zip)
+      - name: Deploy to Azure Web App (publish profile)
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'ITHelpDeskSupport'
