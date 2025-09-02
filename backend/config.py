@@ -11,14 +11,8 @@ if not FRONTEND_URL:
     print("Warning: FRONTEND_URL environment variable is not set. Defaulting to localhost.")
     FRONTEND_URL = "http://localhost:3000"
 
-# ─── Database Configuration ───────────────────────────────────────────────────
 
-# Example Azure MySQL Flexible Server connection string:
-# mysql+pymysql://<username>:<password>@<hostname>:3306/<database>?ssl_mode=REQUIRED
-# Example:
-# mysql+pymysql://szdqtomhah:your-password@ithelpdesksupport-server.mysql.database.azure.com:3306/your-db-name?ssl_mode=REQUIRED
 
-# Use the DATABASE_URL environment variable for production (Azure MySQL)
 # Fallback to local SQLite for development
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
