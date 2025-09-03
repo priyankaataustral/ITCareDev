@@ -97,10 +97,5 @@ jobs:
           slot-name: 'production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: app.zip
-          startup-command: >-
-            python -m gunicorn
-            --chdir /home/site/wwwroot
-            --pythonpath /home/site/wwwroot/.python_packages/lib/site-packages
-            -w 2 -k gthread --threads 8 --timeout 120
-            -b 0.0.0.0:8000 run:app
+
 
