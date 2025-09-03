@@ -55,12 +55,9 @@ jobs:
         working-directory: backend
         shell: bash
         run: |
-          python - <<'PY'
-            import os
-            p = ".python_packages/lib/site-packages/flask_cors"
-            print("flask_cors:", "FOUND" if os.path.isdir(p) else "MISSING")
-            PY
+          python -c 'import os; p=".python_packages/lib/site-packages/flask_cors"; print("flask_cors:", "FOUND" if os.path.isdir(p) else "MISSING")'
           ls -ld ./.python_packages/lib/site-packages/flask_cors || true
+
 
       # 4) Install the REST of requirements (exclude torch & sentence-transformers)
       #    as portable manylinux_2_17 wheels to avoid GLIBC issues
@@ -106,3 +103,4 @@ jobs:
             --pythonpath /home/site/wwwroot/.python_packages/lib/site-packages
             -w 2 -k gthread --threads 8 --timeout 120
             -b 0.0.0.0:8000 run:app
+
