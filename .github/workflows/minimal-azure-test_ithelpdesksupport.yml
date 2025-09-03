@@ -86,6 +86,22 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             -r req.filtered.txt
 
+      - name: Sanity-check imports (fail fast if missing)
+          working-directory: backend
+          shell: bash
+          run: |
+            set -e
+            PKGDIR=".python_packages/lib/site-packages"
+            for m in flask_cors dotenv openai jwt pymysql sqlalchemy faiss sklearn numpy cryptography; do
+              echo "Checking $m..."
+              python -c "import sys; sys.path.insert(0, '${PKGDIR}'); import ${m}" \
+                || { echo "❌ Missing or broken import: ${m}"; exit 1; }
+            done
+            echo "✅ All sanity imports OK"
+            pip list --format=freeze > ./.python_packages/INSTALLED.txt
+
+      
+
       # Safety: ensure no Python2 'uuid' backport ever sneaks in
       - name: Remove uuid backport if present
         working-directory: backend
@@ -105,6 +121,7 @@ jobs:
           slot-name: 'production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: app.zip
+
 
 
 
