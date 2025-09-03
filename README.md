@@ -60,7 +60,7 @@ venv\Scripts\activate  # On Windows
 pip install -r requirements.txt
 ```
 
-dlslkokjij
+dlslkokjijdfef
 ### Frontend Setup
 ```bash
 cd ../frontend
