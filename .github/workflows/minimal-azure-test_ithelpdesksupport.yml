@@ -1,21 +1,28 @@
-name: Build and deploy Python app to Azure Web App - ITHelpDeskSupport
+name: Deploy backend to Azure Web App (Option A - Oryx on server)
 
 on:
   push:
     branches: [ minimal-azure-test ]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-ithelpdesksupport
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
       # Zip the CONTENTS of backend so requirements.txt is at the ZIP ROOT
       - name: Create deployment zip
-        run: (cd backend && zip -r ../app.zip .)
+        run: |
+          cd backend
+          zip -r ../app.zip .
 
-      - name: Deploy to Azure Web App (publish profile)
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ITHelpDeskSupport
