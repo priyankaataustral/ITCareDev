@@ -46,4 +46,4 @@ Thumbs.db
 # Backups mistakenly added
 backup-*.git/
 
-/e/Austral Dynamics/ai-support-assistant-clean/:
+/e/Austral Dynamics/ai-support-assistant-clean/:*
