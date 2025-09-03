@@ -59,6 +59,14 @@ jobs:
             --target ./.python_packages/lib/site-packages \
             python-dotenv==1.1.1
 
+      - name: Ensure openai is vendored
+        working-directory: backend
+        run: |
+          pip install --no-cache-dir \
+            --target ./.python_packages/lib/site-packages \
+            openai==1.97.1
+
+
       - name: Verify flask_cors present
         working-directory: backend
         shell: bash
@@ -118,3 +126,4 @@ jobs:
           slot-name: "production"
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           package: app.zip
+
