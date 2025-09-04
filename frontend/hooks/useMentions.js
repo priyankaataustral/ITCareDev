@@ -8,14 +8,8 @@ export function useMentions(agentId) {
   useEffect(() => {
     if (!agentId) return;
     setLoading(true);
-    const token = localStorage.getItem('authToken');
-    fetch(`http://localhost:5000/inbox/mentions/${agentId}`, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        return res.json();
-      })
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/inbox/mentions/${agentId}`)
+      .then(res => res.json())
       .then(data => {
         setMentions(data);
         setLoading(false);

@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
 
 export default function ConfirmPage() {
   const [loading, setLoading] = useState(true);

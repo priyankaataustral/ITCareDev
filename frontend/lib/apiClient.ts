@@ -1,9 +1,7 @@
-// apiClient.ts
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 
 export function getToken() {
   if (typeof window === "undefined") return "";
-  // unify this with your login flow: "token" or "authToken" or "jwt"
   return localStorage.getItem("token") || "";
 }
 
@@ -20,9 +18,14 @@ async function handle<T>(res: Response): Promise<T> {
     let message = `${res.status} ${res.statusText}`;
     try {
       const body = isJson ? await res.json() : await res.text();
-      if (body && typeof body === "object" && "error" in body) message = (body as any).error;
-      else if (typeof body === "string" && body.trim()) message = body;
-    } catch {}
+      if (typeof body === "object" && body !== null && "error" in body) {
+        message = (body as { error: string }).error;
+      } else if (typeof body === "string" && body.trim()) {
+        message = body;
+      }
+    } catch {
+      /* ignore */
+    }
     throw new Error(message);
   }
 
@@ -49,7 +52,7 @@ export async function apiGet<T>(path: string, init?: RequestInit) {
   return handle<T>(res);
 }
 
-export async function apiPost<T>(path: string, body?: any, init?: RequestInit) {
+export async function apiPost<T>(path: string, body?: unknown, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     credentials: "include",
@@ -60,7 +63,7 @@ export async function apiPost<T>(path: string, body?: any, init?: RequestInit) {
   return handle<T>(res);
 }
 
-export async function apiPatch<T>(path: string, body?: any, init?: RequestInit) {
+export async function apiPatch<T>(path: string, body?: unknown, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
     credentials: "include",
