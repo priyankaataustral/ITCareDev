@@ -9,6 +9,7 @@ from config import OPENAI_KEY
 from config import FRONTEND_URL
 from extensions import db, migrate
 from cli import register_cli_commands
+from config import SQLALCHEMY_DATABASE_URI
 
 
 def create_app():
@@ -28,8 +29,7 @@ def create_app():
     OPENAI_KEY = os.environ.get("OPENAI_KEY")
     
     # --- Application Configuration ---
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tickets.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.abspath(db_path)}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize extensions
