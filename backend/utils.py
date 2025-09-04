@@ -60,7 +60,10 @@ def require_role(*allowed):
                 user = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             except Exception:
                 return jsonify(error="invalid token"), 401
-            if allowed and user.get("role") not in allowed:
+            # Case-insensitive role check
+            user_role = (user.get("role") or "").upper()
+            allowed_upper = [r.upper() for r in allowed]
+            if allowed and user_role not in allowed_upper:
                 return jsonify(error="forbidden"), 403
             request.agent_ctx = user
             return fn(*args, **kwargs)

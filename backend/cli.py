@@ -19,7 +19,7 @@ def load_df():
     """
     Loads data from the specified CSV file into a pandas DataFrame.
     """
-    return pd.read_csv(DATA_PATH, dtype=str)
+    return pd.read_csv(DATA_PATH, dtype=str, encoding="latin1")
 
 def register_cli_commands(app):
     """

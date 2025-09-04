@@ -79,6 +79,10 @@ def list_threads():
         status        = getattr(t, "status", "open") if t else "open"
         level         = getattr(t, "level", 1) if t else 1
         department    = {"id": department_id, "name": dept_map.get(department_id)} if department_id else None
+        # Check if ticket has been escalated (has at least one ESCALATED event)
+        escalated = False
+        if t:
+            escalated = TicketEvent.query.filter_by(ticket_id=t.id, event_type="ESCALATED").count() > 0
         threads_all.append({
             **row,
             "predicted_category": cat,
@@ -87,7 +91,8 @@ def list_threads():
             "updated_at": updated_at,
             "department_id": department_id,
             "department": department,
-            "level": level
+            "level": level,
+            "escalated": escalated
         })
 
     # Role-based filtering

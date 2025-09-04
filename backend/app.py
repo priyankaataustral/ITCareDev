@@ -25,7 +25,6 @@ def create_app():
     load_dotenv()
 
     # Get environment variables
-    FRONTEND_URL = os.environ.get("FRONTEND_URL")
     OPENAI_KEY = os.environ.get("OPENAI_KEY")
     
     # --- Application Configuration ---
@@ -38,8 +37,9 @@ def create_app():
     migrate.init_app(app, db)
     
     # Configure CORS
-    CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
+    # CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
     CORS(app, origins=[FRONTEND_URL], supports_credentials=True)
+    print(f"✅ CORS enabled for {FRONTEND_URL}")
 
     # Initialize OpenAI client (can be done here or in a separate module)
     app.config['OPENAI_CLIENT'] = OpenAI(api_key=OPENAI_KEY)

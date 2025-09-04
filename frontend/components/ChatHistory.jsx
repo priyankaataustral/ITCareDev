@@ -166,12 +166,14 @@ function TicketInfoCard({ ticket }) {
           {(ticket.created || ticket.created_at) && <div>🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
           {ticket.text && <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{ticket.text}</div>}
         </div>
-        <button
-          onClick={handleDownloadSummary}
-          className="mt-3 px-3 py-1 rounded-full bg-indigo-500 text-white text-sm shadow hover:bg-indigo-600"
-        >
-          ⬇️ Download Summary
-        </button>
+        {ticket.escalated && (
+          <button
+            onClick={handleDownloadSummary}
+            className="mt-3 px-3 py-1 rounded-full bg-indigo-500 text-white text-sm shadow hover:bg-indigo-600"
+          >
+            ⬇️ Download Summary
+          </button>
+        )}
       </div>
     </div>
   );
