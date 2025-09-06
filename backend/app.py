@@ -5,11 +5,9 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
-from config import OPENAI_KEY
-from config import FRONTEND_URL
 from extensions import db, migrate
 from cli import register_cli_commands
-from config import SQLALCHEMY_DATABASE_URI
+from config import FRONTEND_URL, SQLALCHEMY_DATABASE_URI
 
 
 def create_app():
@@ -49,11 +47,11 @@ def create_app():
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
 
-    # --- Start email worker thread ---
-    from urls import email_worker_loop
-    start_worker = os.environ.get("RUN_EMAIL_WORKER", "1") == "1"
-    if start_worker:
-        # We start the worker after the app context is available
-        threading.Thread(target=lambda: email_worker_loop(app), daemon=True).start()
+    # # --- Start email worker thread ---
+    # from urls import email_worker_loop
+    # start_worker = os.environ.get("RUN_EMAIL_WORKER", "1") == "1"
+    # if start_worker:
+    #     # We start the worker after the app context is available
+    #     threading.Thread(target=lambda: email_worker_loop(app), daemon=True).start()
 
     return app

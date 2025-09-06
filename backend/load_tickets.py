@@ -1,19 +1,22 @@
 import pandas as pd
-import sqlite3
+from sqlalchemy import create_engine
 
-# 1. Point to your CSV (in the same folder)
+# 1. Get the database URL from your environment variable
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# 2. Point to your CSV (in the same folder)
 df = pd.read_csv("data/cleaned_tickets.csv", encoding="latin1")
 
-# 2. Connect to your database
-conn = sqlite3.connect("tickets.db")
+# 3. Create a database engine using the DATABASE_URL
+engine = create_engine(DATABASE_URL)
 
-# 3. Append to the 'ticket' table
+# 4. Append to the 'ticket' table
 df.to_sql(
     name="test",
-    con=conn,
+    con=engine,
     if_exists="append",  # or "replace" if you want to wipe & reload entirely
     index=False
 )
 
-conn.close()
-print(f"✅ Loaded {len(df)} rows into 'ticket'")
+print(f"✅ Loaded {len(df)} rows into 'test' table")

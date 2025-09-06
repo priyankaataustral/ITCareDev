@@ -175,7 +175,8 @@ def download_ticket_summary(thread_id):
     allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.0.17:3000",  # Add any other dev IPs here
+        "http://192.168.0.17:3000",  
+        "https://delightful-tree-0a2bac000.1.azurestaticapps.net",
     ]
     origin = request.headers.get("Origin")
     if origin in allowed_origins:
@@ -961,7 +962,9 @@ def after_request(response):
     allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://192.168.0.17:3000",  # Add any other dev IPs here
+        "http://192.168.0.17:3000",
+        "https://delightful-tree-0a2bac000.1.azurestaticapps.net",
+      
     ]
     origin = request.headers.get("Origin")
     if origin in allowed_origins:

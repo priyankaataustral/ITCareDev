@@ -45,63 +45,64 @@ class KBFeedbackType(enum.Enum):
     not_helpful = "not_helpful"
     issue = "issue"
 
+class Department(db.Model):
+    __tablename__ = 'departments'
+    id   = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
+class Agent(db.Model):
+    __tablename__ = 'agents'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    password = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(10), default='L1')  # L1, L2, L3, MANAGER
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
+
 # Solution table
 class Solution(db.Model):
     __tablename__ = 'solutions'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, index=True)
-    proposed_by = db.Column(db.String)  # agent or AI name/id
-    generated_by = db.Column(Enum(SolutionGeneratedBy), default=SolutionGeneratedBy.ai)
-    ai_contribution_pct = db.Column(Float)
-    ai_confidence = db.Column(Float)
+    ticket_id = db.Column(db.String(64))
+    proposed_by = db.Column(db.String(64))
+    generated_by = db.Column(db.String(5))
+    ai_contribution_pct = db.Column(db.Float)
+    ai_confidence = db.Column(db.Float)
     text = db.Column(db.Text)
     normalized_text = db.Column(db.Text)
-    fingerprint_sha256 = db.Column(db.String, unique=True, index=True)
+    fingerprint_sha256 = db.Column(db.String(64))
     sent_for_confirmation_at = db.Column(db.DateTime)
-    confirmed_by_user = db.Column(db.Boolean, default=False)
+    confirmed_by_user = db.Column(db.Boolean)
     confirmed_at = db.Column(db.DateTime)
-    confirmed_ip = db.Column(db.String)
-    confirmed_via = db.Column(Enum(SolutionConfirmedVia))
-    dedup_score = db.Column(Float)
+    confirmed_ip = db.Column(db.String(64))
+    confirmed_via = db.Column(db.String(5))
+    dedup_score = db.Column(db.Float)
     published_article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
-    status = db.Column(Enum(SolutionStatus), index=True, default=SolutionStatus.draft)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
-
-class ResolutionAttempt(db.Model):
-    __tablename__ = 'resolution_attempts'
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id'), index=True, nullable=False)
-    solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id'), index=True, nullable=False)
-    attempt_no = db.Column(db.Integer, nullable=False)
-    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    outcome = db.Column(db.String(16), default='pending', index=True)  # pending|confirmed|rejected
-    rejected_reason = db.Column(db.String(64))
-    rejected_detail_json = db.Column(db.Text)   # JSON string
-    closed_at = db.Column(db.DateTime)
-    agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)  # The agent who sent the solution
+    status = db.Column(db.String(17))
+    created_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
 
 class KBArticle(db.Model):
     __tablename__ = 'kb_articles'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String)
+    title = db.Column(db.String(1000))
     problem_summary = db.Column(db.Text)
     content_md = db.Column(db.Text)
     environment_json = db.Column(JSON)
     category_id = db.Column(db.Integer)
-    origin_ticket_id = db.Column(db.String)
+    origin_ticket_id = db.Column(db.String(45))
     origin_solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id'))
     source = db.Column(Enum(KBArticleSource), default=KBArticleSource.ai)
     ai_contribution_pct = db.Column(Float)
     visibility = db.Column(Enum(KBArticleVisibility), default=KBArticleVisibility.internal)
-    embedding_model = db.Column(db.String)
-    embedding_hash = db.Column(db.String)
+    embedding_model = db.Column(db.String(100))
+    embedding_hash = db.Column(db.String(64))
     faiss_id = db.Column(db.Integer)
-    canonical_fingerprint = db.Column(db.String, unique=True, index=True)
+    canonical_fingerprint = db.Column(db.String(64), unique=True, index=True)
     status = db.Column(Enum(KBArticleStatus), default=KBArticleStatus.draft)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
-    approved_by = db.Column(db.String)  # Agent who promoted the article
+    approved_by = db.Column(db.String(45))  # Agent who promoted the article
 
 class KBArticleVersion(db.Model):
     __tablename__ = 'kb_article_versions'
@@ -118,7 +119,7 @@ class KBFeedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     kb_article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
     user_id = db.Column(db.Integer, nullable=True)
-    user_email = db.Column(db.String)
+    user_email = db.Column(db.String(255), nullable=True)
     feedback_type = db.Column(Enum(KBFeedbackType))
     rating = db.Column(db.Integer)
     comment = db.Column(db.Text)
@@ -130,39 +131,71 @@ class KBFeedback(db.Model):
         UniqueConstraint('kb_article_id', 'user_id', name='ux_kb_feedback_user'),
     )
 
+
 class KBIndex(db.Model):
     __tablename__ = 'kb_index'
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
     faiss_id = db.Column(db.Integer)
-    embedding_model = db.Column(db.String)
-    embedding_hash = db.Column(db.String)
+    embedding_model = db.Column(db.String(100))
+    embedding_hash = db.Column(db.String(64))
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     is_active = db.Column(db.Boolean, default=True)
 
 class KBAudit(db.Model):
     __tablename__ = 'kb_audit'
     id = db.Column(db.Integer, primary_key=True)
-    entity_type = db.Column(db.String)
+    entity_type = db.Column(db.String(100))
     entity_id = db.Column(db.Integer)
-    event = db.Column(db.String)
+    event = db.Column(db.String(100))
     actor_id = db.Column(db.Integer)
     meta_json = db.Column(JSON)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
 
-class Department(db.Model):
-    __tablename__ = 'departments'
-    id   = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, unique=True, nullable=False)
+class Ticket(db.Model):
+    __tablename__ = 'tickets'
+    id = db.Column(db.String(45), primary_key=True)
+    status = db.Column(db.String(45), nullable=False, default='open')
+    owner = db.Column(db.String(100), nullable=True)  # agent name
+    subject = db.Column(db.String(100), nullable=False)
+    requester_name = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'))
+    priority = db.Column(db.String(100), nullable=False)
+    impact_level = db.Column(db.String(100), nullable=False)
+    urgency_level = db.Column(db.String(100), nullable=False)
+    requester_email = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
+    level = db.Column(db.Integer, default=1)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    assigned_to = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
 
-class Agent(db.Model):
-    __tablename__ = 'agents'
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    id        = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(45),  nullable=False)
+    sender    = db.Column(db.String(100),  nullable=False)
+    content   = db.Column(db.Text,    nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    type      = db.Column(db.String(100), default='assistant')
+    meta      = db.Column(SQLiteJSON, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    sender_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
+
+class ResolutionAttempt(db.Model):
+    __tablename__ = 'resolution_attempts'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False, unique=True)
-    email = db.Column(db.String, nullable=False, unique=True)
-    password = db.Column(db.String, nullable=False)
-    role = db.Column(db.String, default='L1')  # L1, L2, L3, MANAGER
-    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id'), index=True, nullable=False)
+    solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id'), index=True, nullable=False)
+    attempt_no = db.Column(db.Integer, nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    outcome = db.Column(db.String(16), default='pending', index=True)  # pending|confirmed|rejected
+    rejected_reason = db.Column(db.String(64))
+    rejected_detail_json = db.Column(db.Text)   # JSON string
+    closed_at = db.Column(db.DateTime)
+    agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)  # The agent who sent the solution
 
 class Mention(db.Model):
     __tablename__ = 'mentions'
@@ -171,56 +204,26 @@ class Mention(db.Model):
     mentioned_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id', ondelete='CASCADE'), nullable=False)
     __table_args__ = (db.UniqueConstraint('message_id', 'mentioned_agent_id'),)
 
-class Ticket(db.Model):
-    __tablename__ = 'tickets'
-    id = db.Column(db.String, primary_key=True)
-    status = db.Column(db.String, nullable=False, default='open')
-    owner = db.Column(db.String, nullable=True)  # agent name
-    subject = db.Column(db.String)
-    requester_name = db.Column(db.String)
-    category = db.Column(db.String)
-    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'))
-    priority = db.Column(db.String)
-    impact_level = db.Column(db.String)
-    urgency_level = db.Column(db.String)
-    requester_email = db.Column(db.String)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
-    level = db.Column(db.Integer, default=1)
-    resolved_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
-    assigned_to = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
-
-class Message(db.Model):
-    __tablename__ = 'messages'
-    id        = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String,  nullable=False)
-    sender    = db.Column(db.String,  nullable=False)
-    content   = db.Column(db.Text,    nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    type      = db.Column(db.String, default='assistant')
-    meta      = db.Column(SQLiteJSON, nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    sender_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
-
 class StepSequence(db.Model):
     __tablename__ = 'step_sequences'
-    ticket_id     = db.Column(db.String, primary_key=True)
+    ticket_id     = db.Column(db.String(45), primary_key=True)
     steps         = db.Column(SQLiteJSON, nullable=False)
     current_index = db.Column(db.Integer, default=0)
 
 class TicketAssignment(db.Model):
     __tablename__ = 'ticket_assignments'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
     agent_id  = db.Column(db.Integer, db.ForeignKey('agents.id', ondelete='SET NULL'))
-    assigned_at   = db.Column(db.String)
-    unassigned_at = db.Column(db.String)
+    assigned_at   = db.Column(db.String(100))
+    unassigned_at = db.Column(db.String(100))
+
 
 class TicketEvent(db.Model):
     __tablename__ = 'ticket_events'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
-    event_type = db.Column(db.String, nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    event_type = db.Column(db.String(100), nullable=False)
     actor_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
     details = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -228,29 +231,33 @@ class TicketEvent(db.Model):
         db.Index('ix_ticket_events_ticket_created', 'ticket_id', 'created_at'),
     )
 
+
 class TicketCC(db.Model):
     __tablename__ = 'ticket_cc'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
-    email = db.Column(db.String, nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    email = db.Column(db.String(100), nullable=False)
     __table_args__ = (db.UniqueConstraint('ticket_id', 'email', name='ux_ticket_cc'),)
+
 
 class TicketWatcher(db.Model):
     __tablename__ = 'ticket_watchers'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
     agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
     __table_args__ = (db.UniqueConstraint('ticket_id', 'agent_id', name='ux_ticket_watchers'),)
+
+
 
 class EmailQueue(db.Model):
     __tablename__ = 'email_queue'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='SET NULL'))
-    to_email = db.Column(db.String, nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='SET NULL'))
+    to_email = db.Column(db.String(100), nullable=False)
     cc = db.Column(db.Text)
-    subject = db.Column(db.String, nullable=False)
+    subject = db.Column(db.String(100), nullable=False)
     body = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String, default='PENDING')
+    status = db.Column(db.String(100), default='PENDING')
     error = db.Column(db.Text)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     sent_at = db.Column(db.DateTime(timezone=True))
@@ -258,17 +265,20 @@ class EmailQueue(db.Model):
 class TicketFeedback(db.Model):
     __tablename__ = 'ticket_feedback'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
     rating = db.Column(db.Integer)
     comment = db.Column(db.Text)
-    submitted_at = db.Column(db.String)
+    submitted_at = db.Column(db.String(100))
+
 
 class KBDraft(db.Model):
     __tablename__ = 'kb_drafts'
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String, db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
-    title = db.Column(db.String)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    title = db.Column(db.String(100))
     body  = db.Column(db.Text)
-    status = db.Column(db.String, default='DRAFT')
+    status = db.Column(db.String(100), default='DRAFT')
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
+
+    
