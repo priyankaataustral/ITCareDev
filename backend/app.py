@@ -1,7 +1,8 @@
 import os, ssl
 import threading
+import re
 import logging
-from flask import Flask, request
+from flask import Flask, app, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -51,43 +52,53 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     
-    # Configure CORS
-    allowed_origins = {
+    DEFAULT_ALLOWED_ORIGINS = {
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://192.168.0.17:3000",
-        "https://delightful-tree-0a2bac000.1.azurestaticapps.net",
     }
+
+    # Comma-separated list of extra origins from env (portal)
+    # e.g.: https://proud-tree-0c99b8f00.1.azurestaticapps.net,https://delightful-tree-0a2bac000.1.azurestaticapps.net
+    env_origins = os.getenv("FRONTEND_ORIGINS", "")
+    extra = {o.strip() for o in env_origins.split(",") if o.strip()}
+
+    # Optional: allow any Azure SWA environment for this app (preview URLs, etc.)
+    swa_regex = re.compile(r"^https://[a-z0-9-]+\.1\.azurestaticapps\.net$")
+
+    allowed_origins = DEFAULT_ALLOWED_ORIGINS | extra
 
     CORS(
         app,
-        resources={r"/*": {"origins": list(allowed_origins)}},
-        supports_credentials=True,  # ok even if you don’t use cookies
-        allow_headers=["Content-Type", "Authorization"],
+        resources={
+            r"/*": {
+                "origins": list(allowed_origins) + [swa_regex]
+            }
+        },
+        supports_credentials=True,  # keep True if you use cookies/Authorization
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         expose_headers=["Content-Disposition"],
-        always_send=True,  # ensure headers on all responses
     )
 
-    # Add Vary: Origin for proper caching behavior
     @app.after_request
     def _vary_origin(resp):
         origin = request.headers.get("Origin")
-        if origin in allowed_origins:
+        if origin and (origin in allowed_origins or swa_regex.match(origin)):
+            # help proxies/CDNs cache per-origin
             resp.headers.setdefault("Vary", "Origin")
         return resp
-
 
     # Initialize OpenAI client (can be done here or in a separate module)
     app.config['OPENAI_CLIENT'] = OpenAI(api_key=OPENAI_KEY)
 
 
     # Register blueprints and CLI commands
-    from urls import urls as urls_blueprint
+    from .urls import urls as urls_blueprint
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
 
-    # Health check endpoint
+        # Health check endpoint
     @app.route("/health", methods=["GET"])
     def health():
         return {"status": "ok"}, 200
