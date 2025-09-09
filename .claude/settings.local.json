@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(python test:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(/Users/prismaura/Pears Scandinavia/AISupportApplication/backend/venv/bin/python test_openai.py)",
+      "Bash(./venv/bin/python:*)",
+      "Bash(./venv/bin/pip install pymysql)",
+      "Bash(./venv/bin/pip list)",
+      "Bash(/Users/prismaura/Pears Scandinavia/AISupportApplication/backend/venv/bin/python3.12 test_database.py)"
+    ],
+    "deny": []
+  }
+}
