@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: ai-support-backend    # Set this to your app service name
+  AZURE_WEBAPP_NAME: ITCareDev    # Set this to your app service name
   PYTHON_VERSION: '3.12'
 
 jobs:
