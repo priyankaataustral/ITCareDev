@@ -30,6 +30,7 @@ OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in .env")
 
+
 # ─── SMTP / Email config ──────────────────────────────────────────────────────
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT   = 465
@@ -37,6 +38,32 @@ SMTP_USER   = os.getenv("SMTP_USER", "testmailaiassistant@gmail.com")
 SMTP_PASS   = os.getenv("SMTP_PASS", "ydop igne ijhw azws")  # consider env in prod
 FROM_NAME   = "AI Support Assistant"  # optional display name
 CONFIRM_SALT = "solution-confirm-v1"
+
+# ─── Additional Configs ───────────────────────────────────────────────────────
+# CORS origins for frontend and local dev
+CORS_ORIGINS = [FRONTEND_URL, "http://localhost:3000"]
+
+# MySQL SSL CA certificate path
+MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA", "certs/DigiCertGlobalRootCA.crt.pem")
+
+# Logging level
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Class-based config for Flask best practices
+class Config:
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI
+    SQLALCHEMY_TRACK_MODIFICATIONS = SQLALCHEMY_TRACK_MODIFICATIONS
+    SECRET_KEY = SECRET_KEY
+    OPENAI_KEY = OPENAI_KEY
+    SMTP_SERVER = SMTP_SERVER
+    SMTP_PORT = SMTP_PORT
+    SMTP_USER = SMTP_USER
+    SMTP_PASS = SMTP_PASS
+    FROM_NAME = FROM_NAME
+    CONFIRM_SALT = CONFIRM_SALT
+    CORS_ORIGINS = CORS_ORIGINS
+    MYSQL_SSL_CA = MYSQL_SSL_CA
+    LOG_LEVEL = LOG_LEVEL
 
 CONFIRM_REDIRECT_URL_SUCCESS = f"{FRONTEND_URL}/confirm"
 CONFIRM_REDIRECT_URL_REJECT  = f"{FRONTEND_URL}/not-fixed"

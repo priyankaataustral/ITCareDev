@@ -81,10 +81,16 @@ def create_app():
     # Initialize OpenAI client (can be done here or in a separate module)
     app.config['OPENAI_CLIENT'] = OpenAI(api_key=OPENAI_KEY)
 
+
     # Register blueprints and CLI commands
     from urls import urls as urls_blueprint
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
+
+    # Health check endpoint
+    @app.route("/health", methods=["GET"])
+    def health():
+        return {"status": "ok"}, 200
 
     # # --- Start email worker thread ---
     # from urls import email_worker_loop
