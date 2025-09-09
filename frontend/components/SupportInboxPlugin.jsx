@@ -8,7 +8,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
 
 // Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 
 const authHeaders = () => {
   try {
@@ -37,7 +37,14 @@ export default function SupportInboxPlugin() {
 
   useEffect(() => {
     setLoading(true);
-  fetch(`${API_BASE}/threads?limit=20&offset=0`)
+    fetch(`${API_BASE}/threads?limit=20&offset=0`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+      },
+    })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -57,10 +64,17 @@ export default function SupportInboxPlugin() {
 
     // NEW: load departments for the dropdown/filter in the new list (inside Sidebar)
   useEffect(() => { 
-  fetch(`${API_BASE}/departments`)
+    fetch(`${API_BASE}/departments`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+      },
+    })
       .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(data => {
-       const list = Array.isArray(data) ? data : (data.departments || []);
+        const list = Array.isArray(data) ? data : (data.departments || []);
         setDepartments(list);
       })
       .catch(() => {});

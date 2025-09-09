@@ -23,13 +23,13 @@ export default nextConfig;
  * You must replace all your hardcoded 'localhost' calls with this pattern.
  *
  * 1. Create a .env.local file in the root of your project:
- * NEXT_PUBLIC_API_URL=https://<your-app-service-name>.azurewebsites.net
+ * NEXT_PUBLIC_API_BASE=https://<your-app-service-name>.azurewebsites.net
  *
  * 2. Update your API calls to use this environment variable.
  * For example, if you have a function to fetch threads:
  */
 //
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
 //
 // const getThreads = async () => {
 //   try {

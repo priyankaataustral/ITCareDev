@@ -1,0 +1,8 @@
+{
+  "routes": [
+    {
+      "route": "/api/*",
+      "rewrite": "https://itcaredev-hkeyh9cheucmbfbf.australiaeast-01.azurewebsites.net/api/*"
+    }
+  ]
+}

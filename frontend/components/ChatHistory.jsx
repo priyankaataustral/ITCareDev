@@ -10,13 +10,13 @@ dayjs.extend(relativeTime);
 // =========================
 // Config & helpers
 // =========================
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000').replace(/\/+$/, '');
 
 
 const authHeaders = () => {
   try {
-    const token = localStorage.getItem('authToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const authToken = localStorage.getItem('authToken');
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   } catch {
     return {};
   }
@@ -201,7 +201,11 @@ function ProposedSolutionBox({ text, onDraft, onDismiss }) {
         <button onClick={onDraft} className="px-3 py-1 rounded-full bg-indigo-600 text-white text-sm">
           ✉️ Draft email
         </button>
-        <button onClick={() => onDismiss(text)} className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-sm">
+        <button
+          onClick={() => onDismiss?.(String(text || '').trim())}
+         
+          className="mt-3 px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-sm"
+        >
           Dismiss
         </button>
       </div>
@@ -294,27 +298,46 @@ function SuggestedPrompts({
   prompts = [],
   open,
   onToggle,
-  apiBase = process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000",
+  onPromptSelect,
+  apiBase = API_BASE,
 }) {
-  const postChat = (body) =>
-    fetch(`${apiBase}/threads/${threadId}/chat`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(body),
-    });
+  // const postChat = (body) =>
+  //   fetch(`${apiBase}/threads/${threadId}/chat`, {
+  //     method: "POST",
+  //     credentials: "include",
+  //     headers: { "Content-Type": "application/json", ...authHeaders() },
+  //     body: JSON.stringify(body),
+  //   });
 
-  const handleClick = (p) => {
-    if (typeof p === "string") {
-      return postChat({ source: "suggested", message: p });
-    }
-    if (p.kind === "ask_user") {
-      return postChat({ source: "user", message: p.text });
-    }
-    if (p.kind === "automate") {
-      return postChat({ source: "suggested", message: p.intent });
-    }
-  };
+  const toText = (p) => {
+    if (typeof p === "string") return p;
+    if (p && typeof p === 'object') {
+    if (p.kind === 'ask_user') return String(p.text || '');
+    if (p.kind === 'automate') return String(p.label || p.intent || '');
+    if (typeof p.text === 'string') return p.text; // generic fallback
+  }
+  return '';
+};
+
+  // Instead of sending immediately, call onPromptSelect to set the send box
+  // const handleClick = (p) => {
+  //   // window.alert('[DEBUG] SuggestedPrompts button clicked: ' + (typeof p === 'string' ? p : JSON.stringify(p)));
+  //   // console.debug('[DEBUG] SuggestedPrompts button clicked:', p);
+  //   if (typeof p === "string") {
+  //     if (typeof onPromptSelect === "function") onPromptSelect(p);
+  //     return;
+  //   }
+  //   if (p.kind === "ask_user") {
+  //     if (typeof onPromptSelect === "function") onPromptSelect(p.text);
+  //     return;
+  //   }
+  //   if (p.kind === "automate") {
+  //     if (typeof onPromptSelect === "function") onPromptSelect(p.intent);
+  //     return;
+  //   }
+  // };
+
+  const handleClick = (p) => { const text = toText(p).trim(); if (!text) return; onPromptSelect?.(text); };
 
   const labelFor = (p) =>
     typeof p === "string" ? p : p.kind === "ask_user" ? p.text : p.label || p.intent;
@@ -583,21 +606,28 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
   const displayMessages = useMemo(() => {
-    const seen = new Set();
     const out = [];
+    const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
     for (const cur of messages) {
-      const isDedup = cur.sender === 'user' || cur.sender === 'bot' || cur.sender === 'assistant';
-      const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-      const who = (cur.sender === 'assistant' || cur.sender === 'bot') ? 'assistant' : cur.sender;
-      const key = isDedup ? `${who}::${norm(toDisplayString(cur.content))}` : undefined;
-      if (isDedup) {
-        if (seen.has(key)) continue;
-        seen.add(key);
+      const prev = out[out.length - 1];
+      const curIsAssistant = cur.sender === 'assistant' || cur.sender === 'bot';
+      const prevIsAssistant = prev && (prev.sender === 'assistant' || prev.sender === 'bot');
+
+      // Only suppress if the *previous* assistant bubble is identical
+      if (
+        curIsAssistant &&
+        prevIsAssistant &&
+        norm(toDisplayString(prev.content)) === norm(toDisplayString(cur.content))
+      ) {
+        continue;
       }
       out.push(cur);
     }
     return out;
   }, [messages]);
+
+
 
   // Sidebar (collapsible)
   const [openSections, setOpenSections] = useState({ suggested: true, related: false, activity: false });
@@ -663,23 +693,32 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   // Allow common typos/synonyms
   const DRAFT_WORD = '(?:draft|drat|draf|darft|drfat|daft|compose|write|prepare|create)';
-  const EMAIL_WORD = '(?:email|mail|message)';
+  const EMAIL_WORD = '(?:email|mail|message|reply)';
 
+  const ADJ_WORDS = '(?:short|brief|concise|detailed|formal|informal|friendly|professional|polite|casual|clear|simple|comprehensive|thorough|succinct)';
+  const ADJ_BLOCK = `(?:${ADJ_WORDS}(?:\\s+${ADJ_WORDS})*)?`; // zero or more adjectives
   // For “show editor empty”
   const DRAFT_EMAIL_OPEN_EMPTY_RE =
     /\b(?:open|show)\s+(?:the\s+)?(?:draft\s+)?email\s+editor\b|\bcompose\s+(?:a\s+)?new\s+email\s+(?:from\s+scratch|without\s+solution)\b/i;
 
-  // For “draft … email with solution”
   const DRAFT_EMAIL_WITH_SOLUTION_RE = new RegExp(
-    `\\b${DRAFT_WORD}(?:\\s+(?:me|us))?\\s+(?:(?:a|an|the)\\s+)?${EMAIL_WORD}(?:\\s+(?:to|for)\\s+(?:the\\s+)?user)?(?:\\s+(?:with|including|containing)\\s+(?:the\\s+)?(?:solution|fix|steps))?\\b`,
-    'i'
-  );
+   `\\b${DRAFT_WORD}(?:\\s+(?:me|us))?\\s+` +
+   `(?:(?:a|an|the)\\s+)?` +              // optional article
+   `${ADJ_BLOCK}\\s*` +                   // optional adjectives (" short", " brief", …)
+   `${EMAIL_WORD}` +                      // email/mail/message/reply
+   `(?:\\s+(?:to|for)\\s+(?:the\\s+)?user)?` +  // optional "to/for the user"
+   `(?:\\s+(?:with|including|containing)\\s+(?:the\\s+)?(?:solution|fix|steps))?` + // "with solution"
+   `\\b`,
+   'i'
+ );
 
-  // Generic “draft an email”
   const GENERIC_DRAFT_EMAIL_RE = new RegExp(
-    `\\b${DRAFT_WORD}(?:\\s+(?:me|us))?\\s+(?:(?:a|an|the)\\s+)?${EMAIL_WORD}\\b`,
-    'i'
-  );
+   `\\b${DRAFT_WORD}(?:\\s+(?:me|us))?\\s+` +
+   `(?:(?:a|an|the)\\s+)?` +  // optional article
+   `${ADJ_BLOCK}\\s*` +       // optional adjectives
+   `${EMAIL_WORD}\\b`,
+   'i'
+ );
 
   // Needed by sendMessage to decide whether to show the Proposed Solution panel
   const EXPLICIT_SOLUTION_INTENT_RE =
@@ -857,8 +896,8 @@ function ChatHistory({ threadId, onBack, className = '' }) {
     if (r2.ok && data2?.token) {
       const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
       const links = {
-        confirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
-        notConfirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=not_confirm`,
+        confirm: `${origin}/solutions/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
+        notConfirm: `${origin}/solutions/confirm?token=${encodeURIComponent(data2.token)}&a=not_confirm`,
       };
       setConfirmLinks(links);
       return links;
@@ -1376,10 +1415,13 @@ const openDraftEditor = (prefill) => {
             if (m?.source === 'suggested' || m?.transient || m?.meta?.transient) continue;
             if (!m?.id || seen.has(m.id)) continue;
             const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-            const existsByText = merged.some(p =>
-              (p.sender === 'assistant' || p.sender === 'bot' || p.sender === 'user') &&
-              norm(toDisplayString(p.content)) === norm(toDisplayString(m.content))
-            );
+            const mIsAssistant = m.sender === 'assistant' || m.sender === 'bot';
+            const existsByText =
+              mIsAssistant &&
+              merged.some(p =>
+                (p.sender === 'assistant' || p.sender === 'bot') &&
+                norm(toDisplayString(p.content)) === norm(toDisplayString(m.content))
+              );
             if (existsByText) continue;
             merged.push(m);
           }
@@ -1555,26 +1597,33 @@ const openDraftEditor = (prefill) => {
 
 
   const showPendingSolutionAsChatAndClear = (solutionText) => {
-    // Clear the panel either way
+    const text = String(solutionText || '').trim();
+
+    // 1) Close the panel FIRST so we don't suppress solution bubbles
     setPendingSolution(null);
-    if (!solutionText) return;
+
+    // 2) No text? nothing to render
+    if (!text) return;
+
+    // 3) Push a normal assistant bubble
     setMessages(prev => [
       ...prev,
       {
         id: `temp-${tempIdRef.current++}`,
         sender: 'bot',
-        content: solutionText,
-        type: 'solution_shown',
+        type: 'solution',              // render like a normal assistant "solution"
+        content: text,
         timestamp: new Date().toISOString(),
       },
     ]);
   };
 
 
+
   const handleSuggestedPromptClick = async (prompt) => {
+    console.debug('[DEBUG] Suggested prompt clicked:', prompt);
     const trimmed = (prompt || '').trim();
     setNewMsg('');
-
 
     if (DRAFT_EMAIL_OPEN_EMPTY_RE.test(trimmed)) {
       setNewMsg('');
@@ -1588,10 +1637,10 @@ const openDraftEditor = (prefill) => {
           timestamp: new Date().toISOString()
         }
       ]);
-  const best = (await ensureSolutionThenGet()) || '';
-  if (best.trim()) setPendingSolution(best.trim());
-  openDraftEditor('');
-  return;
+      const best = (await ensureSolutionThenGet()) || '';
+      if (best.trim()) setPendingSolution(best.trim());
+      openDraftEditor('');
+      return;
     }
 
     if (DRAFT_EMAIL_WITH_SOLUTION_RE.test(trimmed) || GENERIC_DRAFT_EMAIL_RE.test(trimmed)) {
@@ -1606,16 +1655,14 @@ const openDraftEditor = (prefill) => {
           timestamp: new Date().toISOString()
         }
       ]);
-  // Set the solution so the Proposed Solution box appears
-  let best = (await ensureSolutionThenGet()) || '';
-  if (typeof best !== 'string') best = String(best ?? '');
-  if (best.trim()) setPendingSolution(best.trim());
-  const body = await draftFromBackendOrBuild(best);
-  openDraftEditor(body);
-  return;
+      // Show the Proposed Solution panel first (no editor yet)
+      let best = (await ensureSolutionThenGet()) || '';
+      if (typeof best !== 'string') best = String(best ?? '');
+      const clean = best.trim();
+      if (clean) setPendingSolution(clean);
+      return;
+
     }
-
-
 
     // Fallback: treat as normal chat input
     setNewMsg(trimmed);
@@ -1707,7 +1754,8 @@ const openDraftEditor = (prefill) => {
     }
 
     // If user types a draft email request, open only the editor (no solution box)
-    if (DRAFT_EMAIL_OPEN_EMPTY_RE.test(text) || DRAFT_EMAIL_WITH_SOLUTION_RE.test(text) || GENERIC_DRAFT_EMAIL_RE.test(text)) {
+    // 1) Explicitly open an empty editor (keep this behavior)
+    if (DRAFT_EMAIL_OPEN_EMPTY_RE.test(text)) {
       setNewMsg('');
       setMessages(prev => [
         ...prev,
@@ -1719,13 +1767,31 @@ const openDraftEditor = (prefill) => {
           timestamp: new Date().toISOString()
         }
       ]);
-      setPendingSolution(null); // Ensure solution box is not shown
-      let best = (await ensureSolutionThenGet()) || '';
-      if (typeof best !== 'string') best = String(best ?? '');
-      const body = await draftFromBackendOrBuild(best);
-      openDraftEditor(body);
+      setPendingSolution(null);
+      openDraftEditor(''); // empty editor by request
       return;
     }
+
+    // 2) Draft email intent (generic or with solution) → show Proposed Solution first
+    if (DRAFT_EMAIL_WITH_SOLUTION_RE.test(text) || GENERIC_DRAFT_EMAIL_RE.test(text)) {
+      setNewMsg('');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `temp-${tempIdRef.current++}`,
+          sender: 'user',
+          content: text,
+          source: options.source || 'typed',
+          timestamp: new Date().toISOString()
+        }
+      ]);
+      let best = (await ensureSolutionThenGet()) || '';
+      if (typeof best !== 'string') best = String(best ?? '');
+      const clean = best.trim();
+      if (clean) setPendingSolution(clean); // ← show panel, NOT the editor
+      return;
+    }
+
 
 
     setSending(true);
@@ -2150,7 +2216,7 @@ const openDraftEditor = (prefill) => {
       const res = await fetch(`${API_BASE}/threads/${tid}/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
+        // credentials: 'include',
         body: JSON.stringify({ email: emailToSend, cc: ccUnique })
       });
       const data = await res.json();
@@ -2324,6 +2390,7 @@ const openDraftEditor = (prefill) => {
                       openDraftEditor(emailBody);
                     }}
                     onDismiss={showPendingSolutionAsChatAndClear}
+                     
                   />
                 </div>
 
@@ -2363,7 +2430,10 @@ const openDraftEditor = (prefill) => {
               {/* Composer */}
               <ChatComposer
                 value={newMsg}
-                onChange={setNewMsg}
+                onChange={v => {
+                  if (typeof v === 'string') setNewMsg(v);
+                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                }}
                 onSend={sendMessage}
                 sending={sending}
                 textareaRef={textareaRef}
@@ -2388,6 +2458,7 @@ const openDraftEditor = (prefill) => {
                 open={panelOpen}
                 onToggle={() => setPanelOpen(v => !v)}
                 apiBase={API_BASE}
+                onPromptSelect={handleSuggestedPromptClick}
               />
               <RelatedTicketList
                 tickets={relatedTickets}

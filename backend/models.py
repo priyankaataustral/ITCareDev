@@ -177,7 +177,7 @@ class Message(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(45),  nullable=False)
     sender    = db.Column(db.String(100),  nullable=False)
-    content   = db.Column(db.Text,    nullable=False)
+    content   = db.Column(db.Text(collation='utf8mb4_unicode_ci'), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     type      = db.Column(db.String(100), default='assistant')
     meta      = db.Column(SQLiteJSON, nullable=True)

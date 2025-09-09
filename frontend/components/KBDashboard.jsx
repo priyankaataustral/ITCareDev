@@ -5,7 +5,7 @@ import { useAuth } from "../components/AuthContext"; // adjust path if needed
 import Gate from "./Gate"; // adjust path if needed
 
 // Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 
 /**
  * UI: Agent Knowledge Dashboard
@@ -105,7 +105,7 @@ export default function KBDashboard({ open, onClose }) {
     const url =
       s.confirm_url ||
       (s.confirm_token
-        ? `${window.location.origin}/confirm?token=${encodeURIComponent(s.confirm_token)}`
+        ? `${window.location.origin}/solutions/confirm?token=${encodeURIComponent(s.confirm_token)}`
         : "");
     if (!url) return toast("No confirm link available", true);
     await navigator.clipboard.writeText(url);
@@ -447,17 +447,17 @@ export default function KBDashboard({ open, onClose }) {
 
 // Helper for agent analytics fetch
 function authHeaders() {
-  const token = (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('token')) || '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const authToken = (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('token')) || '';
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
 }
 
 // --- Helpers ---
 function useAuthedFetch(){
-  const { token } = useAuth();
+  const { authToken } = useAuth();
   return useCallback((url, opts={}) => {
-    const headers = { ...(opts.headers||{}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    const headers = { ...(opts.headers||{}), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
     return fetch(url, { ...opts, headers, credentials: 'include' });
-  }, [token]);
+  }, [authToken]);
 }
 
 function fmt(ts){

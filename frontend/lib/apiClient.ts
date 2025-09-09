@@ -1,8 +1,8 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 
 export function getToken() {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("token") || "";
+  return localStorage.getItem("authToken") || ""; return localStorage.getItem("authToken") || "";
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -37,8 +37,8 @@ function withAuthHeaders(extra?: HeadersInit): Headers {
   const h = new Headers(extra);
   if (!h.has("Accept")) h.set("Accept", "application/json");
   if (!h.has("X-Requested-With")) h.set("X-Requested-With", "fetch");
-  const token = getToken();
-  if (token && !h.has("Authorization")) h.set("Authorization", `Bearer ${token}`);
+  const authToken = getToken();
+  if (authToken && !h.has("Authorization")) h.set("Authorization", `Bearer ${authToken}`);
   return h;
 }
 
@@ -66,7 +66,6 @@ export async function apiPost<T>(path: string, body?: unknown, init?: RequestIni
 export async function apiPatch<T>(path: string, body?: unknown, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
-    credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
     headers: withAuthHeaders({ "Content-Type": "application/json", ...(init?.headers || {}) }),
     ...(init || {}),

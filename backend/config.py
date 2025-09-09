@@ -12,7 +12,6 @@ if not FRONTEND_URL:
     FRONTEND_URL = "http://localhost:3000"
 
 
-
 # Fallback to local SQLite for development
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:

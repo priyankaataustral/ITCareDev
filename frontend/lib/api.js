@@ -1,3 +1,6 @@
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000').replace(/\/+$/, '');
+
+
 // Get tickets with pagination
 export async function getTickets({ limit = 50, offset = 0 } = {}) {
   const res = await fetch(`${API_BASE}/tickets?limit=${limit}&offset=${offset}`);
@@ -6,27 +9,22 @@ export async function getTickets({ limit = 50, offset = 0 } = {}) {
 }
 
 export async function setTicketDepartment(id, { department_id, reason }) {
-  let token = null;
-  if (typeof window !== 'undefined') {
-    token = localStorage.getItem('authToken');
-  }
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
   const res = await fetch(`${API_BASE}/threads/${id}/department`, {
     method: 'PATCH',
     headers,
-    credentials: 'include',
     body: JSON.stringify({ department_id, reason }),
   });
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
 
-
-// src/lib/api.js
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000'
 
 export async function fetchThreads() {
   const res = await fetch(`${API_BASE}/threads`)

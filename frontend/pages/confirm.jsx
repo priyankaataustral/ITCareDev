@@ -1,7 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000';
+const RAW_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
+const API_BASE = /^https?:\/\//i.test(RAW_BASE) ? RAW_BASE : 'http://localhost:5000';
+console.log('[Confirm] API_BASE =', API_BASE);
 
 export default function ConfirmPage() {
   const [loading, setLoading] = useState(true);
@@ -21,30 +23,50 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const authToken = params.get('token');
     const a = (params.get('a') || '').toLowerCase();
-    if (!token || !a) {
+    if (!authToken || !a) {
       setLoading(false);
       setValid(false);
+      setError('Missing token or action in URL.');
       return;
     }
 
     setAction(a === 'confirm' ? 'confirm' : 'not_confirm');
 
     // Record the click (CONFIRMED / NOT_CONFIRMED) on the backend.
-    fetch(`${API_BASE}/solutions/confirm?token=${encodeURIComponent(token)}&a=${encodeURIComponent(a)}`, {
+    fetch(`${API_BASE}/solutions/confirm?token=${encodeURIComponent(authToken)}&a=${encodeURIComponent(a)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       credentials: 'include',
     })
-      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
-      .then(data => {
-        setTicketId(data.ticket_id ?? null);
-        setAttemptId(data.attempt_id ?? null);
-        setEmail(data.user_email ?? null);
-        setValid(true);
+     .then(async (r) => {
+        // read body even on non-2xx so we can surface .reason/.error
+        const raw = await r.text().catch(() => '');
+        let body;
+        try { body = raw ? JSON.parse(raw) : null; } catch { body = null; }
+        if (!r.ok) {
+          const reason = body?.reason || body?.error || r.statusText || `HTTP ${r.status}`;
+          throw new Error(reason);
+        }
+        return body ?? {};
+      
+    })
+    .then((data) => {
+        if (data?.ok) {
+          setTicketId(data.ticket_id ?? null);
+          setAttemptId(data.attempt_id ?? null);
+          setEmail(data.user_email ?? null);
+          setValid(true);
+        } else {
+          setValid(false);
+          setError(data?.reason || 'Invalid or expired link');
+        }
       })
-      .catch((e) => setError(typeof e === 'string' ? e : 'Failed to record confirmation.'))
+      .catch((e) => {
+        setValid(false);
+        setError(e?.message || 'Failed to record confirmation.');
+      })
       .finally(() => setLoading(false));
   }, []);
 

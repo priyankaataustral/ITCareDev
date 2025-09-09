@@ -1,5 +1,5 @@
 // Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 // frontend/components/ThreadList.jsx
 import React, { useEffect, useState } from 'react';
 import Gate from './Gate';
@@ -46,14 +46,14 @@ export default function ThreadList({
       return;
     }
     setLoading(true);
-  fetch(`${API_BASE}/threads?limit=20&offset=0`, {
-       method: 'GET',
-       credentials: 'include', // send HttpOnly cookie set by /login
-       headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // also send Bearer if we have it
-      },
-    })  
+    fetch(`${API_BASE}/threads?limit=20&offset=0`, {
+         method: 'GET',
+         credentials: 'include', // send HttpOnly cookie set by /login
+         headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}), // also send Bearer if we have it
+        },
+      })  
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -73,7 +73,7 @@ export default function ThreadList({
       const out = {};
       for (const t of threads) {
         try {
-          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/summarize`, {
+          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/summarize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: t.text || t.subject || '' }),

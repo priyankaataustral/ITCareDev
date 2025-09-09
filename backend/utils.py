@@ -52,12 +52,12 @@ def require_role(*allowed):
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            token = (request.headers.get("Authorization","").replace("Bearer ","")
+            authToken = (request.headers.get("Authorization","").replace("Bearer ","")
                      or request.cookies.get("token"))
-            if not token:
+            if not authToken:
                 return jsonify(error="unauthorized"), 401
             try:
-                user = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+                user = jwt.decode(authToken, SECRET_KEY, algorithms=["HS256"])
             except Exception:
                 return jsonify(error="invalid token"), 401
             # Case-insensitive role check

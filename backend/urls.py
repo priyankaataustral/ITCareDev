@@ -4,11 +4,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from time import time, sleep
 from flask import Blueprint, redirect, request, jsonify, abort, make_response, send_file, current_app
-from itsdangerous import BadSignature, SignatureExpired
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func
 import re
 from extensions import db
-from db_helpers import save_steps, insert_message_with_mentions, get_messages, ensure_ticket_record_from_csv, log_event, add_event, _derive_subject_from_text
+from db_helpers import get_next_attempt_no, has_pending_attempt, save_steps, insert_message_with_mentions, get_messages, ensure_ticket_record_from_csv, log_event, add_event, _derive_subject_from_text
 from email_helpers import _serializer, _utcnow, send_via_gmail, enqueue_status_email
 from openai_helpers import _inject_system_message, _start_step_sequence_basic, categorize_department_with_gpt, is_materially_different, next_action_for, categorize_with_gpt
 from utils import extract_mentions, route_department_from_category
@@ -42,9 +42,9 @@ def login():
 		"role": getattr(agent, "role", "L1"),
 	}
 	import jwt
-	token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-	resp = make_response(jsonify({"token": token, "agent": payload}))
-	resp.set_cookie("token", token, httponly=True, samesite='Lax', secure=False)
+	authToken = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+	resp = make_response(jsonify({"token": authToken, "agent": payload}))
+	resp.set_cookie("token", authToken, httponly=True, samesite='Lax', secure=False)
 	return resp
 
 # ... (move all other @app.route endpoints here, replacing @app.route with @urls.route and updating any app-specific references as needed)
@@ -88,7 +88,7 @@ def list_threads():
             "predicted_category": cat,
             "assigned_team": team,
             "status": status,
-            "updated_at": updated_at,
+            "updated_at": updated_at.isoformat() if updated_at else None,
             "department_id": department_id,
             "department": department,
             "level": level,
@@ -730,30 +730,26 @@ def claim_ticket(thread_id):
 @urls.route('/inbox/mentions/<int:agent_id>', methods=['GET'])
 def get_tickets_where_agent_mentioned(agent_id):
     import sqlite3
-    DB_PATH = current_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    query = """
-        SELECT DISTINCT t.id AS ticket_id, t.status
-        FROM mentions m
-        JOIN messages msg ON m.message_id = msg.id
-        JOIN tickets t ON msg.ticket_id = t.id
-        WHERE m.mentioned_agent_id = ?
-    """
-    cursor.execute(query, (agent_id,))
-    rows = cursor.fetchall()
-    conn.close()
-
+    # Use SQLAlchemy ORM for cross-database compatibility
+    from models import Ticket, Message, TicketEvent
+    # Assuming you have a Mentions model, otherwise adjust accordingly
+    # If not, you may need to join Message and Ticket by agent mentions in message content
+    # Example: Find tickets where agent_id is mentioned in any message
+    mentioned_ticket_ids = (
+        db.session.query(Message.ticket_id)
+        .filter(Message.content.like(f"%@{agent_id}%"))
+        .distinct()
+        .all()
+    )
+    ticket_ids = [tid for (tid,) in mentioned_ticket_ids]
+    tickets = Ticket.query.filter(Ticket.id.in_(ticket_ids)).all()
     # Load ticket subjects from CSV
     df = load_df()
     subject_map = dict(zip(df['id'], df['text']))
-
     results = []
-    for row in rows:
-        ticket_id, status = row[0], row[1]
-        subject = subject_map.get(ticket_id, "")
-        results.append({"ticket_id": ticket_id, "status": status, "subject": subject})
+    for t in tickets:
+        subject = subject_map.get(t.id, "")
+        results.append({"ticket_id": t.id, "status": t.status, "subject": subject})
     response = jsonify(results)
     response.headers['Access-Control-Allow-Origin'] = FRONTEND_URL
     response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -798,11 +794,11 @@ def send_confirmation_email(solution_id):
     db.session.add(att); db.session.commit()
 
     # Token includes attempt_id
-    serializer = _serializer(SECRET_KEY)
-    token = serializer.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+    authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
-    confirm_url = f"{FRONTEND_URL}/confirm?token={token}&a=confirm"
-    reject_url  = f"{FRONTEND_URL}/confirm?token={token}&a=not_confirm"
+    confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
+    reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
 
     subject = f"Please review the solution for Ticket {s.ticket_id}"
     body = (
@@ -848,14 +844,146 @@ def draft_email(thread_id):
     return jsonify(email=email_text)
 
 
+# @urls.route('/threads/<thread_id>/send-email', methods=['POST'])
+# @require_role("L1","L2","L3","MANAGER")  
+# def send_email(thread_id):
+#     data = request.json or {}
+#     email_body = (data.get('email') or '').strip()
+#     solution_id = data.get('solution_id')  # ← FIX 1: accept optional solution id
+
+#     # Parse CC from either a string ("a@x.com, b@y.com") or a list
+#     cc_raw = data.get('cc') or []
+#     if isinstance(cc_raw, str):
+#         parts = re.split(r'[,\s;]+', cc_raw)
+#     elif isinstance(cc_raw, list):
+#         parts = cc_raw
+#     else:
+#         parts = []
+
+#     # Light email validation + normalize + dedupe
+#     def is_email(s: str) -> bool:
+#         return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', s))
+
+#     cc = sorted({p.strip().lower() for p in parts if p and is_email(p)})
+
+#     if not email_body:
+#         return jsonify(error="Missing email body"), 400
+
+#     # Ensure ticket + resolve primary recipient
+#     ensure_ticket_record_from_csv(thread_id)
+#     t = db.session.get(Ticket, thread_id)
+#     recipient_email = (t.requester_email or '').strip().lower() if t else ''
+#     if not recipient_email:
+#         df = load_df()
+#         row = df[df["id"] == thread_id]
+#         recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
+#     if not recipient_email:
+#         return jsonify(error="No recipient email found for this ticket"), 400
+
+#     # Persist new CCs so future status emails include them
+#     if cc:
+#         existing = {r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}
+#         new_addrs = [addr for addr in cc if addr not in existing]
+#         if new_addrs:
+#             for addr in new_addrs:
+#                 db.session.add(TicketCC(ticket_id=thread_id, email=addr))
+#             try:
+#                 db.session.commit()
+#             except Exception:
+#                 db.session.rollback()
+
+#     subject = f"Support Ticket #{thread_id} Update"
+
+#     # Resolve solution (optional)
+#     # Resolve solution (optional) – create one if missing so we always have s.id
+#     s = None
+#     if solution_id:
+#         try:
+#             s = db.session.get(Solution, int(solution_id))
+#         except Exception:
+#             s = None
+
+#     if s is None:
+#         s = (
+#             Solution.query.filter_by(ticket_id=thread_id)
+#             .order_by(Solution.created_at.desc())
+#             .first()
+#         )
+
+#     if s is None:
+#         # No solution exists yet — create a minimal one so ResolutionAttempt can FK it
+#         try:
+#             creator_id = None
+#             if hasattr(request, "agent_ctx") and isinstance(request.agent_ctx, dict):
+#                 creator_id = request.agent_ctx.get("id")
+#             s = Solution(
+#                 ticket_id=thread_id,          # ensure this type matches your schema (str/int)
+#                 text=email_body,              # store the body we’re about to send
+#                 created_by=creator_id,        # optional if your model allows NULL
+#                 status=SolutionStatus.draft,  # or initial status that fits your workflow
+#             )
+#             db.session.add(s)
+#             db.session.flush()  # get s.id without committing yet
+#         except Exception as e:
+#             db.session.rollback()
+#             return jsonify(error=f"failed to create solution: {e}"), 500
+
+
+#     if s:
+#         # Prevent overlapping attempts
+#         from db_helpers import has_pending_attempt
+#         if has_pending_attempt(thread_id):
+#             return jsonify(error="A previous solution is still pending user confirmation."), 409
+
+#         # If last rejected exists, require material change
+#         last_rejected = (Solution.query
+#                             .filter_by(ticket_id=thread_id, status=SolutionStatus.rejected)
+#                             .order_by(Solution.id.desc()).first())
+#         if last_rejected and not is_materially_different(s.text, last_rejected.text):
+#             return jsonify(error="New solution is too similar to the last rejected fix. Please revise or escalate."), 422
+
+#     # Create a new attempt for this send
+#     from db_helpers import get_next_attempt_no
+#     att_no = get_next_attempt_no(thread_id)
+#     att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no)
+#     db.session.add(att); db.session.commit()
+
+#     serializer = _serializer(SECRET_KEY)
+#     authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
+
+#     confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
+#     reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
+#     email_body += (
+#         "\n\n---\n"
+#         "Please let us know if this solved your issue:\n"
+#         f"Confirm: {confirm_url}\n"
+#         f"Not fixed: {reject_url}\n"
+#     )
+#     if s.status != SolutionStatus.sent_for_confirm:
+#         s.status = SolutionStatus.sent_for_confirm
+#         s.sent_for_confirmation_at = _utcnow()
+#         db.session.commit()
+
+#     try:
+#         send_via_gmail(recipient_email, subject, email_body, cc_list=cc)
+#         log_event(thread_id, 'EMAIL_SENT', {
+#             "subject": subject, "manual": True, "to": recipient_email, "cc": cc
+#         })
+#         return jsonify(status="sent", recipient=recipient_email, cc=cc)
+#     except Exception as e:
+#         current_app.logger.exception("Manual send failed")
+#         return jsonify(error=f"Failed to send email: {e}"), 500
+
+# ... keep your decorators
 @urls.route('/threads/<thread_id>/send-email', methods=['POST'])
-@require_role("L1","L2","L3","MANAGER")  
+@require_role("L1","L2","L3","MANAGER")
 def send_email(thread_id):
+
     data = request.json or {}
     email_body = (data.get('email') or '').strip()
-    solution_id = data.get('solution_id')  # ← FIX 1: accept optional solution id
+    solution_id = data.get('solution_id')  # optional
 
-    # Parse CC from either a string ("a@x.com, b@y.com") or a list
+    # --- CC parsing/validation ---
     cc_raw = data.get('cc') or []
     if isinstance(cc_raw, str):
         parts = re.split(r'[,\s;]+', cc_raw)
@@ -864,7 +992,6 @@ def send_email(thread_id):
     else:
         parts = []
 
-    # Light email validation + normalize + dedupe
     def is_email(s: str) -> bool:
         return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', s))
 
@@ -873,7 +1000,7 @@ def send_email(thread_id):
     if not email_body:
         return jsonify(error="Missing email body"), 400
 
-    # Ensure ticket + resolve primary recipient
+    # --- Ensure ticket + recipient ---
     ensure_ticket_record_from_csv(thread_id)
     t = db.session.get(Ticket, thread_id)
     recipient_email = (t.requester_email or '').strip().lower() if t else ''
@@ -884,70 +1011,102 @@ def send_email(thread_id):
     if not recipient_email:
         return jsonify(error="No recipient email found for this ticket"), 400
 
-    # Persist new CCs so future status emails include them
+    # --- Persist CC so future mails include them ---
     if cc:
         existing = {r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}
-        new_addrs = [addr for addr in cc if addr not in existing]
-        if new_addrs:
-            for addr in new_addrs:
+        for addr in cc:
+            if addr not in existing:
                 db.session.add(TicketCC(ticket_id=thread_id, email=addr))
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     subject = f"Support Ticket #{thread_id} Update"
 
-    # Resolve solution (optional)
+    # --- Resolve or create a Solution record ---
     s = None
     if solution_id:
         try:
             s = db.session.get(Solution, int(solution_id))
         except Exception:
             s = None
+
     if s is None:
         s = (Solution.query
                 .filter_by(ticket_id=thread_id)
                 .order_by(Solution.created_at.desc())
                 .first())
 
-    if s:
-        # Prevent overlapping attempts
-        from db_helpers import has_pending_attempt
+    # If still none, create a minimal Solution that matches your schema
+    if s is None:
+        try:
+            s = Solution(
+                ticket_id=thread_id,
+                text=email_body,                         # store what we’re sending
+                proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name") or None,  # optional
+                generated_by="HUMAN",                    # <=5 chars fits your schema
+                status="proposed",                       # optional; will set to sent_for_confirm below
+                created_at=_utcnow(),
+                updated_at=_utcnow(),
+            )
+            db.session.add(s)
+            db.session.flush()  # get s.id
+        except Exception as e:
+            db.session.rollback()
+            return jsonify(error=f"failed to create solution: {e}"), 500
+
+    # --- Gate checks only if we have a real solution to compare against ---
+    if s is not None:
         if has_pending_attempt(thread_id):
             return jsonify(error="A previous solution is still pending user confirmation."), 409
 
-        # If last rejected exists, require material change
         last_rejected = (Solution.query
-                            .filter_by(ticket_id=thread_id, status=SolutionStatus.rejected)
-                            .order_by(Solution.id.desc()).first())
-        if last_rejected and not is_materially_different(s.text, last_rejected.text):
+                         .filter_by(ticket_id=thread_id, status=SolutionStatus.rejected)
+                         .order_by(Solution.id.desc())
+                         .first())
+        if last_rejected and not is_materially_different(s.text or "", last_rejected.text or ""):
             return jsonify(error="New solution is too similar to the last rejected fix. Please revise or escalate."), 422
 
-    # Create a new attempt for this send
-    from db_helpers import get_next_attempt_no
-    att_no = get_next_attempt_no(thread_id)
-    att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no)
-    db.session.add(att); db.session.commit()
+    # --- Create an attempt tied to this solution ---
+    try:
+        att_no = get_next_attempt_no(thread_id)
+        att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no)
+        db.session.add(att)
+        db.session.flush()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(error=f"failed to create attempt: {e}"), 500
 
+    # --- Build signed links & append to body ---
     serializer = _serializer(SECRET_KEY)
-    token = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
+    authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
 
-    confirm_url = f"{FRONTEND_URL}/confirm?token={token}&a=confirm"
-    reject_url  = f"{FRONTEND_URL}/confirm?token={token}&a=not_confirm"
-    email_body += (
-        "\n\n---\n"
-        "Please let us know if this solved your issue:\n"
+    confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
+    reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
+
+    final_body = (
+        f"{email_body}\n\n"
+        f"---\n"
+        f"Please let us know if this solved your issue:\n"
         f"Confirm: {confirm_url}\n"
         f"Not fixed: {reject_url}\n"
     )
-    if s.status != SolutionStatus.sent_for_confirm:
+
+    # Mark solution as sent-for-confirm (use enum.value if SolutionStatus is an Enum)
+    try:
         s.status = SolutionStatus.sent_for_confirm
         s.sent_for_confirmation_at = _utcnow()
+        s.updated_at = _utcnow()
         db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to mark solution sent_for_confirm")
+        # not fatal for sending—continue
 
+    # --- Send mail ---
     try:
-        send_via_gmail(recipient_email, subject, email_body, cc_list=cc)
+        send_via_gmail(recipient_email, subject, final_body, cc_list=cc)
         log_event(thread_id, 'EMAIL_SENT', {
             "subject": subject, "manual": True, "to": recipient_email, "cc": cc
         })
@@ -957,34 +1116,35 @@ def send_email(thread_id):
         return jsonify(error=f"Failed to send email: {e}"), 500
 
 
-@urls.after_request
-def after_request(response):
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.0.17:3000",
-        "https://delightful-tree-0a2bac000.1.azurestaticapps.net",
-      
-    ]
-    origin = request.headers.get("Origin")
-    if origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-    else:
-        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'  # fallback or remove for stricter security
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-    return response
 
-# Global OPTIONS handler for all routes
-@urls.route('/<path:path>', methods=['OPTIONS'])
-def options_handler(path):
-    response = make_response('', 200)
-    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-    return response
+# @urls.after_request
+# def after_request(response):
+#     allowed_origins = [
+#         "http://localhost:3000",
+#         "http://127.0.0.1:3000",
+#         "http://192.168.0.17:3000",
+#         "https://delightful-tree-0a2bac000.1.azurestaticapps.net",
+      
+#     ]
+#     origin = request.headers.get("Origin")
+#     if origin in allowed_origins:
+#         response.headers['Access-Control-Allow-Origin'] = origin
+#     else:
+#         response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'  # fallback or remove for stricter security
+#     response.headers['Access-Control-Allow-Credentials'] = 'true'
+#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+#     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+#     return response
+
+# # Global OPTIONS handler for all routes
+# @urls.route('/<path:path>', methods=['OPTIONS'])
+# def options_handler(path):
+#     response = make_response('', 200)
+#     response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+#     response.headers['Access-Control-Allow-Credentials'] = 'true'
+#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+#     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+#     return response
 def threads_step_options(thread_id):
     return ('', 200)
 
@@ -1358,20 +1518,62 @@ def deescalate_ticket(thread_id):
     return jsonify(status=t.status, level=to_level), 200
 
 
-@urls.get("/solutions/confirm")
+@urls.route("/solutions/confirm", methods=["GET", "OPTIONS"])
 def confirm_solution_via_link():
-    token  = request.args.get("token", "")
+    import logging
+    authToken  = request.args.get("token", "")
     action = (request.args.get("a") or "confirm").lower()
     wants_json = "application/json" in (request.headers.get("Accept") or "").lower()
 
+    logging.warning(f"[CONFIRM] Incoming token: {authToken}")
+    logging.warning(f"[CONFIRM] Action: {action}")
+
+    from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+    # SECRET_KEY is already imported at the top of this file from config.py
+
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     try:
-        payload = _serializer(SECRET_KEY).loads(token, max_age=7*24*3600)
-    except (BadSignature, SignatureExpired):
-        return (jsonify(ok=False, reason="invalid_or_expired"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
+        payload = ts.loads(authToken, max_age=7*24*3600)
+        logging.warning(f"[CONFIRM] Token payload: {payload}")
+    except SignatureExpired:
+        logging.error("[CONFIRM] Token expired")
+        return (jsonify(ok=False, reason="expired"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
+    except BadSignature:
+        logging.error("[CONFIRM] Bad token signature")
+        return (jsonify(ok=False, reason="bad_signature"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
+    except Exception as e:
+        logging.error(f"[CONFIRM] Token parse error: {e}")
+        return (jsonify(ok=False, reason=f"token_error:{e}"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
 
     sid = payload.get("solution_id")
+    ticket_id = payload.get("ticket_id")
+    attempt_id = payload.get("attempt_id")
+    logging.warning(f"[CONFIRM] solution_id={sid}, ticket_id={ticket_id}, attempt_id={attempt_id}")
     s   = db.session.get(Solution, sid)
-    if not s:
+    t   = db.session.get(Ticket, ticket_id) if ticket_id else None
+    att = db.session.get(ResolutionAttempt, attempt_id) if attempt_id else None
+    logging.warning(f"[CONFIRM] Solution: {s}")
+    logging.warning(f"[CONFIRM] Ticket: {t}")
+    logging.warning(f"[CONFIRM] Attempt: {att}")
+    if not s and action == "confirm":
+        # Create a new Solution record if confirming and none exists
+        ticket_id = payload.get("ticket_id")
+        attempt_id = payload.get("attempt_id")
+        # You may want to add more fields from the payload or context
+        s = Solution(
+            id=sid,
+            ticket_id=ticket_id,
+            status=SolutionStatus.confirmed_by_user,
+            confirmed_by_user=True,
+            confirmed_at=_utcnow(),
+            confirmed_via=SolutionConfirmedVia.web,
+            confirmed_ip=request.headers.get("X-Forwarded-For", request.remote_addr),
+            created_at=_utcnow(),
+            updated_at=_utcnow(),
+        )
+        db.session.add(s)
+        db.session.commit()
+    elif not s:
         return (jsonify(ok=False, reason="not_found"), 404) if wants_json else redirect(CONFIRM_REDIRECT_URL)
 
     # attempt is optional for old tokens
@@ -1856,32 +2058,32 @@ def analytics_agents():
     return jsonify({"agents": result})
 
 
-# Confirmation Redirect
-@urls.route("/confirm", methods=["GET"])
-def confirm_redirect():
-    # Extract token from query string
-    from urllib.parse import parse_qs
-    qs = request.query_string.decode()
-    params = parse_qs(qs)
-    token = params.get('token', [None])[0]
-    if token:
-        try:
-            payload = _serializer(SECRET_KEY).loads(token, max_age=7*24*3600)
-            att = db.session.get(ResolutionAttempt, payload.get("attempt_id"))
-            t = db.session.get(Ticket, payload.get("ticket_id"))
-            if att and t and att.agent_id:
-                t.resolved_by = att.agent_id
-                db.session.commit()
-        except Exception as e:
-            pass  # Ignore errors, just redirect
-    target = CONFIRM_REDIRECT_URL_SUCCESS + (f"?{qs}" if qs else "")
-    return redirect(target, code=302)
+# # Confirmation Redirect
+# @urls.route("/confirm", methods=["GET"])
+# def confirm_redirect():
+#     # Extract token from query string
+#     from urllib.parse import parse_qs
+#     qs = request.query_string.decode()
+#     params = parse_qs(qs)
+#     authToken = params.get('token', [None])[0]
+#     if authToken:
+#         try:
+#             payload = _serializer(SECRET_KEY).loads(authToken, max_age=7*24*3600)
+#             att = db.session.get(ResolutionAttempt, payload.get("attempt_id"))
+#             t = db.session.get(Ticket, payload.get("ticket_id"))
+#             if att and t and att.agent_id:
+#                 t.resolved_by = att.agent_id
+#                 db.session.commit()
+#         except Exception as e:
+#             pass  # Ignore errors, just redirect
+#     target = CONFIRM_REDIRECT_URL_SUCCESS + (f"?{qs}" if qs else "")
+#     return redirect(target, code=302)
 
 @urls.post("/solutions/not_fixed_feedback")
 def not_fixed_feedback():
-    token = (request.args.get("token") or "").strip()
+    authToken = (request.args.get("token") or "").strip()
     try:
-        payload = _serializer(SECRET_KEY).loads(token, max_age=7*24*3600)
+        payload = _serializer(SECRET_KEY).loads(authToken, max_age=7*24*3600)
     except (BadSignature, SignatureExpired):
         return jsonify(ok=False, error="invalid_or_expired"), 400
 

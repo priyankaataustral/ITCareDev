@@ -34,7 +34,7 @@ jobs:
           ###### End of Repository/Build Configurations ######
         env:
           # This line exposes the secret to the build process
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE }}
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
