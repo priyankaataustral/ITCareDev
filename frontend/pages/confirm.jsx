@@ -1,8 +1,8 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 
-const RAW_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
-const API_BASE = /^https?:\/\//i.test(RAW_BASE) ? RAW_BASE : 'http://localhost:5000';
+const RAW_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || '';
+const API_BASE = /^https?:\/\//i.test(RAW_BASE) ? RAW_BASE : '';
 console.log('[Confirm] API_BASE =', API_BASE);
 
 export default function ConfirmPage() {
