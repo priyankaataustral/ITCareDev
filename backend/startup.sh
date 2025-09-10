@@ -4,7 +4,7 @@
 echo "Starting AI Support Assistant Backend..."
 
 # Run database migrations
-flask --app app:create_app db upgrade
+flask --app run:app db upgrade
 
 # Start Gunicorn
-gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 "app:create_app()"
+gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 run:app
