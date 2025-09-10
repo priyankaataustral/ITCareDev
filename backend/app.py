@@ -42,7 +42,7 @@ def create_app():
     # Optional: TLS validation with CA bundle (if present). If not found,
     # SQLAlchemy/PyMySQL will still use TLS if server enforces it.
     project_root = os.path.abspath(os.path.dirname(__file__))
-    ca_bundle = os.path.join(project_root, "certs", "azure-mysql-roots.pem")
+    ca_bundle = os.path.join(project_root, "certs", "DigiCertGlobalRootCA.crt.pem")
     if os.path.exists(ca_bundle):
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "connect_args": {"ssl": {"ca": ca_bundle}}
