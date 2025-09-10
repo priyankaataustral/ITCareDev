@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiGet, apiPost } from '@/lib/apiClient';
+import { apiGet, apiPost } from '../lib/apiClient';
 
 const TOKEN_KEY = 'authToken';
 const AGENT_KEY = 'authAgent';

@@ -8,7 +8,7 @@ import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
-import { apiGet } from '@/lib/apiClient'; // only import what we use
+import { apiGet } from '../lib/apiClient'; // only import what we use
 
 export default function SupportInboxPlugin() {
   const [selectedId, setSelectedId] = useState(null);

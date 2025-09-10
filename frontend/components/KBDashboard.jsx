@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dayjs from "dayjs";
 import { useAuth } from "../components/AuthContext"; // keep if Gate/children rely on context
 import Gate from "./Gate";
-import { apiGet, apiPost } from "@/lib/apiClient"; // ← use the centralized client
+import { apiGet, apiPost } from "../lib/apiClient"; // ← use the centralized client
 
 /**
  * UI: Agent Knowledge Dashboard

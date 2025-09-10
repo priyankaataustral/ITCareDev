@@ -6,7 +6,7 @@ import Gate from './Gate';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
-import { apiGet, apiPost, apiPatch } from '@/lib/apiClient'; // <— use centralized client
+import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
 
 dayjs.extend(relativeTime);
 

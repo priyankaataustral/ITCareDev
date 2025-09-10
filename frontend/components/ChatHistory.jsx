@@ -4,7 +4,7 @@ import Gate from './Gate';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { apiGet, apiPost, apiPatch, API_BASE } from '@/lib/apiClient';
+import { apiGet, apiPost, apiPatch, API_BASE } from '../lib/apiClient';
 // import { apiFetch } from '/apiFetch';
 dayjs.extend(relativeTime);
 
