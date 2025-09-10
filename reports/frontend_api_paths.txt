@@ -1,0 +1,9 @@
+﻿/chat
+/kb/articles/${articleId}/feedback
+/search
+/solutions/${solutionId}/send_confirmation_email
+/threads
+/threads/${id}/department
+/threads/${threadId}/feedback
+/tickets/${id}
+/tickets?limit=${limit}&offset=${offset}

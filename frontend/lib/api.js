@@ -2,7 +2,7 @@
 import { apiGet, apiPost, apiPatch } from "./apiClient";
 
 export function getTickets({ limit = 50, offset = 0 } = {}) {
-  return apiGet(`/tickets?limit=${limit}&offset=${offset}`);
+  return apiGet(`/threads?limit=${limit}&offset=${offset}`);
 }
 
 export function setTicketDepartment(id, { department_id, reason }) {
@@ -14,11 +14,11 @@ export function fetchThreads() {
 }
 
 export function fetchTicket(id) {
-  return apiGet(`/tickets/${id}`);
+  return apiGet(`/threads/${id}`);
 }
 
-export function sendMessage(ticketId, message) {
-  return apiPost(`/chat`, { ticketId, message });
+export function sendMessage(threadId, message) {
+  return apiPost(`/threads/${threadId}/chat`, { threadId, message });
 }
 
 export function searchContext(ticketId) {

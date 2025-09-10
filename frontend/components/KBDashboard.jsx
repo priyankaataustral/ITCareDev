@@ -1,11 +1,10 @@
+'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { useAuth } from "../components/AuthContext"; // adjust path if needed
-import Gate from "./Gate"; // adjust path if needed
-
-// Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
+import { useAuth } from "../components/AuthContext"; // keep if Gate/children rely on context
+import Gate from "./Gate";
+import { apiGet, apiPost } from "@/lib/apiClient"; // ← use the centralized client
 
 /**
  * UI: Agent Knowledge Dashboard
@@ -13,27 +12,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
  * - Manage KB drafts (publish, archive)
  * - Handle feedback (resolve, triage)
  * - Light analytics (counts & trends)
- *
- * Props
- * - open: boolean — show/hide overlay
- * - onClose: () => void
  */
 export default function KBDashboard({ open, onClose }) {
-  const authedFetch = useAuthedFetch();
   const [tab, setTab] = useState("review");
-
-  // --- API endpoints (adjust if your backend uses different paths) ---
-  const API = useMemo(() => ({
-    solutions: `${API_BASE}/solutions`, // GET list; POST actions may be on /solutions/:id/*
-    solutionConfirm: (id) => `${API_BASE}/solutions/${id}/send_confirmation_email`,
-    articles: `${API_BASE}/kb/articles`, // GET list
-    promoteFromSolution: (id) => `${API_BASE}/solutions/${id}/promote`, // POST
-    publishArticle: (id) => `${API_BASE}/kb/articles/${id}/publish`,
-    archiveArticle: (id) => `${API_BASE}/kb/articles/${id}/archive`,
-    feedback: `${API_BASE}/kb/feedback`, // GET list
-    resolveFeedback: (id) => `${API_BASE}/kb/feedback/${id}/resolve`,
-    analytics: `${API_BASE}/kb/analytics`,
-  }), [API_BASE]);
 
   // --- State ---
   const [loading, setLoading] = useState(false);
@@ -47,22 +28,17 @@ export default function KBDashboard({ open, onClose }) {
   const [q, setQ] = useState(""); // search
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // --- Data fetchers ---
+  // --- Data fetchers (now use apiGet/apiPost which return parsed JSON) ---
   const refresh = useCallback(async () => {
     if (!open) return;
     setLoading(true); setErr("");
     try {
-      const [solR, artR, fbR, anR] = await Promise.all([
-        // solutions: prefer statuses relevant to review
-        authedFetch(`${API.solutions}?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50`),
-        authedFetch(`${API.articles}?status=draft,published,archived&limit=50`),
-        authedFetch(`${API.feedback}?limit=50`),
-        authedFetch(API.analytics).catch(() => null),
+      const [sol, art, fb, mx] = await Promise.all([
+        apiGet('/solutions?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50'),
+        apiGet('/kb/articles?status=draft,published,archived&limit=50'),
+        apiGet('/kb/feedback?limit=50'),
+        apiGet('/kb/analytics').catch(() => null),
       ]);
-      const sol = (await solR.json()) || [];
-      const art = (await artR.json()) || [];
-      const fb  = (await fbR.json())  || [];
-      const mx  = anR ? await anR.json() : null;
       setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
       setArticles(Array.isArray(art) ? art : (art.items || []));
       setFeedback(Array.isArray(fb) ? fb : (fb.items || []));
@@ -72,35 +48,29 @@ export default function KBDashboard({ open, onClose }) {
     } finally {
       setLoading(false);
     }
-  }, [API, authedFetch, open]);
-
+  }, [open]);
 
   // Fetch agent analytics when analytics tab is loaded
   useEffect(() => {
     if (tab !== 'analytics' || !open) return;
     (async () => {
       try {
-        const res = await authedFetch(`${API_BASE}/kb/analytics/agents`);
-        const data = await res.json();
-        setAgentStats(Array.isArray(data.agents) ? data.agents : []);
-      } catch (e) {
+        const data = await apiGet('/kb/analytics/agents');
+        setAgentStats(Array.isArray(data?.agents) ? data.agents : []);
+      } catch {
         setAgentStats([]);
       }
     })();
-  }, [tab, open, authedFetch]);
+  }, [tab, open]);
 
   // --- Actions ---
   const sendConfirmEmail = async (solution) => {
     try {
-      const r = await authedFetch(API.solutionConfirm(solution.id), { method: 'POST' });
-      if (!r.ok) throw new Error((await r.json()).error || 'Failed');
+      await apiPost(`/solutions/${solution.id}/send_confirmation_email`, {});
       toast(`Confirmation email queued for solution #${solution.id}`);
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
   };
 
-  const promoteToKB = async (solution) => {
-    try {
-  // Copy confirm link helper (component scope)
   const copyConfirmLink = async (s) => {
     const url =
       s.confirm_url ||
@@ -111,11 +81,10 @@ export default function KBDashboard({ open, onClose }) {
     await navigator.clipboard.writeText(url);
     toast("Confirm link copied");
   };
-      const r = await authedFetch(API.promoteFromSolution(solution.id), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+
+  const promoteToKB = async (solution) => {
+    try {
+      const data = await apiPost(`/solutions/${solution.id}/promote`, {});
       toast(`Promoted to KB as article #${data.article_id || ''}`);
       refresh();
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
@@ -123,9 +92,7 @@ export default function KBDashboard({ open, onClose }) {
 
   const publishArticle = async (article) => {
     try {
-      const r = await authedFetch(API.publishArticle(article.id), { method: 'POST' });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      await apiPost(`/kb/articles/${article.id}/publish`, {});
       toast(`Published article #${article.id}`);
       refresh();
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
@@ -133,9 +100,7 @@ export default function KBDashboard({ open, onClose }) {
 
   const archiveArticle = async (article) => {
     try {
-      const r = await authedFetch(API.archiveArticle(article.id), { method: 'POST' });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      await apiPost(`/kb/articles/${article.id}/archive`, {});
       toast(`Archived article #${article.id}`);
       refresh();
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
@@ -143,9 +108,7 @@ export default function KBDashboard({ open, onClose }) {
 
   const resolveFeedback = async (f) => {
     try {
-      const r = await authedFetch(API.resolveFeedback(f.id), { method: 'POST' });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      await apiPost(`/kb/feedback/${f.id}/resolve`, {});
       toast(`Resolved feedback #${f.id}`);
       refresh();
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
@@ -445,21 +408,7 @@ export default function KBDashboard({ open, onClose }) {
   );
 }
 
-// Helper for agent analytics fetch
-function authHeaders() {
-  const authToken = (typeof window !== 'undefined' && window.localStorage && window.localStorage.getItem('token')) || '';
-  return authToken ? { Authorization: `Bearer ${authToken}` } : {};
-}
-
 // --- Helpers ---
-function useAuthedFetch(){
-  const { authToken } = useAuth();
-  return useCallback((url, opts={}) => {
-    const headers = { ...(opts.headers||{}), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
-    return fetch(url, { ...opts, headers, credentials: 'include' });
-  }, [authToken]);
-}
-
 function fmt(ts){
   if (!ts) return '-';
   const d = dayjs(ts);
@@ -557,7 +506,6 @@ function avgHoursToConfirm(solutions){
   if (!diffs.length) return "—";
   return `${(diffs.reduce((a,b)=>a+b,0) / diffs.length).toFixed(1)}h`;
 }
-
 
 function toast(msg, isErr){
   // tiny inline toast; replace with your own system if present

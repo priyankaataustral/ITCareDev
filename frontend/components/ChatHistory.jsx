@@ -4,13 +4,13 @@ import Gate from './Gate';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { apiGet, apiPost, apiPatch, API_BASE } from '@/lib/apiClient';
 // import { apiFetch } from '/apiFetch';
 dayjs.extend(relativeTime);
 
 // =========================
 // Config & helpers
 // =========================
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000').replace(/\/+$/, '');
 
 
 const authHeaders = () => {
@@ -543,55 +543,6 @@ function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus
   );
 }
 
-// function RightTopPanel({
-//   tid,
-//   API_BASE,
-//   panelOpen,
-//   setPanelOpen,
-//   suggestedPrompts,
-//   suggestedPromptsLoading,
-//   suggestedPromptsError,
-//   relatedTickets,
-//   relatedTicketsLoading,
-//   relatedTicketsError,
-//   handleRelatedTicketClick,
-//   stepInfo,
-//   timeline,
-//   timelineLoading,
-//   timelineError,
-//   openSections,
-//   toggleSection,
-// }) {
-//   return (
-//     <aside className="flex flex-col gap-2 w-full md:w-80 max-w-xs">
-//       {/* Activity collapsible at the top */}
-//       <TimelinePanel
-//         events={timeline}
-//         loading={timelineLoading}
-//         error={timelineError}
-//         openSections={openSections}
-//         toggleSection={toggleSection}
-//       />
-//       <SuggestedPrompts
-//         threadId={tid}
-//         prompts={suggestedPrompts}
-//         open={panelOpen}
-//         onToggle={() => setPanelOpen((v) => !v)}
-//         apiBase={API_BASE}
-//       />
-//       <RelatedTicketList
-//         tickets={relatedTickets}
-//         loading={relatedTicketsLoading}
-//         error={relatedTicketsError}
-//         onClick={handleRelatedTicketClick}
-//         openSections={openSections}
-//         toggleSection={toggleSection}
-//       />
-//       <StepProgressBar stepInfo={stepInfo} />
-//     </aside>
-//   );
-// }
-
 
 // =========================
 // Main Component
@@ -760,103 +711,6 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   };
 
 
-//   const getConfirmLinks = async () => {
-//   // Use cached if available
-//   if (confirmLinks.confirm && confirmLinks.notConfirm) return confirmLinks;
-
-//   // 1) Try direct links endpoint
-//   try {
-//     const r = await fetch(`${API_BASE}/threads/${tid}/confirm-links`, {
-//       headers: authHeaders(),
-//       credentials: 'include'
-//     });
-//     if (r.ok) {
-//       const data = await r.json();
-//       const links = {
-//         confirm: data?.confirm_url || data?.confirm || '',
-//         notConfirm: data?.not_confirm_url || data?.notConfirm || data?.deny_url || ''
-//       };
-//       if (links.confirm && links.notConfirm) {
-//         setConfirmLinks(links);
-//         return links;
-//       }
-//     }
-//   } catch {}
-
-//   // 2) Try token -> build signed links
-//   try {
-//     const r2 = await fetch(`${API_BASE}/threads/${tid}/confirm-token`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-//       credentials: 'include'
-//     });
-//     const data2 = await r2.json();
-//     if (r2.ok && data2?.token) {
-//       const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
-//       const links = {
-//         confirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
-//         notConfirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=not_confirm`
-//       };
-//       setConfirmLinks(links);
-//       return links;
-//     }
-//   } catch {}
-
-//   // 3) **DEMO FALLBACK** (always produce visible links even if unauthorized)
-//   const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
-//   const demoLinks = {
-//     confirm: `${origin}/confirm?thread=${encodeURIComponent(tid)}&a=confirm&demo=1`,
-//     notConfirm: `${origin}/confirm?thread=${encodeURIComponent(tid)}&a=not_confirm&demo=1`
-//   };
-//   setConfirmLinks(demoLinks);
-//   return demoLinks;
-// };
-
-  // const getConfirmLinks = async () => {
-  //   // Use cached if available
-  //   if (confirmLinks.confirm && confirmLinks.notConfirm) return confirmLinks;
-
-  //   // Try a direct links endpoint (if your API exposes it)
-  //   try {
-  //     const r = await fetch(`${API_BASE}/threads/${tid}/confirm-links`, {
-  //       headers: authHeaders(),
-  //       credentials: 'include'
-  //     });
-  //     if (r.ok) {
-  //       const data = await r.json();
-  //       const links = {
-  //         confirm: data?.confirm_url || data?.confirm || '',
-  //         notConfirm: data?.not_confirm_url || data?.notConfirm || data?.deny_url || ''
-  //       };
-  //       if (links.confirm && links.notConfirm) {
-  //         setConfirmLinks(links);
-  //         return links;
-  //       }
-  //     }
-  //   } catch {}
-
-  //   // Otherwise get a token and build the URLs against the app origin
-  //   try {
-  //     const r2 = await fetch(`${API_BASE}/threads/${tid}/confirm-token`, {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-  //       credentials: 'include'
-  //     });
-  //     const data2 = await r2.json();
-  //     if (r2.ok && data2?.token) {
-  //       const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
-  //       const links = {
-  //         confirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
-  //         notConfirm: `${origin}/confirm?token=${encodeURIComponent(data2.token)}&a=not_confirm`
-  //       };
-  //       setConfirmLinks(links);
-  //       return links;
-  //     }
-  //   } catch {}
-
-  //   // Last resort: empty (won't append)
-  //   return { confirm: '', notConfirm: '' };
-  // };
 
   const getConfirmLinks = async () => {
   // Use cache
@@ -864,12 +718,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   // 1) Server-prepared links
   try {
-    const r = await fetch(`${API_BASE}/threads/${tid}/confirm-links`, {
-      headers: authHeaders(),
-      credentials: 'include'
-    });
-    if (r.ok) {
-      const data = await r.json();
+      const data = await apiGet(`/threads/${tid}/confirm-links`);
       const links = {
         confirm: data?.confirm_url || data?.confirm || '',
         notConfirm: data?.not_confirm_url || data?.notConfirm || data?.deny_url || ''
@@ -878,22 +727,12 @@ function ChatHistory({ threadId, onBack, className = '' }) {
         setConfirmLinks(links);
         return links;
       }
-    } else {
-      console.warn('[getConfirmLinks] confirm-links status:', r.status);
-    }
-  } catch (e) {
-    console.warn('[getConfirmLinks] confirm-links error:', e);
-  }
+    } catch (e) { console.warn('[getConfirmLinks] confirm-links error:', e); }
 
   // 2) Signed token → build URLs
   try {
-    const r2 = await fetch(`${API_BASE}/threads/${tid}/confirm-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      credentials: 'include'
-    });
-    const data2 = await r2.json().catch(() => ({}));
-    if (r2.ok && data2?.token) {
+    const data2 = await apiPost(`/threads/${tid}/confirm-token`, {});
+    if (data2?.token) {
       const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
       const links = {
         confirm: `${origin}/solutions/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
@@ -901,12 +740,8 @@ function ChatHistory({ threadId, onBack, className = '' }) {
       };
       setConfirmLinks(links);
       return links;
-    } else {
-      console.warn('[getConfirmLinks] confirm-token status:', r2.status, data2);
     }
-  } catch (e) {
-    console.warn('[getConfirmLinks] confirm-token error:', e);
-  }
+  } catch (e) { console.warn('[getConfirmLinks] confirm-token error:', e); }
 
   // 3) Dev fallback (lets you SEE links even if you’re logged out)
   const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
@@ -945,106 +780,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   Support Team`;
   };
 
-  // const draftFromBackendOrBuild = async (solutionLike) => {
-  //   const candidate = (solutionLike || '').trim();
 
-  //   // Ask backend first (and request links if it supports them)
-  //   try {
-  //     if (candidate) {
-  //       const res = await fetch(`${API_BASE}/threads/${tid}/draft-email`, {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-  //         credentials: 'include',
-  //         body: JSON.stringify({ solution: candidate, include_links: false })
-  //       });
-  //       let data = {};
-  //       try { data = await res.json(); } catch {}
-  //       let email = (data?.email && String(data.email).trim()) || '';
-
-  //       // If backend didn't include the confirm links, append ours
-  //       const hasConfirmLinks = /\/confirm\?token=.*?&a=/.test(email);
-  //       if (!hasConfirmLinks) {
-  //         const links = await getConfirmLinks();
-  //         if (links.confirm && links.notConfirm) {
-  //           const base = email || buildEmailFromAnyText(candidate);
-  //           email = `${base}
-
-  // —
-
-  // Please let us know if the fix worked:
-
-  // ✅ Solution worked: ${links.confirm}
-  // ❌ Didn’t solve the problem: ${links.notConfirm}`;
-  //         } else if (!email) {
-  //           email = buildEmailFromAnyText(candidate);
-  //         }
-  //       }
-  //       return email;
-  //     }
-  //   } catch {}
-
-  //   // Pure frontend fallback (+links if we can fetch them)
-  //   const base = buildEmailFromAnyText(candidate);
-  //   const links = await getConfirmLinks();
-  //   if (links.confirm && links.notConfirm) {
-  //     return `${base}
-
-  // —
-
-  // Please let us know if the fix worked:
-
-  // ✅ Solution worked: ${links.confirm}
-  // ❌ Didn’t solve the problem: ${links.notConfirm}`;
-  //   }
-  //   return base;
-  // };
-
-// const draftFromBackendOrBuild = async (solutionLike) => {
-//   const candidate = (solutionLike || '').trim();
-
-//   try {
-//     if (candidate) {
-//       const res = await fetch(`${API_BASE}/threads/${tid}/draft-email`, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-//         credentials: 'include',
-//         body: JSON.stringify({ solution: candidate, include_links: false })
-//       });
-//       let data = {};
-//       try { data = await res.json(); } catch {}
-//       let email = (data?.email && String(data.email).trim()) || '';
-
-//       // If backend didn't include the confirm links, insert ours BEFORE "Best regards,"
-//       const hasConfirmLinks = /\/confirm\?token=.*?&a=/.test(email);
-//       if (!hasConfirmLinks) {
-//         const links = await getConfirmLinks();
-//         if (links.confirm && links.notConfirm) {
-//           const base = email || buildEmailFromAnyText(candidate);
-//           const confirmBlock = `Please let us know if the fix worked:
-
-// ✅ Solution worked: ${links.confirm}
-// ❌ Didn’t solve the problem: ${links.notConfirm}`;
-//           email = insertBeforeBestRegards(base, confirmBlock);
-//         } else if (!email) {
-//           email = buildEmailFromAnyText(candidate);
-//         }
-//       }
-//       return email;
-//     }
-//   } catch {}
-
-//   // Pure frontend fallback (+links inserted BEFORE "Best regards,")
-//   const base = buildEmailFromAnyText(candidate);
-//   const links = await getConfirmLinks();
-//   if (links.confirm && links.notConfirm) {
-//     const confirmBlock = `Please let us know if the fix worked:
-
-// ✅ Solution worked: ${links.confirm}
-// ❌ Didn’t solve the problem: ${links.notConfirm}`;
-//     return insertBeforeBestRegards(base, confirmBlock);
-//   }
-//   return base;
-// };
 
 // Convert simple HTML (especially <a>) to plain text while keeping URLs visible.
 function asPlainTextPreservingLinks(htmlOrText = '') {
@@ -1107,100 +843,6 @@ const draftFromBackendOrBuild = async (solutionLike) => {
 };
 
 
-// const draftFromBackendOrBuild = async (solutionLike) => {
-//   const candidate = (solutionLike || '').trim();
-
-//   // Get base from backend (no links requested) or fallback
-//   try {
-//     if (candidate) {
-//       const res = await fetch(`${API_BASE}/threads/${tid}/draft-email`, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-//         credentials: 'include',
-//         body: JSON.stringify({ solution: candidate, include_links: false })
-//       });
-//       const data = await res.json().catch(() => ({}));
-//       email = (data?.email && String(data.email).trim()) || '';
-//     }
-//   } catch {}
-//   if (!email) email = buildEmailFromAnyText(candidate);
-
-//   // Fetch (or build) links → insert BEFORE "Best regards,"
-//   const { confirm, notConfirm } = await getConfirmLinks();
-//   const block =
-// `Please let us know if the fix worked:
-
-// ✅ Solution worked: ${confirm}
-// ❌ Didn’t solve the problem: ${notConfirm}`;
-
-//   return insertBeforeBestRegards(email, block);
-// };
-
-
-// const draftFromBackendOrBuild = async (solutionLike) => {
-//   const candidate = (solutionLike || '').trim();
-
-//   try {
-//     if (candidate) {
-//       // **Ask backend to include links again**
-//       const res = await fetch(`${API_BASE}/threads/${tid}/draft-email`, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-//         credentials: 'include',
-//         body: JSON.stringify({ solution: candidate, include_links: true })
-//       });
-
-//       let data = {};
-//       try { data = await res.json(); } catch {}
-//       let email = asPlainTextPreservingLinks((data?.email && String(data.email).trim()) || '');
-
-//       // If backend didn't include the confirm links, or they are missing,
-//       // build them and insert BEFORE "Best regards," so sanitize won't cut them.
-//       const hasConfirmLinks = /\/confirm\?token=.*?&a=/.test(email);
-//       if (!hasConfirmLinks) {
-//         const links = await getConfirmLinks();
-//         if (links.confirm && links.notConfirm) {
-//           const base = email || buildEmailFromAnyText(candidate);
-//           const block =
-// `Please let us know if the fix worked:
-
-// ✅ Solution worked: ${links.confirm}
-// ❌ Didn’t solve the problem: ${links.notConfirm}`;
-//           email = insertBeforeBestRegards(base, block);
-//         } else if (!email) {
-//           email = buildEmailFromAnyText(candidate);
-//         }
-//       } else {
-//         // Backend included links; make sure they survive sanitize by moving them
-//         // before "Best regards," if needed.
-//         const BR_RE = /(^|\n)\s*Best regards,?/i;
-//         if (BR_RE.test(email) && email.indexOf('confirm?') > email.search(BR_RE)) {
-//           // If links are after the signature, pull them up above it
-//           const after = email.slice(email.search(BR_RE));
-//           const before = email.slice(0, email.search(BR_RE));
-//           const tailWithLinks = email.match(/.*confirm\?.*$/ms)?.[0] || '';
-//           email = before + '\n\n' + tailWithLinks + '\n\n' + after;
-//         }
-//       }
-
-//       return email;
-//     }
-//   } catch {}
-
-//   // Pure frontend fallback (+links) — also insert BEFORE "Best regards,"
-//   const base = buildEmailFromAnyText(candidate);
-//   const links = await getConfirmLinks();
-//   if (links.confirm && links.notConfirm) {
-//     const block =
-// `Please let us know if the fix worked:
-
-// ✅ Solution worked: ${links.confirm}
-// ❌ Didn’t solve the problem: ${links.notConfirm}`;
-//     return insertBeforeBestRegards(base, block);
-//   }
-//   return base;
-// };
-
 
 
   // Fetch an explicit solution (without adding bubbles), then show the panel
@@ -1209,19 +851,13 @@ const draftFromBackendOrBuild = async (solutionLike) => {
     if (best && best.trim()) return best;
 
     try {
-      const resp = await fetch(`${API_BASE}/threads/${tid}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
-        body: JSON.stringify({
-          message: 'propose a solution',
-          history: buildHistory(messages),
-          no_store: true,
-          source: 'suggested'
-        })
+      const data = await apiPost(`/threads/${tid}/chat`, {
+        message: 'propose a solution',
+        history: buildHistory(messages),
+        no_store: true,
+        source: 'suggested',
       });
-      const data = await resp.json();
-      if (resp.ok && data?.type === 'solution' && typeof data.text === 'string' && data.text.trim()) {
+      if (data?.type === 'solution' && typeof data.text === 'string' && data.text.trim()) {
         setPendingSolution(data.text);      // show Proposed Solution panel
         best = data.text;
       }
@@ -1333,13 +969,6 @@ const sanitizeEmailBody = (raw) => {
   return t;
 };
 
-// // Insert a block right before "Best regards,"
-// const insertBeforeBestRegards = (body, block) => {
-//   const re = /(^|\n)\s*Best regards,?/i;
-//   const m = re.exec(body);
-//   if (!m) return `${body.trim()}\n\n${block}`; // fallback if no BR line found
-//   return `${body.slice(0, m.index).trimEnd()}\n\n${block}\n\n${body.slice(m.index)}`;
-// };
 
 
 const openDraftEditor = (prefill) => {
@@ -1357,8 +986,7 @@ const openDraftEditor = (prefill) => {
   if (!activeThreadId || sending || loadingStep || actionLoading) return;
 
   const interval = setInterval(() => {
-    fetch(`${API_BASE}/threads/${activeThreadId}`, { headers: authHeaders(), credentials: 'include' })
-      .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+    apiGet(`/threads/${activeThreadId}`)
       .then(data => setTicket(t => {
         if (!t) return t;
         const statusChanged = t.status !== data.status;
@@ -1388,8 +1016,7 @@ const openDraftEditor = (prefill) => {
     if (!activeThreadId) return;
     setTimelineLoading(true);
     setTimelineError(null);
-    fetch(`${API_BASE}/threads/${activeThreadId}/timeline`, { headers: authHeaders(), credentials: 'include' })
-      .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+    apiGet(`/threads/${activeThreadId}/timeline`)
       .then(data => setTimeline(Array.isArray(data) ? data : []))
       .catch(() => setTimelineError('Failed to load timeline'))
       .finally(() => setTimelineLoading(false));
@@ -1398,8 +1025,7 @@ const openDraftEditor = (prefill) => {
   // Refresh messages when timeline changes (merge, not replace)
   useEffect(() => {
     if (!activeThreadId) return;
-    fetch(`${API_BASE}/threads/${activeThreadId}`, { headers: authHeaders(), credentials: 'include' })
-      .then(r => r.ok ? r.json() : Promise.reject())
+    apiGet(`/threads/${activeThreadId}`)
       .then(data => {
         const fresh = Array.isArray(data.messages)
           ? data.messages.map(m => ({
@@ -1463,8 +1089,7 @@ const openDraftEditor = (prefill) => {
     if (!activeThreadId) return;
     setLoading(true);
     setError(null);
-    fetch(`${API_BASE}/threads/${activeThreadId}`, { headers: authHeaders(), credentials: 'include' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    apiGet(`/threads/${activeThreadId}`)
       .then(data => {
         setTicket(data);
         const normalized = (Array.isArray(data.messages) ? data.messages : []).map((m) => {
@@ -1585,8 +1210,7 @@ const openDraftEditor = (prefill) => {
     setSuggestedPromptsLoading(true);
     setSuggestedPromptsError(null);
 
-    fetch(`${API_BASE}/threads/${tid}/suggested-prompts`, { credentials: "include", headers: authHeaders() })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    apiGet(`/threads/${tid}/suggested-prompts`)
       .then((data) => {
         let prompts = Array.isArray(data.prompts) ? data.prompts : [];
         setSuggestedPrompts(prompts);
@@ -1679,8 +1303,7 @@ const openDraftEditor = (prefill) => {
     if (!tid) return;
     setRelatedTicketsLoading(true);
     setRelatedTicketsError(null);
-    fetch(`${API_BASE}/threads/${tid}/related-tickets`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    apiGet(`/threads/${tid}/related-tickets`)
       .then(data => setRelatedTickets(Array.isArray(data.tickets) ? data.tickets : []))
       .catch(() => setRelatedTicketsError('Failed to load related tickets'))
       .finally(() => setRelatedTicketsLoading(false));
@@ -1816,19 +1439,12 @@ const openDraftEditor = (prefill) => {
         ...messages,
         { sender: 'user', content: text }  // <- include current user message
       ]);
-      const resp = await fetch(`${API_BASE}/threads/${tid}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
-        body: JSON.stringify({
-              message: text,
-              history: lastMessages,
-              no_store: true,
-              ...(options.source ? { source: options.source } : {})
-            })
+      const data = await apiPost(`/threads/${tid}/chat`, {
+        message: text,
+        history: lastMessages,
+        no_store: true,
+        ...(options.source ? { source: options.source } : {}),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Error');
 
       setMessages(prev => {
       let arr = prev.filter(m => m.id !== tempTypingId);
@@ -1931,14 +1547,7 @@ const openDraftEditor = (prefill) => {
         return;
       }
 
-      const resp = await fetch(`${API_BASE}/threads/${tid}/step`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
-        body: JSON.stringify({ ok })
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error);
+      const data = await apiPost(`/threads/${tid}/step`, { ok });
       if (typeof data.step === 'number' && typeof data.total === 'number') {
         if (data.step === data.total) {
           setMessages(prev => [
@@ -1976,14 +1585,7 @@ const openDraftEditor = (prefill) => {
   const handleSolutionResponse = async (solved) => {
     setShowSolutionPrompt(false);
     try {
-      const resp = await fetch(`${API_BASE}/threads/${tid}/solution`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        credentials: 'include',
-        body: JSON.stringify({ solved }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Error');
+      const data = await apiPost(`/threads/${tid}/solution`, { solved });
       setMessages(prev => [
         ...prev,
         {
@@ -2020,14 +1622,7 @@ const openDraftEditor = (prefill) => {
         });
         const reportText = reportLines.join('\n');
 
-        const resp = await fetch(`${API_BASE}/threads/${tid}/escalate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          credentials: 'include',
-          body: JSON.stringify({ report: reportText })
-        });
-        if (!resp.ok) throw new Error('Failed to escalate');
-        const data = await resp.json();
+        const data = await apiPost(`/threads/${tid}/escalate`, { report: reportText });
         setTicket(t => ({ ...t, status: data.status }));
 
         const blob = new Blob([reportText], { type: 'text/plain' });
@@ -2039,13 +1634,8 @@ const openDraftEditor = (prefill) => {
         ]);
         setTimelineRefresh(x => x + 1);
       } else {
-        const resp = await fetch(`${API_BASE}/threads/${tid}/close`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          credentials: 'include',
-          body: JSON.stringify({ notify: notifyUser })
-        });
-        const data = await resp.json();
+        const data = await apiPost(`/threads/${tid}/close`, { notify: notifyUser });
+
         if (!resp.ok) throw new Error(data.error || 'Failed to close');
 
         setTicket(t => ({ ...t, status: data.status }));
@@ -2073,14 +1663,7 @@ const openDraftEditor = (prefill) => {
       const note = window.prompt('Add a short note for de-escalation (optional):') || '';
       setActionLoading(true);
       try {
-        const resp = await fetch(`${API_BASE}/threads/${ticket?.id}/deescalate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          credentials: 'include',
-          body: JSON.stringify({ note })
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Failed');
+        const data = await apiPost(`/threads/${ticket?.id}/deescalate`, { note });
         setTicket(t => ({ ...t, status: data.status, level: Number(data.level) }));
         setMessages(prev => [...prev, {
           id: `temp-${Date.now()}-deesc`,

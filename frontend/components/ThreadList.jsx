@@ -1,12 +1,12 @@
-// Use environment variable for API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000";
 // frontend/components/ThreadList.jsx
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import Gate from './Gate';
-import { setTicketDepartment } from '../lib/api';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
+import { apiGet, apiPost, apiPatch } from '@/lib/apiClient'; // <— use centralized client
 
 dayjs.extend(relativeTime);
 
@@ -46,25 +46,15 @@ export default function ThreadList({
       return;
     }
     setLoading(true);
-    fetch(`${API_BASE}/threads?limit=20&offset=0`, {
-         method: 'GET',
-         credentials: 'include', // send HttpOnly cookie set by /login
-         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}), // also send Bearer if we have it
-        },
-      })  
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
+
+    apiGet(`/threads?limit=20&offset=0`)
       .then((payload) => {
         const list = Array.isArray(payload) ? payload : payload.threads || [];
         setThreads(list);
       })
       .catch((err) => setError(err.message || String(err)))
       .finally(() => setLoading(false));
-  }, [threadsProp, token]);
+  }, [threadsProp, token]); // keep token in deps so list refreshes after login
 
   // (Optional) fetch short summaries for each ticket
   useEffect(() => {
@@ -73,12 +63,10 @@ export default function ThreadList({
       const out = {};
       for (const t of threads) {
         try {
-          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/summarize`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: t.text || t.subject || '' }),
+          const resp = await apiPost(`/summarize`, {
+            text: t.text || t.subject || '',
           });
-          out[t.id] = resp.ok ? (await resp.json()).summary || '' : '';
+          out[t.id] = (resp && resp.summary) ? resp.summary : '';
         } catch {
           out[t.id] = '';
         }
@@ -93,7 +81,6 @@ export default function ThreadList({
 
   if (loading) return <div className="p-6 text-center text-gray-500">Loading tickets…</div>;
   if (error)   return <div className="p-6 text-center text-red-500">Error: {error}</div>;
-
 
   // Build department options, add Unassigned
   const deptOptions = [
@@ -242,7 +229,7 @@ export default function ThreadList({
                       setSaving((s) => ({ ...s, [t.id]: true }));
                       const prevDeptId = t.department_id ?? t.department?.id ?? null;
                       try {
-                        await setTicketDepartment(t.id, {
+                        await apiPatch(`/threads/${t.id}/department`, {
                           department_id: overrideDept[t.id],
                           reason: overrideReason[t.id],
                         });

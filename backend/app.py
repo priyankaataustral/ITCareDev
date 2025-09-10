@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from extensions import db, migrate
 from cli import register_cli_commands
-from config import FRONTEND_URL, SQLALCHEMY_DATABASE_URI
+from config import FRONTEND_URL, SQLALCHEMY_DATABASE_URI, DATABASE_URL
 
 
 def create_app():

@@ -91,7 +91,7 @@ export default function KbFeedback(props) {
     setMsg({ ok: "", err: "" });
 
     try {
-      await apiPost(`/kb/articles/${articleId}/feedback`, {
+      await apiPost(`/kb/${articleId}/feedback`, {
         feedback_type: thumb,                // "helpful" | "not_helpful"
         rating: aRating || undefined,
         comment: aComment || undefined,

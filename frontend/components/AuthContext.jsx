@@ -1,14 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiGet, apiPost } from '@/lib/apiClient';
 
 const TOKEN_KEY = 'authToken';
 const AGENT_KEY = 'authAgent';
-
-// Use ONE env var, make sure you set NEXT_PUBLIC_API_BASE in your SWA/Next.js env
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000')
-    .replace(/\/+$/, '');
 
 const AuthContext = createContext({
   token: null,
@@ -25,6 +21,7 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(token && agent);
 
+  // hydrate from localStorage
   useEffect(() => {
     setMounted(true);
     try {
@@ -35,44 +32,33 @@ export function AuthProvider({ children }) {
     } catch {}
   }, []);
 
+  // persist token
   useEffect(() => {
     if (!mounted) return;
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
   }, [token, mounted]);
 
+  // persist agent
   useEffect(() => {
     if (!mounted) return;
     if (agent) localStorage.setItem(AGENT_KEY, JSON.stringify(agent));
     else localStorage.removeItem(AGENT_KEY);
   }, [agent, mounted]);
 
+  // login now uses apiPost's parsed JSON + built-in error handling
   async function login(email, password) {
-    const resp = await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      // credentials: 'include', // only if using cookies
-    });
-
-    let data = {};
-    try {
-      data = await resp.json();
-    } catch {}
-
-    if (!resp.ok) {
-      throw new Error(data.error || data.message || `Login failed (HTTP ${resp.status})`);
-    }
-
-    const { token: newToken, agent: agentData } = data;
+    const data = await apiPost('/login', { email, password });
+    const { token: newToken, agent: agentData } = data || {};
     if (!newToken || !agentData) throw new Error('Malformed response from server');
-
     setToken(newToken);
     setAgent(agentData);
     return { token: newToken, agent: agentData };
   }
 
-  function logout() {
+  // optional: hit backend logout if your API exposes it; otherwise just clear
+  async function logout() {
+    try { await apiPost('/logout', {}); } catch {/* ignore if not present */}
     setToken(null);
     setAgent(null);
   }
