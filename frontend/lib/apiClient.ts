@@ -1,8 +1,9 @@
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
+// frontend/lib/apiClient.ts
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 
 export function getToken() {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("authToken") || ""; return localStorage.getItem("authToken") || "";
+  return localStorage.getItem("authToken") || "";
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -23,9 +24,7 @@ async function handle<T>(res: Response): Promise<T> {
       } else if (typeof body === "string" && body.trim()) {
         message = body;
       }
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     throw new Error(message);
   }
 
@@ -66,9 +65,13 @@ export async function apiPost<T>(path: string, body?: unknown, init?: RequestIni
 export async function apiPatch<T>(path: string, body?: unknown, init?: RequestInit) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
+    credentials: "include", // << add this
     body: body !== undefined ? JSON.stringify(body) : undefined,
     headers: withAuthHeaders({ "Content-Type": "application/json", ...(init?.headers || {}) }),
     ...(init || {}),
   });
   return handle<T>(res);
 }
+
+// Optional: expose for quick console checks after deploy
+if (typeof window !== "undefined") (window as any).API_BASE = API_BASE;

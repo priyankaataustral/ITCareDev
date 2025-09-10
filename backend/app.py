@@ -2,7 +2,7 @@ import os, ssl
 import threading
 import re
 import logging
-from flask import Flask, app, request
+from flask import Flask, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -94,7 +94,7 @@ def create_app():
 
 
     # Register blueprints and CLI commands
-    from .urls import urls as urls_blueprint
+    from urls import urls as urls_blueprint
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
 
