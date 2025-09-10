@@ -1,0 +1,51 @@
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local database files
+*.sqlite
+*.db
+
+# Log files
+*.log
+logs/
+
+# Environment files (keep .env.example if you have one)
+.env
+.env.*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Node.js (if you have any JS tools)
+node_modules/
+package-lock.json
+
+# Backup files
+*.bak
+*.backup

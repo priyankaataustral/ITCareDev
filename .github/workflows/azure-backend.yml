@@ -30,7 +30,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-azure.txt
         
-    
+    - name: Remove unnecessary files for deployment
+      run: |
+        cd backend
+        # Remove venv directories (they should already be ignored, but just in case)
+        rm -rf venv .venv env .env
+        # Remove Python cache
+        find . -type d -name "__pycache__" -exec rm -rf {} +
+        find . -name "*.pyc" -delete
+        # Remove test files
+        rm -rf tests/ .pytest_cache/
+        # Keep important AI model files but remove temp/backup files
+        rm -f *.bak *.backup *.tmp *.temp
+        
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
