@@ -80,7 +80,7 @@ flask run --app app:create_app
 
 ### Environment Variables
 - `OPENAI_KEY` (for GPT integration, required)
-- `FRONTEND_URL` (URL of your frontend, e.g. http://localhost:3000)
+- `FRONTEND_ORIGINS` (URL of your frontend, e.g. http://localhost:3000)
 - `RUN_EMAIL_WORKER` (set to "1" to enable background email worker, default: 1)
 - (Optional) Email server settings for sending emails
 
@@ -88,7 +88,7 @@ You can create a `.env` file in the `backend/` directory to set these variables.
 
 ```
 OPENAI_KEY=sk-...
-FRONTEND_URL=http://localhost:3000
+FRONTEND_ORIGINS=http://localhost:3000
 RUN_EMAIL_WORKER=1
 ```
 
@@ -122,7 +122,7 @@ RUN_EMAIL_WORKER=1
 
 ## Troubleshooting
 - **Large file errors on git push:** Make sure `venv/` is in `.gitignore` and not tracked by git
-- **CORS errors:** Ensure backend allows requests from frontend origin (set `FRONTEND_URL`)
+- **CORS errors:** Ensure backend allows requests from frontend origin (set `FRONTEND_ORIGINS`)
 - **OpenAI errors:** Check your API key and usage limits
 
 

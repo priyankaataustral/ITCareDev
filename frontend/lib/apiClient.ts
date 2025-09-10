@@ -1,4 +1,4 @@
-export const API_BASE: string = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
+export const API_BASE: string = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export function getToken(): string {
   if (typeof window === "undefined") return "";

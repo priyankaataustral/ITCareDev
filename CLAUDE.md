@@ -62,7 +62,7 @@ npm run lint
 Create `.env` file in backend directory:
 ```
 OPENAI_KEY=sk-...
-FRONTEND_URL=http://localhost:3000
+FRONTEND_ORIGINS=http://localhost:3000
 RUN_EMAIL_WORKER=1
 ```
 

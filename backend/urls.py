@@ -19,7 +19,7 @@ from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_RE
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
 from utils import require_role
 from sqlalchemy import text as _sql_text
-from config import FRONTEND_URL
+from config import FRONTEND_ORIGINS
 
 urls = Blueprint('urls', __name__)
 
@@ -117,7 +117,7 @@ def list_threads():
 @urls.route("/threads/<thread_id>/download-summary", methods=["OPTIONS"])
 def download_summary_options(thread_id):
     response = current_app.make_response("")
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get("Origin", "http://localhost:3000")
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get("Origin")
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
@@ -173,9 +173,6 @@ def download_ticket_summary(thread_id):
     file_stream.seek(0)
     response = send_file(file_stream, as_attachment=True, download_name=f"ticket_{t.id}_summary.txt", mimetype="text/plain")
     allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.0.17:3000",
         "https://proud-tree-0c99b8f00.1.azurestaticapps.net",
     ]
     origin = request.headers.get("Origin")
@@ -751,7 +748,7 @@ def get_tickets_where_agent_mentioned(agent_id):
         subject = subject_map.get(t.id, "")
         results.append({"ticket_id": t.id, "status": t.status, "subject": subject})
     response = jsonify(results)
-    response.headers['Access-Control-Allow-Origin'] = FRONTEND_URL
+    response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     response.headers['Vary'] = 'Origin'
     return response
@@ -797,8 +794,8 @@ def send_confirmation_email(solution_id):
     ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
-    confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
-    reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
+    confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+    reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
 
     subject = f"Please review the solution for Ticket {s.ticket_id}"
     body = (
@@ -951,8 +948,8 @@ def draft_email(thread_id):
 #     serializer = _serializer(SECRET_KEY)
 #     authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
 
-#     confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
-#     reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
+#     confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+#     reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
 #     email_body += (
 #         "\n\n---\n"
 #         "Please let us know if this solved your issue:\n"
@@ -1082,8 +1079,8 @@ def send_email(thread_id):
     serializer = _serializer(SECRET_KEY)
     authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
 
-    confirm_url = f"{FRONTEND_URL}/confirm?token={authToken}&a=confirm"
-    reject_url  = f"{FRONTEND_URL}/confirm?token={authToken}&a=not_confirm"
+    confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+    reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
 
     final_body = (
         f"{email_body}\n\n"

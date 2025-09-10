@@ -733,7 +733,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   try {
     const data2 = await apiPost(`/threads/${tid}/confirm-token`, {});
     if (data2?.token) {
-      const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
+      const origin = (typeof window !== 'undefined' && window.location?.origin);
       const links = {
         confirm: `${origin}/solutions/confirm?token=${encodeURIComponent(data2.token)}&a=confirm`,
         notConfirm: `${origin}/solutions/confirm?token=${encodeURIComponent(data2.token)}&a=not_confirm`,
@@ -744,7 +744,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   } catch (e) { console.warn('[getConfirmLinks] confirm-token error:', e); }
 
   // 3) Dev fallback (lets you SEE links even if you’re logged out)
-  const origin = (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost:3000';
+  const origin = (typeof window !== 'undefined' && window.location?.origin);
   const links = {
     confirm: `${origin}/confirm?thread=${encodeURIComponent(tid)}&a=confirm&demo=1`,
     notConfirm: `${origin}/confirm?thread=${encodeURIComponent(tid)}&a=not_confirm&demo=1`,

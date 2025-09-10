@@ -6,10 +6,10 @@ load_dotenv()
 
 # Get environment variables and fallbacks.
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
-FRONTEND_URL = os.getenv("FRONTEND_URL")
-if not FRONTEND_URL:
-    print("Warning: FRONTEND_URL environment variable is not set. Defaulting to localhost.")
-    FRONTEND_URL = "http://localhost:3000"
+FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS")
+if not FRONTEND_ORIGINS:
+    print("Warning: FRONTEND_ORIGINS environment variable is not set. Defaulting to localhost.")
+    FRONTEND_ORIGINS = "http://localhost:3000"
 
 
 # Fallback to local SQLite for development
@@ -41,7 +41,7 @@ CONFIRM_SALT = "solution-confirm-v1"
 
 # ─── Additional Configs ───────────────────────────────────────────────────────
 # CORS origins for frontend and local dev
-CORS_ORIGINS = [FRONTEND_URL, "http://localhost:3000"]
+CORS_ORIGINS = [FRONTEND_ORIGINS]
 
 # MySQL SSL CA certificate path
 MYSQL_SSL_CA = os.getenv("MYSQL_SSL_CA", "certs/DigiCertGlobalRootCA.crt.pem")
@@ -65,9 +65,9 @@ class Config:
     MYSQL_SSL_CA = MYSQL_SSL_CA
     LOG_LEVEL = LOG_LEVEL
 
-CONFIRM_REDIRECT_URL_SUCCESS = f"{FRONTEND_URL}/confirm"
-CONFIRM_REDIRECT_URL_REJECT  = f"{FRONTEND_URL}/not-fixed"
-CONFIRM_REDIRECT_URL         = f"{FRONTEND_URL}/thank-you"
+CONFIRM_REDIRECT_URL_SUCCESS = f"{FRONTEND_ORIGINS}/confirm"
+CONFIRM_REDIRECT_URL_REJECT  = f"{FRONTEND_ORIGINS}/not-fixed"
+CONFIRM_REDIRECT_URL         = f"{FRONTEND_ORIGINS}/thank-you"
 
 # ─── OpenAI & FAISS setup ──────────────────────────────────────────────────────
 CHAT_MODEL = "gpt-3.5-turbo"

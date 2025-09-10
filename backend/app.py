@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from extensions import db, migrate
 from cli import register_cli_commands
-from config import FRONTEND_URL, SQLALCHEMY_DATABASE_URI, DATABASE_URL
+from config import FRONTEND_ORIGINS, SQLALCHEMY_DATABASE_URI, DATABASE_URL
 
 
 def create_app():
@@ -52,11 +52,6 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     
-    DEFAULT_ALLOWED_ORIGINS = {
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.0.17:3000",
-    }
 
     # Comma-separated list of extra origins from env (portal)
     # e.g.: https://proud-tree-0c99b8f00.1.azurestaticapps.net,https://delightful-tree-0a2bac000.1.azurestaticapps.net
@@ -98,7 +93,7 @@ def create_app():
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
 
-        # Health check endpoint
+    # Health check endpoint
     @app.route("/health", methods=["GET"])
     def health():
         return {"status": "ok"}, 200
