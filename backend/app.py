@@ -1,5 +1,4 @@
-import os, ssl
-import threading
+import os, ssl  
 import re
 import logging
 from flask import Flask, request
@@ -11,66 +10,73 @@ from cli import register_cli_commands
 from config import FRONTEND_ORIGINS, SQLALCHEMY_DATABASE_URI, DATABASE_URL
 
 
+def _comma_list(s: str) -> set[str]:
+    """Split a comma-separated string into a clean set of non-empty items."""
+    return {x.strip() for x in (s or "").split(",") if x.strip()}
+
+
+
 def create_app():
     """
-    Creates and configures a Flask application instance.
-    This is the application factory.
+    Flask application factory.
     """
-    app = Flask(__name__)
-    
-    # Configure logging
+    # Basic logging
     logging.basicConfig(level=logging.INFO)
+    log = logging.getLogger("app")
 
-    # Load environment variables
+    # Load .env (does nothing in Azure if env vars already set)
     load_dotenv()
 
-    # Get environment variables
-    OPENAI_KEY = os.environ.get("OPENAI_KEY")
-    DATABASE_URL = os.environ.get("DATABASE_URL")
+    # ---------------------------------------------------------------------
+    # App + Config
+    # ---------------------------------------------------------------------
+    app = Flask(__name__)
 
-    # --- Application Configuration ---
-    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # DB URI: prefer env DATABASE_URL if present, else config fallback
+    db_uri = os.getenv("DATABASE_URL") or SQLALCHEMY_DATABASE_URI
+    if not db_uri:
+        log.warning("No DATABASE_URL/SQLALCHEMY_DATABASE_URI found. Set one in App Settings.")
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-        # ============== NEW: SSL for Azure MySQL ==============
-    # Expect a combined root bundle at ./certs/azure-mysql-roots.pem
-    # (contains DigiCert Global Root CA, DigiCert Global Root G2, Microsoft RSA Root 2017)
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    # Optional: TLS validation with CA bundle (if present). If not found,
+    # SQLAlchemy/PyMySQL will still use TLS if server enforces it.
+    project_root = os.path.abspath(os.path.dirname(__file__))
     ca_bundle = os.path.join(project_root, "certs", "azure-mysql-roots.pem")
-
-    # Pass SSL parameters via SQLAlchemy -> PyMySQL
-    # (This avoids putting long/escaped Windows paths in the URI.)
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {
-            "ssl": {
-                "ca": ca_bundle
-            }
+    if os.path.exists(ca_bundle):
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "connect_args": {"ssl": {"ca": ca_bundle}}
         }
-    }
-    
-    # Initialize extensions
+        log.info("Using MySQL CA bundle at %s", ca_bundle)
+    else:
+        # No CA bundle shipped — still OK; encrypted if server requires TLS.
+        # If you want to force TLS without CA pinning:
+        # app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"ssl": {}}}
+        log.info("MySQL CA bundle not found; proceeding without explicit CA file.")
+
+    # Init DB & migrations
     db.init_app(app)
     migrate.init_app(app, db)
-    
 
-    # Comma-separated list of extra origins from env (portal)
-    # e.g.: https://proud-tree-0c99b8f00.1.azurestaticapps.net,https://delightful-tree-0a2bac000.1.azurestaticapps.net
-    env_origins = os.getenv("FRONTEND_ORIGINS", "")
-    extra = {o.strip() for o in env_origins.split(",") if o.strip()}
+    # ---------------------------------------------------------------------
+    # CORS
+    # ---------------------------------------------------------------------
+    # Base allowlist from config (comma-separated)
+    base_allowed = _comma_list(os.getenv("FRONTEND_ORIGINS_CONFIG", FRONTEND_ORIGINS))
+    # Extra allowlist from App Settings env FRONTEND_ORIGINS
+    extra_allowed = _comma_list(os.getenv("FRONTEND_ORIGINS", ""))
 
-    # Optional: allow any Azure SWA environment for this app (preview URLs, etc.)
+    # Allow any SWA preview hostname for this app (regex)
     swa_regex = re.compile(r"^https://[a-z0-9-]+\.1\.azurestaticapps\.net$")
 
-    allowed_origins = DEFAULT_ALLOWED_ORIGINS | extra
+    allowed_origins = base_allowed | extra_allowed
+    if not allowed_origins:
+        log.warning("No explicit CORS origins set. Only SWA regex will match.")
 
     CORS(
         app,
-        resources={
-            r"/*": {
-                "origins": list(allowed_origins) + [swa_regex]
-            }
-        },
-        supports_credentials=True,  # keep True if you use cookies/Authorization
+        resources={r"/*": {"origins": list(allowed_origins) + [swa_regex]}},
+        supports_credentials=True,  # keep True if you use cookies/Authorization headers
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         expose_headers=["Content-Disposition"],
@@ -78,31 +84,34 @@ def create_app():
 
     @app.after_request
     def _vary_origin(resp):
+        # Help caches handle per-origin responses correctly
         origin = request.headers.get("Origin")
         if origin and (origin in allowed_origins or swa_regex.match(origin)):
-            # help proxies/CDNs cache per-origin
-            resp.headers.setdefault("Vary", "Origin")
+            existing = resp.headers.get("Vary")
+            resp.headers["Vary"] = "Origin" if not existing else f"{existing}, Origin"
         return resp
 
-    # Initialize OpenAI client (can be done here or in a separate module)
-    app.config['OPENAI_CLIENT'] = OpenAI(api_key=OPENAI_KEY)
+    # ---------------------------------------------------------------------
+    # OpenAI client (optional)
+    # ---------------------------------------------------------------------
+    openai_key = os.getenv("OPENAI_KEY", "")
+    if openai_key:
+        app.config["OPENAI_CLIENT"] = OpenAI(api_key=openai_key)
+    else:
+        log.info("OPENAI_KEY is not set; skipping OpenAI client initialization.")
 
-
-    # Register blueprints and CLI commands
+    # ---------------------------------------------------------------------
+    # Blueprints & CLI
+    # ---------------------------------------------------------------------
     from urls import urls as urls_blueprint
     app.register_blueprint(urls_blueprint)
     register_cli_commands(app)
 
-    # Health check endpoint
-    @app.route("/health", methods=["GET"])
+    # ---------------------------------------------------------------------
+    # Health
+    # ---------------------------------------------------------------------
+    @app.get("/health")
     def health():
         return {"status": "ok"}, 200
-
-    # # --- Start email worker thread ---
-    # from urls import email_worker_loop
-    # start_worker = os.environ.get("RUN_EMAIL_WORKER", "1") == "1"
-    # if start_worker:
-    #     # We start the worker after the app context is available
-    #     threading.Thread(target=lambda: email_worker_loop(app), daemon=True).start()
 
     return app
