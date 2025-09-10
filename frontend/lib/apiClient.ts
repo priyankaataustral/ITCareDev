@@ -1,7 +1,6 @@
-// frontend/lib/apiClient.ts
-export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
+export const API_BASE: string = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000").replace(/\/+$/, "");
 
-export function getToken() {
+export function getToken(): string {
   if (typeof window === "undefined") return "";
   return localStorage.getItem("authToken") || "";
 }
@@ -18,18 +17,21 @@ async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
     try {
-      const body = isJson ? await res.json() : await res.text();
-      if (typeof body === "object" && body !== null && "error" in body) {
-        message = (body as { error: string }).error;
+      const body = isJson ? ((await res.json()) as unknown) : ((await res.text()) as unknown);
+      if (typeof body === "object" && body !== null && "error" in (body as Record<string, unknown>)) {
+        message = String((body as Record<string, unknown>)["error"]);
       } else if (typeof body === "string" && body.trim()) {
         message = body;
       }
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     throw new Error(message);
   }
 
   if (res.status === 204) return undefined as unknown as T;
-  return (isJson ? await res.json() : await res.text()) as T;
+  const payload = isJson ? ((await res.json()) as unknown) : ((await res.text()) as unknown);
+  return payload as T;
 }
 
 function withAuthHeaders(extra?: HeadersInit): Headers {
@@ -41,37 +43,33 @@ function withAuthHeaders(extra?: HeadersInit): Headers {
   return h;
 }
 
-export async function apiGet<T>(path: string, init?: RequestInit) {
+export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "GET",
     credentials: "include",
     ...(init || {}),
     headers: withAuthHeaders(init?.headers),
-  });
+  } as RequestInit);
   return handle<T>(res);
 }
 
-export async function apiPost<T>(path: string, body?: unknown, init?: RequestInit) {
+export async function apiPost<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
     headers: withAuthHeaders({ "Content-Type": "application/json", ...(init?.headers || {}) }),
     ...(init || {}),
-  });
+  } as RequestInit);
   return handle<T>(res);
 }
 
-export async function apiPatch<T>(path: string, body?: unknown, init?: RequestInit) {
+export async function apiPatch<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
-    credentials: "include", // << add this
     body: body !== undefined ? JSON.stringify(body) : undefined,
     headers: withAuthHeaders({ "Content-Type": "application/json", ...(init?.headers || {}) }),
     ...(init || {}),
-  });
+  } as RequestInit);
   return handle<T>(res);
 }
-
-// Optional: expose for quick console checks after deploy
-if (typeof window !== "undefined") (window as any).API_BASE = API_BASE;

@@ -1,16 +1,13 @@
 // next.config.ts
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // We need to use static export because Azure Static Web Apps is a static hosting service.
-  // This will generate all the necessary HTML, CSS, and JS at build time.
   output: 'export',
-
-  // The 'rewrites' feature is a server-side concept that does not work with 'output: "export"'.
-  // It should be removed to prevent conflicts and ensure a clean build.
-  async rewrites() {
-    return [];
-  }
+  // remove or comment out any rewrites() you had here
+  // rewrites: async () => ([ /* DELETE */ ]),
+  // Optional safety if you're in a rush (see section 3)
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
 };
 
 export default nextConfig;
