@@ -107,12 +107,11 @@ class KBProtocolLoader:
             fingerprint = hashlib.sha256(content_text.encode('utf-8')).hexdigest()
             
             # Check if article already exists (but don't skip, just log)
+            existing = None
             try:
                 existing = KBArticle.query.filter_by(canonical_fingerprint=fingerprint).first()
                 if existing:
-                    log.info(f"KB article already exists, updating: {protocol_data['title']}")
-                    # Will update after creating markdown_content below
-                    pass
+                    log.info(f"KB article already exists, will update: {protocol_data['title']}")
             except Exception as e:
                 log.warning(f"Could not check for existing article: {e}")
                 existing = None  # Continue with creation
@@ -221,13 +220,19 @@ class KBProtocolLoader:
                 
                 # Create KB article
                 log.info(f"Attempting to create KB article for: {protocol_data['title']}")
-                article = self.create_kb_article(protocol_data)
-                if article:
-                    results["loaded"] += 1
-                    log.info(f"✅ Successfully loaded protocol: {protocol_data['title']}")
-                else:
-                    results["skipped"] += 1
-                    log.warning(f"⚠️ Skipped protocol (create_kb_article returned None): {protocol_data['title']}")
+                try:
+                    article = self.create_kb_article(protocol_data)
+                    if article:
+                        results["loaded"] += 1
+                        log.info(f"✅ Successfully loaded protocol: {protocol_data['title']}")
+                    else:
+                        results["skipped"] += 1
+                        log.warning(f"⚠️ Skipped protocol (create_kb_article returned None): {protocol_data['title']}")
+                except Exception as create_error:
+                    results["errors"] += 1
+                    log.error(f"❌ Error creating KB article for {protocol_data['title']}: {create_error}")
+                    import traceback
+                    log.error(f"Traceback: {traceback.format_exc()}")
                     
             except Exception as e:
                 log.error(f"Error processing {filename}: {e}")

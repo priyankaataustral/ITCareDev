@@ -1832,10 +1832,15 @@ const openDraftEditor = (prefill) => {
       setActionError(null);
       
       // Use apiPost for proper authentication and error handling
+      console.log('Sending email to:', `/threads/${tid}/send-email`);
+      console.log('Email data:', { email: emailToSend.substring(0, 100) + '...', cc: ccUnique });
+      
       const data = await apiPost(`/threads/${tid}/send-email`, {
         email: emailToSend,
         cc: ccUnique
       });
+      
+      console.log('Email send response:', data);
 
       setMessages(prev => [
         ...prev,

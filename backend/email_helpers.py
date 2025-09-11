@@ -48,19 +48,38 @@ def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
 
 def send_via_gmail(to_email: str, subject: str, body: str, cc_list: list[str] | None = None):
     """Send a plain‑text email via the unified Gmail account."""
+    from config import DEMO_MODE
+    
     cc_list = cc_list or []
-    em = EmailMessage()
-    em["From"] = f"{FROM_NAME} <{SMTP_USER}>"
-    em["To"] = to_email
-    if cc_list:
-        em["Cc"] = ", ".join(cc_list)
-    em["Subject"] = subject
-    em.set_content(body)
+    
+    # In demo mode, just log the email instead of sending
+    if DEMO_MODE:
+        print(f"📧 [DEMO MODE] Email would be sent:")
+        print(f"   To: {to_email}")
+        print(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
+        print(f"   Subject: {subject}")
+        print(f"   Body: {body[:100]}...")
+        return  # Don't actually send in demo mode
+    
+    try:
+        em = EmailMessage()
+        em["From"] = f"{FROM_NAME} <{SMTP_USER}>"
+        em["To"] = to_email
+        if cc_list:
+            em["Cc"] = ", ".join(cc_list)
+        em["Subject"] = subject
+        em.set_content(body)
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as smtp:
-        smtp.login(SMTP_USER, SMTP_PASS)
-        smtp.send_message(em)
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as smtp:
+            smtp.login(SMTP_USER, SMTP_PASS)
+            smtp.send_message(em)
+            print(f"📧 Email sent successfully to {to_email}")
+    except Exception as e:
+        # Log the error but don't crash the application
+        print(f"❌ Email send failed: {e}")
+        # In production, you might want to queue the email for retry
+        raise Exception(f"Failed to send email: {str(e)}")
 
 
 def _serializer(secret_key: str, salt: str = "solution-confirm-v1"):
