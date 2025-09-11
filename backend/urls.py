@@ -2138,15 +2138,41 @@ def not_fixed_feedback():
 @urls.route("/threads", methods=["GET"]) 
 @require_role("L1","L2","L3","MANAGER")
 def list_threads_simple():
-    # Simple static data to get frontend working
-    sample_threads = [...]
-    return jsonify(sample_threads)
+    """Temporary simple threads endpoint - REMOVE AFTER FIXING CSV ISSUE"""
+    try:
+        # Simple static data to get frontend working
+        sample_threads = [
+            {
+                "id": "1", 
+                "subject": "Email not working", 
+                "status": "open", 
+                "lastActivity": "2024-01-01T10:00:00Z",
+                "department": "IT",
+                "priority": "high"
+            },
+            {
+                "id": "2", 
+                "subject": "Password reset needed", 
+                "status": "open", 
+                "lastActivity": "2024-01-01T11:00:00Z",
+                "department": "IT", 
+                "priority": "medium"
+            },
+            {
+                "id": "3", 
+                "subject": "Software installation request", 
+                "status": "open", 
+                "lastActivity": "2024-01-01T12:00:00Z",
+                "department": "IT",
+                "priority": "low"
+            }
+        ]
+        return jsonify(sample_threads)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# TODO: Fix this original endpoint and remove temporary one above
-# @urls.route("/threads", methods=["GET"])
-# @require_role("L1","L2","L3","MANAGER") 
-# def list_threads():
-#     df = load_df()  # This is failing
+# TODO: Fix the original endpoint below and remove temporary one above
+# Original complex endpoint that's failing:
 
 
 
