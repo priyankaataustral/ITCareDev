@@ -2627,7 +2627,7 @@ def get_kb_articles():
 
 # Load protocol documents into KB
 @urls.route('/kb/protocols/load', methods=['POST'])
-@require_role("MANAGER")  # Only managers can load protocols
+@require_role("L2", "L3", "MANAGER")  # L2, L3, and Managers can load protocols
 def load_kb_protocols():
     """Load static protocol documents into the KB system"""
     try:
