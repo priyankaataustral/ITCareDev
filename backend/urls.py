@@ -194,16 +194,16 @@ def list_threads():
         limit = int(request.args.get("limit", 20))
         offset = int(request.args.get("offset", 0))
 
-    # Get user role from JWT
-    user = getattr(request, "agent_ctx", None)
-    role = user.get("role") if user else None
+        # Get user role from JWT
+        user = getattr(request, "agent_ctx", None)
+        role = user.get("role") if user else None
 
         # Query all tickets from database (we'll filter by role later)
         tickets = Ticket.query.all()
-    dept_map = {d.id: d.name for d in Department.query.all()}
+        dept_map = {d.id: d.name for d in Department.query.all()}
         
         # Build all threads with full enrichment (like original)
-    threads_all = []
+        threads_all = []
         for ticket in tickets:
             # GPT categorization (preserve original logic)
             text = ticket.subject or ""
@@ -232,7 +232,7 @@ def list_threads():
                 "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
                 "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
                 "department_id": ticket.department_id,
-            "department": department,
+                "department": department,
                 "level": ticket.level or 1,  # Critical for role filtering
                 "escalated": escalated,       # From TicketEvent query
                 "priority": ticket.priority,
@@ -247,26 +247,26 @@ def list_threads():
             threads_all.append(enriched_ticket)
         
         # PRESERVE ORIGINAL ROLE-BASED FILTERING
-    if role == "L2":
+        if role == "L2":
             # L2 sees tickets with level >= 2 (escalated tickets)
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
-    elif role == "L3":
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
+        elif role == "L3":
             # L3 sees only tickets with level == 3 (highest escalation)
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
-    else:  # L1 and MANAGER see all
-        threads_filtered = threads_all
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
+        else:  # L1 and MANAGER see all
+            threads_filtered = threads_all
 
         # Apply pagination after filtering (preserve original logic)
-    total = len(threads_filtered)
-    threads = threads_filtered[offset:offset+limit]
+        total = len(threads_filtered)
+        threads = threads_filtered[offset:offset+limit]
 
         # Return exact same format as original
-    return jsonify(
+        return jsonify(
             total=total,
             limit=limit,
             offset=offset,
             threads=threads
-    ), 200
+        ), 200
         
     except ValueError:
         return jsonify(error="limit and offset must be integers"), 400
@@ -1444,19 +1444,19 @@ def get_tickets_where_agent_mentioned(agent_id):
     try:
         # Use the proper Mention model and database relationships
         from models import Ticket, Message, Mention, Agent
-        
+
         # Query tickets where this agent is mentioned using proper JOIN
         mentioned_tickets = (
             db.session.query(Ticket)
             .join(Message, Ticket.id == Message.ticket_id)
             .join(Mention, Message.id == Mention.message_id)
             .filter(Mention.mentioned_agent_id == agent_id)
-        .distinct()
-        .all()
-    )
+            .distinct()
+            .all()
+        )
         
         # Build response using database data (NO CSV!)
-    results = []
+        results = []
         for ticket in mentioned_tickets:
             # Get the most recent message that mentioned this agent for context
             recent_mention = (
@@ -1485,11 +1485,11 @@ def get_tickets_where_agent_mentioned(agent_id):
         # Sort by most recent mention first
         results.sort(key=lambda x: x["mention_timestamp"] or "", reverse=True)
         
-    response = jsonify(results)
-    response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Vary'] = 'Origin'
-    return response
+        response = jsonify(results)
+        response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Vary'] = 'Origin'
+        return response
         
     except Exception as e:
         print(f"ERROR in mentions endpoint: {e}")
