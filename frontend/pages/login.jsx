@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../components/AuthContext";
+import { useRouter } from "next/router";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -7,6 +8,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
