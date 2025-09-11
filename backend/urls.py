@@ -149,6 +149,94 @@ def login():
 #         threads = threads
 #     ), 200
 
+@urls.route("/threads", methods=["GET"])
+@require_role("L1","L2","L3","MANAGER")
+def list_threads():
+    """Database-based threads with full role filtering and GPT categorization"""
+    try:
+        # Get pagination parameters
+        limit = int(request.args.get("limit", 20))
+        offset = int(request.args.get("offset", 0))
+        
+        # Get user role from JWT
+        user = getattr(request, "agent_ctx", None)
+        role = user.get("role") if user else None
+        
+        # Query all tickets from database (we'll filter by role later)
+        tickets = Ticket.query.all()
+        dept_map = {d.id: d.name for d in Department.query.all()}
+        
+        # Build all threads with full enrichment (like original)
+        threads_all = []
+        for ticket in tickets:
+            # GPT categorization (preserve original logic)
+            text = ticket.subject or ""
+            cat, team = categorize_with_gpt(text)
+            
+            # Check if ticket has been escalated (preserve original logic)
+            escalated = TicketEvent.query.filter_by(
+                ticket_id=ticket.id, 
+                event_type="ESCALATED"
+            ).count() > 0
+            
+            # Department info
+            department = {
+                "id": ticket.department_id, 
+                "name": dept_map.get(ticket.department_id)
+            } if ticket.department_id else None
+            
+            # Build enriched ticket (preserve original structure)
+            enriched_ticket = {
+                "id": str(ticket.id),
+                "text": text,  # Map subject -> text for frontend compatibility
+                "subject": ticket.subject,  # Keep original field too
+                "status": ticket.status or "open",
+                "predicted_category": cat,  # From GPT
+                "assigned_team": team,      # From GPT
+                "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                "department_id": ticket.department_id,
+                "department": department,
+                "level": ticket.level or 1,  # Critical for role filtering
+                "escalated": escalated,       # From TicketEvent query
+                "priority": ticket.priority,
+                "category": ticket.category,
+                "requester_name": ticket.requester_name,
+                "requester_email": ticket.requester_email,
+                "assigned_to": ticket.assigned_to,
+                "urgency_level": ticket.urgency_level,
+                "impact_level": ticket.impact_level,
+                "lastActivity": ticket.updated_at.isoformat() if ticket.updated_at else None
+            }
+            threads_all.append(enriched_ticket)
+        
+        # PRESERVE ORIGINAL ROLE-BASED FILTERING
+        if role == "L2":
+            # L2 sees tickets with level >= 2 (escalated tickets)
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
+        elif role == "L3":
+            # L3 sees only tickets with level == 3 (highest escalation)
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
+        else:  # L1 and MANAGER see all
+            threads_filtered = threads_all
+        
+        # Apply pagination after filtering (preserve original logic)
+        total = len(threads_filtered)
+        threads = threads_filtered[offset:offset+limit]
+        
+        # Return exact same format as original
+        return jsonify(
+            total=total,
+            limit=limit,
+            offset=offset,
+            threads=threads
+        ), 200
+        
+    except ValueError:
+        return jsonify(error="limit and offset must be integers"), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @urls.route("/threads/<thread_id>/download-summary", methods=["OPTIONS"])
 def download_summary_options(thread_id):
@@ -2134,45 +2222,45 @@ def not_fixed_feedback():
     log_event(t.id, "FEEDBACK", {"kind":"not_fixed_detail", "attempt_id": att.id, "reason": att.rejected_reason})
     return jsonify(ok=True)
 
-# TEMPORARY - REMOVE IN FINAL DEPLOYMENT
-@urls.route("/threads", methods=["GET"]) 
-@require_role("L1","L2","L3","MANAGER")
-def list_threads_simple():
-    """Temporary simple threads endpoint - REMOVE AFTER FIXING CSV ISSUE"""
-    try:
-        # Simple static data to get frontend working
-        sample_threads = [
-            {
-                "id": "1", 
-                "subject": "Email not working", 
-                "status": "open", 
-                "lastActivity": "2024-01-01T10:00:00Z",
-                "department": "IT",
-                "priority": "high"
-            },
-            {
-                "id": "2", 
-                "subject": "Password reset needed", 
-                "status": "open", 
-                "lastActivity": "2024-01-01T11:00:00Z",
-                "department": "IT", 
-                "priority": "medium"
-            },
-            {
-                "id": "3", 
-                "subject": "Software installation request", 
-                "status": "open", 
-                "lastActivity": "2024-01-01T12:00:00Z",
-                "department": "IT",
-                "priority": "low"
-            }
-        ]
-        return jsonify(sample_threads)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# # TEMPORARY - REMOVE IN FINAL DEPLOYMENT
+# @urls.route("/threads", methods=["GET"]) 
+# @require_role("L1","L2","L3","MANAGER")
+# def list_threads_simple():
+#     """Temporary simple threads endpoint - REMOVE AFTER FIXING CSV ISSUE"""
+#     try:
+#         # Simple static data to get frontend working
+#         sample_threads = [
+#             {
+#                 "id": "1", 
+#                 "subject": "Email not working", 
+#                 "status": "open", 
+#                 "lastActivity": "2024-01-01T10:00:00Z",
+#                 "department": "IT",
+#                 "priority": "high"
+#             },
+#             {
+#                 "id": "2", 
+#                 "subject": "Password reset needed", 
+#                 "status": "open", 
+#                 "lastActivity": "2024-01-01T11:00:00Z",
+#                 "department": "IT", 
+#                 "priority": "medium"
+#             },
+#             {
+#                 "id": "3", 
+#                 "subject": "Software installation request", 
+#                 "status": "open", 
+#                 "lastActivity": "2024-01-01T12:00:00Z",
+#                 "department": "IT",
+#                 "priority": "low"
+#             }
+#         ]
+#         return jsonify(sample_threads)
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
-# TODO: Fix the original endpoint below and remove temporary one above
-# Original complex endpoint that's failing:
+# # TODO: Fix the original endpoint below and remove temporary one above
+# # Original complex endpoint that's failing:
 
 
 
