@@ -34,7 +34,7 @@ def import_tickets_from_csv(csv_path):
         reader = csv.DictReader(csvfile)
         for row in reader:
             c.execute('''
-                INSERT OR IGNORE INTO tickets (id, text, level, urgency_level, impact_level, category_id, status)
+                INSERT IGNORE INTO tickets (id, text, level, urgency_level, impact_level, category_id, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'open')
             ''', (
                 row['id'], row['email'], row['text'], row['level'], row['urgency_level'], row['impact_level'], row['category_id']

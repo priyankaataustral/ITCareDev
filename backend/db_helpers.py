@@ -51,7 +51,7 @@ def insert_message_with_mentions(ticket_id, sender, content):
         if agent_row:
             mentioned_agent_id = agent_row[0]
             # b. Insert a record into the 'mentions' table with message_id and mentioned_agent_id
-            db.session.execute(text("INSERT OR IGNORE INTO mentions (message_id, mentioned_agent_id) VALUES (:msg_id, :agent_id)"), {"msg_id": message_id, "agent_id": mentioned_agent_id})
+            db.session.execute(text("INSERT IGNORE INTO mentions (message_id, mentioned_agent_id) VALUES (:msg_id, :agent_id)"), {"msg_id": message_id, "agent_id": mentioned_agent_id})
     db.session.commit()
     print(f"Message inserted (id={message_id}), mentions stored: {mentions}")
 

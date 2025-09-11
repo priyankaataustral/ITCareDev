@@ -15,9 +15,13 @@ log = logging.getLogger(__name__)
 class KBProtocolLoader:
     """Load static protocol documents into KB system"""
     
-    def __init__(self, protocols_dir: str = "backend/kb_protocols"):
-        self.protocols_dir = protocols_dir
-        self.client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
+    def __init__(self, protocols_dir: str = None):
+        if protocols_dir is None:
+            # Get absolute path to protocols directory
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            protocols_dir = os.path.join(base_dir, "kb_protocols")
+            self.protocols_dir = protocols_dir
+            self.client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
         
     def parse_protocol_file(self, file_path: str) -> Optional[Dict]:
         """Parse a protocol text file into structured data"""
