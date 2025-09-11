@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 from openai import OpenAI
 from models import KBArticle, KBArticleSource, KBArticleStatus, KBArticleVisibility, Department
 from extensions import db
-from config import OPENAI_API_KEY
+from config import OPENAI_KEY
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class KBProtocolLoader:
     
     def __init__(self, protocols_dir: str = "backend/kb_protocols"):
         self.protocols_dir = protocols_dir
-        self.client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+        self.client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
         
     def parse_protocol_file(self, file_path: str) -> Optional[Dict]:
         """Parse a protocol text file into structured data"""
