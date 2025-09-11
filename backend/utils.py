@@ -44,9 +44,24 @@ def extract_json(text: str) -> dict:
     return json.loads(json_str)
 
 def _can_view(role: str, lvl: int) -> bool:
-    if role == "L2": return (lvl or 1) >= 2
-    if role == "L3": return (lvl or 1) == 3
-    return True  # L1 & MANAGER see all
+    """Role-based ticket visibility rules:
+    - L1: can see all tickets (level 1, 2, 3, 4)
+    - L2: can only see L2 and L3 tickets (level 2, 3)
+    - L3: can see only L3 tickets (level 3)
+    - MANAGER: can see all tickets (level 1, 2, 3, 4)
+    """
+    ticket_level = lvl or 1
+    
+    if role == "L1":
+        return True  # L1 sees all tickets
+    elif role == "L2":
+        return ticket_level in [2, 3]  # L2 sees only L2 and L3 tickets
+    elif role == "L3":
+        return ticket_level == 3  # L3 sees only L3 tickets
+    elif role == "MANAGER":
+        return True  # Manager sees all tickets
+    else:
+        return False  # Unknown role, no access
 
 def require_role(*allowed):
     def deco(fn):

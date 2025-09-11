@@ -1124,9 +1124,37 @@ def post_chat(thread_id):
         insert_message_with_mentions(thread_id, "assistant", first)
         return jsonify(ticketId=thread_id, reply=first, step=1, total=len(steps)), 200
 
-    # DEFAULT: General chat assistance
+    # DEFAULT: General chat assistance with escalation detection
     try:
-        response_text = next_action_for(text, history, ticket_subject=subject)
+        # Check for escalation commands first
+        escalation_keywords = ["escalate to l2", "escalate to l3", "escalate to manager", "escalate this", "need escalation"]
+        if any(keyword in text.lower() for keyword in escalation_keywords):
+            # Extract target level from text
+            if "l2" in text.lower():
+                target_level = 2
+            elif "l3" in text.lower():
+                target_level = 3
+            elif "manager" in text.lower():
+                target_level = 4
+            else:
+                target_level = min((t.level or 1) + 1, 3)  # Default increment
+            
+            # Perform escalation
+            old_level = t.level or 1
+            t.level = target_level
+            t.status = "escalated"
+            t.updated_at = datetime.now(timezone.utc)
+            db.session.commit()
+            
+            # Log the escalation
+            add_event(thread_id, "ESCALATED", {"reason": "User requested escalation", "from_level": old_level, "to_level": target_level})
+            
+            escalation_msg = f"🚀 Ticket escalated to L{target_level} support as requested."
+            insert_message_with_mentions(thread_id, "assistant", escalation_msg)
+            return jsonify(ticketId=thread_id, reply=escalation_msg), 200
+        
+        # Default chat response
+        response_text = "I understand you need assistance. Let me help you with that. If you need this escalated to a higher level, just let me know!"
         insert_message_with_mentions(thread_id, "assistant", response_text)
         return jsonify(ticketId=thread_id, reply=response_text), 200
     except Exception as e:
@@ -1192,17 +1220,43 @@ def escalate_ticket(thread_id):
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
         return jsonify(error="Ticket not found"), 404
-    old = ticket.level or 1
-    to_level = 2 if old == 1 else 3
+    
+    # Get current agent role for escalation rules
+    agent = getattr(request, 'agent_ctx', {}) or {}
+    current_role = agent.get('role', 'L1')
+    
+    old_level = ticket.level or 1
+    
+    # Escalation rules: L1→L2, L2→L3, L3→Manager, Manager can escalate anywhere
+    if current_role == "L1":
+        to_level = 2  # L1 can only escalate to L2
+    elif current_role == "L2":
+        to_level = 3  # L2 can only escalate to L3
+    elif current_role == "L3":
+        to_level = 4  # L3 escalates to Manager level
+    elif current_role == "MANAGER":
+        # Manager can escalate to any level, default increment
+        to_level = min(old_level + 1, 4)
+    else:
+        return jsonify(error="Insufficient permissions to escalate"), 403
+    
+    # Prevent invalid escalations
+    if old_level >= to_level and current_role != "MANAGER":
+        return jsonify(error=f"Ticket already at level {old_level} or higher"), 400
+    
     ticket.level = to_level
     ticket.status = 'escalated'
     ticket.updated_at = datetime.now(timezone.utc)
-    add_event(ticket.id, 'ESCALATED', actor_agent_id=None, from_level=old, to_level=to_level)
+    add_event(ticket.id, 'ESCALATED', actor_agent_id=agent.get('id'), from_level=old_level, to_level=to_level)
     db.session.commit()
-    insert_message_with_mentions(thread_id, "assistant", f"🚀 Ticket escalated to L{to_level} support.")
-    insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been escalated to L{to_level} support.")
-    enqueue_status_email(thread_id, "escalated", f"We've escalated this to L{to_level}.")
-    return jsonify(status="escalated", level=to_level, message={"sender":"assistant","content":f"🚀 Ticket escalated to L{to_level} support.","timestamp":datetime.now(timezone.utc).isoformat()}), 200
+    
+    level_name = "Manager" if to_level == 4 else f"L{to_level}"
+    escalation_msg = f"🚀 Ticket escalated to {level_name} support."
+    
+    insert_message_with_mentions(thread_id, "assistant", escalation_msg)
+    insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been escalated to {level_name} support.")
+    enqueue_status_email(thread_id, "escalated", f"We've escalated this to {level_name}.")
+    return jsonify(status="escalated", level=to_level, message={"sender":"assistant","content":escalation_msg,"timestamp":datetime.now(timezone.utc).isoformat()}), 200
 
 @urls.route("/threads/<thread_id>/close", methods=["POST"])
 @require_role("L2","L3","MANAGER")
