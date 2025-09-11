@@ -180,6 +180,7 @@ export default function KBDashboard({ open, onClose }) {
           <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
             {[
               { id: 'review', label: 'Review' },
+              { id: 'articles', label: 'Articles' },
               { id: 'feedback', label: 'Feedback' },
               { id: 'analytics', label: 'Analytics' },
             ].map(t => (

@@ -983,26 +983,26 @@ def post_chat(thread_id):
         insert_message_with_mentions(thread_id, "assistant", reply)
         return jsonify(ticketId=thread_id, reply=reply), 200
 
-    # MENTION DETECTION (before saving user message)
-    mentions = extract_mentions(text)
-    if mentions:
-        # DON'T save user mention message - just respond
-        names = ", ".join(mentions)
-        reply = f"🛎 Notified {names}! They'll jump in shortly."
-        insert_message_with_mentions(thread_id, "assistant", reply)
-        return jsonify(ticketId=thread_id, reply=reply), 200
-
-    # NOW save user message (after special cases)
+    # SAVE USER MESSAGE FIRST (so mentions get stored in database)
     TRIGGER_PHRASES = [
         "help me fix this", "give me a solution", "fix this", "give me the top fix with exact steps."
     ]
     user_msg_inserted = False
     if not (source != "user" and text.strip().lower() in TRIGGER_PHRASES):
-        insert_message_with_mentions(thread_id, "user", text)
+        insert_message_with_mentions(thread_id, "user", text)  # This will extract and store mentions
         user_msg_inserted = True
         from datetime import datetime, timezone
         t.updated_at = datetime.now(timezone.utc)
         db.session.commit()
+
+    # MENTION DETECTION (after saving user message with mentions)
+    mentions = extract_mentions(text)
+    if mentions:
+        # User message already saved above with mentions stored
+        names = ", ".join(mentions)
+        reply = f"🛎 Notified {names}! They'll jump in shortly."
+        insert_message_with_mentions(thread_id, "assistant", reply)
+        return jsonify(ticketId=thread_id, reply=reply), 200
 
     current_app.logger.info(f"[CHAT] Incoming message for Ticket {thread_id}: {text}")
     msg_lower = text.lower()
@@ -1512,16 +1512,50 @@ def draft_email(thread_id):
     solution = data.get('solution', '').strip()
     if not solution:
         return jsonify(error="Missing solution text"), 400
-    prompt = f"Draft a professional email to a user to explain this solution:\n\n{solution}"
+    
+    # Enhanced prompt for user-friendly emails
+    prompt = f"""Draft a professional but simple email to explain this solution to a non-technical user.
+
+SOLUTION TO EXPLAIN:
+{solution}
+
+REQUIREMENTS:
+- Write in plain, everyday language that anyone can understand
+- Avoid ALL technical terms (no server logs, IP addresses, blacklists, etc.)
+- Use simple step-by-step instructions
+- Be helpful and reassuring
+- Keep it short and friendly
+- If technical steps are needed, explain them in everyday terms"""
+
     try:
         resp = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful IT support assistant."},
+                {"role": "system", "content": """You are writing emails for everyday people who are not tech-savvy. Your audience includes seniors, busy professionals, and people who just want their technology to work without understanding how.
+
+WRITING STYLE:
+- Use simple, everyday language
+- Replace technical terms with plain explanations
+- Write like you're talking to a family member
+- Be patient and reassuring
+- Focus on what the user needs to DO, not technical details
+
+AVOID THESE TECHNICAL TERMS:
+- Server, IP address, blacklist, domain, DNS, SMTP, logs
+- Bounce-back messages, MXToolbox, configuration, protocols
+- Error codes, diagnostics, troubleshooting tools
+- Any software names users wouldn't recognize
+
+INSTEAD USE:
+- "email system" instead of "server"
+- "blocked" instead of "blacklisted" 
+- "check for returned messages" instead of "bounce-back messages"
+- "simple steps" instead of "troubleshooting procedures"
+- Explain what things do in everyday terms"""},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            max_tokens=300
+            max_tokens=400
         )
         email_text = resp.choices[0].message.content.strip()
     except Exception as e:
