@@ -15,7 +15,7 @@ from utils import extract_mentions, route_department_from_category
 from cli import client, load_df
 from utils import _can_view, extract_json
 from openai_helpers import build_prompt_from_intent
-from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL, FRONTEND_ORIGINS
+from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
 def get_relevant_kb_context(query: str, department_id: int = None, max_articles: int = 3) -> str:
@@ -72,49 +72,6 @@ def test_database():
         return jsonify({"status": "ok", "agent_count": count})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
-
-@urls.route('/debug-email-system', methods=['GET'])
-def debug_email_system():
-    """Debug endpoint to check email system components"""
-    try:
-        debug_info = {}
-        
-        # Check config imports
-        try:
-            from config import DEMO_MODE, FRONTEND_ORIGINS, SECRET_KEY
-            debug_info['config'] = {
-                'demo_mode': DEMO_MODE,
-                'frontend_origins': FRONTEND_ORIGINS,
-                'secret_key_exists': bool(SECRET_KEY)
-            }
-        except Exception as e:
-            debug_info['config_error'] = str(e)
-        
-        # Check email helper imports  
-        try:
-            from email_helpers import send_via_gmail, _utcnow, _serializer
-            debug_info['email_helpers'] = 'imported_successfully'
-        except Exception as e:
-            debug_info['email_helpers_error'] = str(e)
-            
-        # Check DB helper imports
-        try:
-            from db_helpers import get_next_attempt_no, has_pending_attempt
-            debug_info['db_helpers'] = 'imported_successfully'
-        except Exception as e:
-            debug_info['db_helpers_error'] = str(e)
-        
-        # Check CSV loader
-        try:
-            from cli import load_df
-            debug_info['csv_loader'] = 'imported_successfully'
-        except Exception as e:
-            debug_info['csv_loader_error'] = str(e)
-            
-        return jsonify(debug_info)
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @urls.route('/create-admin', methods=['POST'])
 def create_admin_user():
@@ -1794,15 +1751,6 @@ INSTEAD USE:
 @urls.route('/threads/<thread_id>/send-email', methods=['POST'])
 @require_role("L1","L2","L3","MANAGER")
 def send_email(thread_id):
-    """Send email with comprehensive error handling and logging"""
-    try:
-        current_app.logger.info(f"[SEND_EMAIL] Starting email send for ticket {thread_id}")
-        return _send_email_impl(thread_id)
-    except Exception as e:
-        current_app.logger.exception(f"[SEND_EMAIL] Critical error in send_email for {thread_id}: {e}")
-        return jsonify(error=f"Internal server error: {str(e)}"), 500
-
-def _send_email_impl(thread_id):
 
     data = request.json or {}
     email_body = (data.get('email') or '').strip()
@@ -1826,26 +1774,13 @@ def _send_email_impl(thread_id):
         return jsonify(error="Missing email body"), 400
 
     # --- Ensure ticket + recipient ---
-    try:
-        ensure_ticket_record_from_csv(thread_id)
-    except Exception as e:
-        current_app.logger.warning(f"CSV lookup failed: {e}")
-        # Continue without CSV - ticket might exist in DB already
-    
+    ensure_ticket_record_from_csv(thread_id)
     t = db.session.get(Ticket, thread_id)
-    if not t:
-        return jsonify(error="Ticket not found"), 404
-        
     recipient_email = (t.requester_email or '').strip().lower() if t else ''
     if not recipient_email:
-        try:
-            df = load_df()
-            row = df[df["id"] == thread_id]
-            recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
-        except Exception as e:
-            current_app.logger.warning(f"CSV load failed: {e}")
-            # Continue without CSV data
-    
+        df = load_df()
+        row = df[df["id"] == thread_id]
+        recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
     if not recipient_email:
         return jsonify(error="No recipient email found for this ticket"), 400
 
