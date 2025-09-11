@@ -21,6 +21,7 @@ from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAu
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
+import pandas as pd
 
 urls = Blueprint('urls', __name__)
 
