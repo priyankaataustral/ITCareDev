@@ -1830,14 +1830,12 @@ const openDraftEditor = (prefill) => {
     try {
       setSending(true);
       setActionError(null);
-      const res = await fetch(`${API_BASE}/threads/${tid}/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        // credentials: 'include',
-        body: JSON.stringify({ email: emailToSend, cc: ccUnique })
+      
+      // Use apiPost for proper authentication and error handling
+      const data = await apiPost(`/threads/${tid}/send-email`, {
+        email: emailToSend,
+        cc: ccUnique
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Error sending email');
 
       setMessages(prev => [
         ...prev,
