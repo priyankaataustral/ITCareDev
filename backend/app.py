@@ -39,20 +39,11 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Optional: TLS validation with CA bundle (if present). If not found,
-    # SQLAlchemy/PyMySQL will still use TLS if server enforces it.
-    project_root = os.path.abspath(os.path.dirname(__file__))
-    ca_bundle = os.path.join(project_root, "certs", "DigiCertGlobalRootCA.crt.pem")
-    if os.path.exists(ca_bundle):
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-            "connect_args": {"ssl": {"ca": ca_bundle}}
-        }
-        log.info("Using MySQL CA bundle at %s", ca_bundle)
-    else:
-        # No CA bundle shipped — still OK; encrypted if server requires TLS.
-        # If you want to force TLS without CA pinning:
-        # app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"ssl": {}}}
-        log.info("MySQL CA bundle not found; proceeding without explicit CA file.")
+    # Disable SSL verification for Azure MySQL (Azure handles SSL termination)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"ssl_disabled": True}
+    }
+    log.info("SSL verification disabled for Azure MySQL connection")
 
     # Init DB & migrations
     db.init_app(app)
