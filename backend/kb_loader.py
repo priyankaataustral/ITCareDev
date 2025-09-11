@@ -111,14 +111,11 @@ class KBProtocolLoader:
                 existing = KBArticle.query.filter_by(canonical_fingerprint=fingerprint).first()
                 if existing:
                     log.info(f"KB article already exists, updating: {protocol_data['title']}")
-                    # Update existing article instead of skipping
-                    existing.content_md = markdown_content
-                    existing.problem_summary = protocol_data['problem_summary'][:500]
-                    existing.updated_at = datetime.utcnow()
-                    return existing
+                    # Will update after creating markdown_content below
+                    pass
             except Exception as e:
                 log.warning(f"Could not check for existing article: {e}")
-                # Continue with creation
+                existing = None  # Continue with creation
             
             # Generate embedding for semantic search
             embedding_text = f"{protocol_data['title']} {protocol_data['problem_summary']} {protocol_data['solution_content']}"
@@ -139,6 +136,14 @@ class KBProtocolLoader:
 ---
 *Source: Company Protocol Document*
 """
+            
+            # If article already exists, update it and return
+            if existing:
+                log.info(f"Updating existing KB article: {protocol_data['title']}")
+                existing.content_md = markdown_content
+                existing.problem_summary = protocol_data['problem_summary'][:500]
+                existing.updated_at = datetime.utcnow()
+                return existing
             
             # Create KB article with safe enum handling
             try:
@@ -215,12 +220,14 @@ class KBProtocolLoader:
                     continue
                 
                 # Create KB article
+                log.info(f"Attempting to create KB article for: {protocol_data['title']}")
                 article = self.create_kb_article(protocol_data)
                 if article:
                     results["loaded"] += 1
-                    log.info(f"Loaded protocol: {protocol_data['title']}")
+                    log.info(f"✅ Successfully loaded protocol: {protocol_data['title']}")
                 else:
                     results["skipped"] += 1
+                    log.warning(f"⚠️ Skipped protocol (create_kb_article returned None): {protocol_data['title']}")
                     
             except Exception as e:
                 log.error(f"Error processing {filename}: {e}")
