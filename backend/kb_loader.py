@@ -29,18 +29,30 @@ class KBProtocolLoader:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
             
-            # Extract metadata using regex
+            # Extract metadata using regex (fixed patterns to handle spaces in headers)
             title_match = re.search(r'^TITLE:\s*(.+)$', content, re.MULTILINE)
             category_match = re.search(r'^CATEGORY:\s*(.+)$', content, re.MULTILINE)
             department_match = re.search(r'^DEPARTMENT:\s*(.+)$', content, re.MULTILINE)
-            problem_match = re.search(r'^PROBLEM:\s*(.+?)(?=^[A-Z_]+:|$)', content, re.MULTILINE | re.DOTALL)
+            problem_match = re.search(r'^PROBLEM:\s*(.+?)(?=^[A-Z][A-Z_ ]*:|$)', content, re.MULTILINE | re.DOTALL)
             
             # Extract solution steps
-            solution_match = re.search(r'^SOLUTION STEPS:\s*(.+?)(?=^[A-Z_]+:|$)', content, re.MULTILINE | re.DOTALL)
+            solution_match = re.search(r'^SOLUTION STEPS:\s*(.+?)(?=^[A-Z][A-Z_ ]*:|$)', content, re.MULTILINE | re.DOTALL)
             
             if not title_match:
                 log.warning(f"No title found in {file_path}")
+                log.debug(f"First 200 chars of content: {content[:200]}")
                 return None
+            
+            # Debug logging for parsing results
+            log.debug(f"Parsed {file_path}:")
+            log.debug(f"  Title: {title_match.group(1) if title_match else 'None'}")
+            log.debug(f"  Category: {category_match.group(1) if category_match else 'None'}")
+            log.debug(f"  Problem found: {bool(problem_match)}")
+            log.debug(f"  Solution found: {bool(solution_match)}")
+            if problem_match:
+                log.debug(f"  Problem content: {problem_match.group(1)[:100]}...")
+            if solution_match:
+                log.debug(f"  Solution content: {solution_match.group(1)[:100]}...")
                 
             # Create structured data
             protocol_data = {
@@ -94,11 +106,15 @@ class KBProtocolLoader:
             content_text = f"{protocol_data['title']}\n{protocol_data['problem_summary']}\n{protocol_data['solution_content']}"
             fingerprint = hashlib.sha256(content_text.encode('utf-8')).hexdigest()
             
-            # Check if article already exists
+            # Check if article already exists (but don't skip, just log)
             try:
                 existing = KBArticle.query.filter_by(canonical_fingerprint=fingerprint).first()
                 if existing:
-                    log.info(f"KB article already exists: {protocol_data['title']}")
+                    log.info(f"KB article already exists, updating: {protocol_data['title']}")
+                    # Update existing article instead of skipping
+                    existing.content_md = markdown_content
+                    existing.problem_summary = protocol_data['problem_summary'][:500]
+                    existing.updated_at = datetime.utcnow()
                     return existing
             except Exception as e:
                 log.warning(f"Could not check for existing article: {e}")
