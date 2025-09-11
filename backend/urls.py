@@ -23,6 +23,29 @@ from config import FRONTEND_ORIGINS
 
 urls = Blueprint('urls', __name__)
 
+@urls.route('/create-admin', methods=['POST'])
+def create_admin_user():
+    """Temporary endpoint to create a test admin user"""
+    try:
+        # Check if admin already exists
+        existing = Agent.query.filter_by(email='admin@example.com').first()
+        if existing:
+            return jsonify(message="Admin user already exists"), 200
+        
+        # Create admin user
+        admin = Agent(
+            name='Admin User',
+            email='admin@example.com',
+            password='admin123',  # Change this!
+            role='MANAGER'
+        )
+        db.session.add(admin)
+        db.session.commit()
+        
+        return jsonify(message="Admin user created successfully", email="admin@example.com", password="admin123"), 201
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
 @urls.route('/login', methods=['POST'])
 def login():
 	data = request.json or {}
