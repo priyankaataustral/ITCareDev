@@ -362,7 +362,7 @@ def post_chat(thread_id):
     mentions = extract_mentions(text)
     if mentions:
         names = ", ".join(mentions)
-        reply = f"🛎 Notified {names}! They’ll jump in shortly."
+        reply = f"🛎 Notified {names}! They'll jump in shortly."
         insert_message_with_mentions(thread_id, "assistant", reply)
         return jsonify(ticketId=thread_id, reply=reply), 200
 
@@ -491,7 +491,7 @@ def post_chat(thread_id):
                 current_app.logger.error(f"Concise GPT error: {e!r}")
                 solution = f"(fallback) GPT error: {e}"
 
-            solution = solution or "(fallback) Sorry, I couldn’t generate a solution."
+            solution = solution or "(fallback) Sorry, I couldn't generate a solution."
             insert_message_with_mentions(thread_id, "assistant", {"type": "solution", "text": solution, "askToSend": True})
             return jsonify(ticketId=thread_id, type="solution", text=solution, askToSend=True), 200
 
@@ -606,7 +606,7 @@ def escalate_ticket(thread_id):
     db.session.commit()
     insert_message_with_mentions(thread_id, "assistant", f"🚀 Ticket escalated to L{to_level} support.")
     insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been escalated to L{to_level} support.")
-    enqueue_status_email(thread_id, "escalated", f"We’ve escalated this to L{to_level}.")
+    enqueue_status_email(thread_id, "escalated", f"We've escalated this to L{to_level}.")
     return jsonify(status="escalated", level=to_level, message={"sender":"assistant","content":f"🚀 Ticket escalated to L{to_level} support.","timestamp":datetime.now(timezone.utc).isoformat()}), 200
 
 @urls.route("/threads/<thread_id>/close", methods=["POST"])
@@ -951,7 +951,7 @@ def draft_email(thread_id):
 #                 creator_id = request.agent_ctx.get("id")
 #             s = Solution(
 #                 ticket_id=thread_id,          # ensure this type matches your schema (str/int)
-#                 text=email_body,              # store the body we’re about to send
+#                 text=email_body,              # store the body we're about to send
 #                 created_by=creator_id,        # optional if your model allows NULL
 #                 status=SolutionStatus.draft,  # or initial status that fits your workflow
 #             )
@@ -1076,7 +1076,7 @@ def send_email(thread_id):
         try:
             s = Solution(
                 ticket_id=thread_id,
-                text=email_body,                         # store what we’re sending
+                text=email_body,                         # store what we're sending
                 proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name") or None,  # optional
                 generated_by="HUMAN",                    # <=5 chars fits your schema
                 status="proposed",                       # optional; will set to sent_for_confirm below
@@ -2133,6 +2133,20 @@ def not_fixed_feedback():
 
     log_event(t.id, "FEEDBACK", {"kind":"not_fixed_detail", "attempt_id": att.id, "reason": att.rejected_reason})
     return jsonify(ok=True)
+
+# TEMPORARY - REMOVE IN FINAL DEPLOYMENT
+@urls.route("/threads", methods=["GET"]) 
+@require_role("L1","L2","L3","MANAGER")
+def list_threads_simple():
+    # Simple static data to get frontend working
+    sample_threads = [...]
+    return jsonify(sample_threads)
+
+# TODO: Fix this original endpoint and remove temporary one above
+# @urls.route("/threads", methods=["GET"])
+# @require_role("L1","L2","L3","MANAGER") 
+# def list_threads():
+#     df = load_df()  # This is failing
 
 
 
