@@ -24,6 +24,18 @@ from config import FRONTEND_ORIGINS
 
 urls = Blueprint('urls', __name__)
 
+@urls.route('/test-db', methods=['GET'])
+def test_database():
+    """Test database connection"""
+    try:
+        from extensions import db
+        from models import Agent
+        # Simple query
+        count = Agent.query.count()
+        return jsonify({"status": "ok", "agent_count": count})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
 @urls.route('/create-admin', methods=['POST'])
 def create_admin_user():
     """Temporary endpoint to create a test admin user"""
