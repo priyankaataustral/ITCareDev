@@ -1446,6 +1446,16 @@ const openDraftEditor = (prefill) => {
         ...(options.source ? { source: options.source } : {}),
       });
 
+      // Check for @mentions in the message and trigger refresh
+      const mentionRegex = /@[\w]+/g;
+      const mentions = text.match(mentionRegex);
+      if (mentions && mentions.length > 0) {
+        // Trigger mentions refresh for real-time updates
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('refreshMentions'));
+        }, 500); // Small delay to ensure backend processing is complete
+      }
+
       setMessages(prev => {
       let arr = prev.filter(m => m.id !== tempTypingId);
 
@@ -1622,17 +1632,41 @@ const openDraftEditor = (prefill) => {
         });
         const reportText = reportLines.join('\n');
 
-        const data = await apiPost(`/threads/${tid}/escalate`, { report: reportText });
-        setTicket(t => ({ ...t, status: data.status }));
+        const data = await apiPost(`/threads/${tid}/escalate`, {});
+        
+        // Update ticket status and level
+        setTicket(t => ({ ...t, status: data.status, level: data.level }));
 
+        // Add escalation message from backend response
+        if (data.message) {
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `temp-${Date.now()}-escalate`,
+              sender: 'bot',
+              content: data.message.content + (notifyUser ? ' (notification sent)' : ' (no notification)'),
+              timestamp: data.message.timestamp,
+            }
+          ]);
+        }
+
+        // Generate and offer download of report
         const blob = new Blob([reportText], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         setMessages(prev => [
           ...prev,
-          { id: `temp-${Date.now()}-escalate`, sender: 'bot', content: `Ticket escalated to L2 support.${notifyUser ? ' (notification sent)' : ' (no notification)'}`, timestamp: new Date().toISOString() },
-          { id: `temp-${Date.now()}-dl`, sender: 'bot', content: <a href={url} download={`ticket_${tid}_report.txt`} className="underline text-blue-600">ticket_{tid}_report.txt</a>, timestamp: new Date().toISOString() }
+          { 
+            id: `temp-${Date.now()}-dl`, 
+            sender: 'bot', 
+            content: <a href={url} download={`ticket_${tid}_report.txt`} className="underline text-blue-600">📄 Download Report: ticket_{tid}_report.txt</a>, 
+            timestamp: new Date().toISOString() 
+          }
         ]);
+        
+        // Refresh timeline and mentions
         setTimelineRefresh(x => x + 1);
+        // Trigger mentions refresh to update sidebar counts
+        window.dispatchEvent(new CustomEvent('refreshMentions'));
       } else {
         const data = await apiPost(`/threads/${tid}/close`, { notify: notifyUser });
 

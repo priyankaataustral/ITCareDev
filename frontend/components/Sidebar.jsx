@@ -13,7 +13,7 @@ export default function Sidebar({
   useNewList = false
 }) {
   const [view, setView] = useState('all');
-  const { mentions = [] } = useMentions(agentId) || {};
+  const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
   return (
   <div className="sidebar" style={{ width: 350, minWidth: 350, maxWidth: 350 }}>

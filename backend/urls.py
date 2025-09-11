@@ -1147,7 +1147,7 @@ def post_chat(thread_id):
             db.session.commit()
             
             # Log the escalation
-            add_event(thread_id, "ESCALATED", {"reason": "User requested escalation", "from_level": old_level, "to_level": target_level})
+            add_event(thread_id, "ESCALATED", actor_agent_id=None, reason="User requested escalation", from_level=old_level, to_level=target_level)
             
             escalation_msg = f"🚀 Ticket escalated to L{target_level} support as requested."
             insert_message_with_mentions(thread_id, "assistant", escalation_msg)
