@@ -14,6 +14,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      router.push("/SupportInboxPlugin");
     } catch (err) {
       setError(err.message || "Network error");
     }

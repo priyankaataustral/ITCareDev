@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/baut
 
 # Azure App Service startup script
 echo "Starting AI Support Assistant Backend..."
