@@ -84,70 +84,70 @@ def login():
 	return resp
 
 # ... (move all other @app.route endpoints here, replacing @app.route with @urls.route and updating any app-specific references as needed)
-@urls.route("/threads", methods=["GET"])
-@require_role("L1","L2","L3","MANAGER")
-def list_threads():
+# @urls.route("/threads", methods=["GET"])
+# @require_role("L1","L2","L3","MANAGER")
+# def list_threads():
 
-    df = load_df()
-    df["status"]       = "open"
-    df["lastActivity"] = datetime.utcnow().isoformat()
-    try:
-        limit  = int(request.args.get("limit", 20))
-        offset = int(request.args.get("offset", 0))
-    except ValueError:
-        return jsonify(error="limit and offset must be integers"), 400
+#     df = load_df()
+#     df["status"]       = "open"
+#     df["lastActivity"] = datetime.utcnow().isoformat()
+#     try:
+#         limit  = int(request.args.get("limit", 20))
+#         offset = int(request.args.get("offset", 0))
+#     except ValueError:
+#         return jsonify(error="limit and offset must be integers"), 400
 
-    # Get user role from JWT
-    user = getattr(request, "agent_ctx", None)
-    role = user.get("role") if user else None
+#     # Get user role from JWT
+#     user = getattr(request, "agent_ctx", None)
+#     role = user.get("role") if user else None
 
-    # Build all threads (with DB info)
-    rows = df.to_dict(orient="records")
-    ids = [r["id"] for r in rows]
-    db_tickets = {t.id: t for t in Ticket.query.filter(Ticket.id.in_(ids)).all()}
-    dept_map = {d.id: d.name for d in Department.query.all()}
-    threads_all = []
-    for row in rows:
-        cat, team = categorize_with_gpt(row.get("text", ""))
-        t = db_tickets.get(row["id"])
-        department_id = getattr(t, "department_id", None) if t else None
-        updated_at    = getattr(t, "updated_at", None) if t else None
-        status        = getattr(t, "status", "open") if t else "open"
-        level         = getattr(t, "level", 1) if t else 1
-        department    = {"id": department_id, "name": dept_map.get(department_id)} if department_id else None
-        # Check if ticket has been escalated (has at least one ESCALATED event)
-        escalated = False
-        if t:
-            escalated = TicketEvent.query.filter_by(ticket_id=t.id, event_type="ESCALATED").count() > 0
-        threads_all.append({
-            **row,
-            "predicted_category": cat,
-            "assigned_team": team,
-            "status": status,
-            "updated_at": updated_at.isoformat() if updated_at else None,
-            "department_id": department_id,
-            "department": department,
-            "level": level,
-            "escalated": escalated
-        })
+#     # Build all threads (with DB info)
+#     rows = df.to_dict(orient="records")
+#     ids = [r["id"] for r in rows]
+#     db_tickets = {t.id: t for t in Ticket.query.filter(Ticket.id.in_(ids)).all()}
+#     dept_map = {d.id: d.name for d in Department.query.all()}
+#     threads_all = []
+#     for row in rows:
+#         cat, team = categorize_with_gpt(row.get("text", ""))
+#         t = db_tickets.get(row["id"])
+#         department_id = getattr(t, "department_id", None) if t else None
+#         updated_at    = getattr(t, "updated_at", None) if t else None
+#         status        = getattr(t, "status", "open") if t else "open"
+#         level         = getattr(t, "level", 1) if t else 1
+#         department    = {"id": department_id, "name": dept_map.get(department_id)} if department_id else None
+#         # Check if ticket has been escalated (has at least one ESCALATED event)
+#         escalated = False
+#         if t:
+#             escalated = TicketEvent.query.filter_by(ticket_id=t.id, event_type="ESCALATED").count() > 0
+#         threads_all.append({
+#             **row,
+#             "predicted_category": cat,
+#             "assigned_team": team,
+#             "status": status,
+#             "updated_at": updated_at.isoformat() if updated_at else None,
+#             "department_id": department_id,
+#             "department": department,
+#             "level": level,
+#             "escalated": escalated
+#         })
 
-    # Role-based filtering
-    if role == "L2":
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
-    elif role == "L3":
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
-    else:  # L1 and MANAGER see all
-        threads_filtered = threads_all
+#     # Role-based filtering
+#     if role == "L2":
+#         threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
+#     elif role == "L3":
+#         threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
+#     else:  # L1 and MANAGER see all
+#         threads_filtered = threads_all
 
-    total = len(threads_filtered)
-    threads = threads_filtered[offset:offset+limit]
+#     total = len(threads_filtered)
+#     threads = threads_filtered[offset:offset+limit]
 
-    return jsonify(
-        total   = total,
-        limit   = limit,
-        offset  = offset,
-        threads = threads
-    ), 200
+#     return jsonify(
+#         total   = total,
+#         limit   = limit,
+#         offset  = offset,
+#         threads = threads
+#     ), 200
 
 
 @urls.route("/threads/<thread_id>/download-summary", methods=["OPTIONS"])
