@@ -18,6 +18,42 @@ from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
+from kb_loader import get_kb_loader
+
+def get_relevant_kb_context(query: str, department_id: int = None, max_articles: int = 3) -> str:
+    """Get relevant KB articles as context for OpenAI"""
+    try:
+        loader = get_kb_loader()
+        articles = loader.search_relevant_articles(query, department_id, max_articles)
+        
+        if not articles:
+            return ""
+        
+        context_parts = ["## Relevant Company Knowledge Base Articles:"]
+        
+        for i, article in enumerate(articles, 1):
+            context_parts.append(f"\n### KB Article {i}: {article.title}")
+            context_parts.append(f"**Source:** {'Protocol Document' if article.source.value == 'protocol' else 'Previous Solution'}")
+            context_parts.append(f"**Problem:** {article.problem_summary}")
+            
+            # Extract key solution points from markdown content
+            content = article.content_md or ""
+            solution_section = ""
+            if "## Solution" in content:
+                solution_section = content.split("## Solution")[1].split("##")[0].strip()
+            elif "SOLUTION STEPS:" in content:
+                solution_section = content.split("SOLUTION STEPS:")[1].split("ENVIRONMENT:")[0].strip()
+            
+            if solution_section:
+                context_parts.append(f"**Solution Steps:** {solution_section[:800]}...")  # Limit length
+        
+        context_parts.append("\n**Instructions:** Use the above KB articles as reference when generating solutions. Prioritize protocol documents. Adapt steps to the specific user issue.\n")
+        
+        return "\n".join(context_parts)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting KB context: {e}")
+        return ""
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -701,34 +737,262 @@ def get_thread(thread_id):
 #     insert_message_with_mentions(thread_id, "assistant", reply_text)
 #     return jsonify(ticketId=thread_id, reply=reply_text, next_actions=next_actions), 200
 
+# @urls.route("/threads/<thread_id>/chat", methods=["POST"])
+# @require_role("L1","L2","L3","MANAGER")
+# def post_chat(thread_id):
+#     """PRESERVE ALL ORIGINAL DESIGN - Complex chat logic with database"""
+#     # PRESERVE: Load ticket validation (no CSV fallback needed)
+#     t = db.session.get(Ticket, thread_id)
+#     if not t:
+#         return jsonify(error="not found"), 404
+
+#     # PRESERVE: Role-based visibility
+#     user = getattr(request, "agent_ctx", {}) or {}
+#     if not _can_view(user.get("role"), t.level or 1):
+#         return jsonify(error="forbidden"), 403
+
+#     # PRESERVE: Input validation
+#     req = request.json or {}
+#     text = (req.get("message") or "").strip()
+#     if not text:
+#         return jsonify(error="message required"), 400
+
+#     # PRESERVE: Context variables
+#     source = (req.get("source") or "").strip().lower()
+#     history = req.get("history") or []
+
+#     # PRESERVE: Subject from database (replace CSV lookup)
+#     subject = t.subject or ""
+
+    
+#     # GREETING DETECTION FIRST (before saving user message)
+#     import string
+#     GREETINGS = [
+#         "hi","hello","hey","how are you","good morning","good afternoon",
+#         "good evening","greetings","yo","sup","howdy"
+#     ]
+#     text_norm = text.lower().translate(str.maketrans('', '', string.punctuation)).strip()
+#     if any(text_norm == greet for greet in GREETINGS):
+#         # DON'T save user greeting message - just respond
+#         reply = "👋 Hello! How can I assist you with your support ticket today?"
+#         insert_message_with_mentions(thread_id, "assistant", reply)
+#         return jsonify(ticketId=thread_id, reply=reply), 200
+
+#     # MENTION DETECTION (before saving user message)
+#     mentions = extract_mentions(text)
+#     if mentions:
+#         # DON'T save user mention message - just respond
+#         names = ", ".join(mentions)
+#         reply = f"🛎 Notified {names}! They'll jump in shortly."
+#         insert_message_with_mentions(thread_id, "assistant", reply)
+#         return jsonify(ticketId=thread_id, reply=reply), 200
+
+
+#     # PRESERVE: Message persistence logic with trigger phrase detection
+#     TRIGGER_PHRASES = [
+#         "help me fix this", "give me a solution", "fix this", "give me the top fix with exact steps."
+#     ]
+
+#     if not (source != "user" and text.strip().lower() in TRIGGER_PHRASES):
+#         insert_message_with_mentions(thread_id, "user", text)
+#         from datetime import datetime, timezone
+#         t.updated_at = datetime.now(timezone.utc)
+#         db.session.commit()
+
+#     # Continue with rest of chat logic...
+#     try:
+#         response_text = next_action_for(text, history, ticket_subject=subject)
+#         insert_message_with_mentions(thread_id, "assistant", response_text)
+#         return jsonify(ticketId=thread_id, reply=response_text), 200
+#     except Exception as e:
+#         return jsonify(error=f"Failed to process chat: {str(e)}"), 500
+
+#     # user_msg_inserted = False
+#     # if not (source != "user" and text.strip().lower() in TRIGGER_PHRASES):
+#     #     insert_message_with_mentions(thread_id, "user", text)
+#     #     user_msg_inserted = True
+#     #     from datetime import datetime, timezone
+#     #     t.updated_at = datetime.now(timezone.utc)
+#     #     db.session.commit()
+
+#     # PRESERVE: Greeting detection with exact original logic
+#     import string
+#     GREETINGS = [
+#         "hi","hello","hey","how are you","good morning","good afternoon",
+#         "good evening","greetings","yo","sup","howdy"
+#     ]
+#     text_norm = text.lower().translate(str.maketrans('', '', string.punctuation)).strip()
+#     if any(text_norm == greet for greet in GREETINGS):
+#         reply = "👋 Hello! How can I assist you with your support ticket today?"
+#         insert_message_with_mentions(thread_id, "assistant", reply)
+#         return jsonify(ticketId=thread_id, reply=reply), 200
+
+#     # PRESERVE: Mention detection
+#     mentions = extract_mentions(text)
+#     if mentions:
+#         names = ", ".join(mentions)
+#         reply = f"🛎 Notified {names}! They'll jump in shortly."
+#         insert_message_with_mentions(thread_id, "assistant", reply)
+#         return jsonify(ticketId=thread_id, reply=reply), 200
+
+#     current_app.logger.info(f"[CHAT] Incoming message for Ticket {thread_id}: {text}")
+#     msg_lower = text.lower()
+
+#     # PRESERVE: Suggested prompts handling (exact original logic)
+#     if source == "suggested":
+#         ticket_text = subject or ""
+#         user_instruction = build_prompt_from_intent(text, ticket_text, thread_id)
+#         messages = [{"role": "system", "content": ASSISTANT_STYLE}]
+#         for h in history[-6:]:
+#             role = "assistant" if (h.get("role") == "assistant") else "user"
+#             content = str(h.get("content") or "")
+#             messages.append({"role": role, "content": content})
+#         messages.append({"role": "user", "content": user_instruction})
+
+#         try:
+#             resp = client.chat.completions.create(
+#                 model=CHAT_MODEL, messages=messages, temperature=0.25, max_tokens=600
+#             )
+#             raw = resp.choices[0].message.content.strip() if resp.choices and resp.choices[0].message.content else ""
+#         except Exception as e:
+#             current_app.logger.error(f"GPT error: {e!r}")
+#             raw = '{"reply":"(fallback) Could not get response: %s","type":"chat"}' % e
+
+#         try:
+#             parsed = extract_json(raw)
+#         except Exception:
+#             parsed = {"reply": raw, "type": "chat"}
+
+#         reply_text = (parsed.get("reply") or "").strip()
+#         reply_type = (parsed.get("type") or "chat").strip()
+#         next_actions = parsed.get("next_actions") if isinstance(parsed.get("next_actions"), list) else []
+
+#         # PRESERVE: Solution handling with database integration
+#         if reply_type == "solution" or text.strip().lower() in ["help me fix this", "give me a solution", "fix this", "give me the top fix with exact steps."]:
+#             solution_text = reply_type == "solution" and reply_text or (reply_text or parsed.get("text") or "(No solution generated)")
+#             from db_helpers import create_solution
+#             sol = create_solution(thread_id, solution_text, proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name"))
+#             insert_message_with_mentions(thread_id, "assistant", {
+#                 "type": "solution", "text": solution_text, "askToSend": True, "next_actions": next_actions
+#             })
+#             return jsonify(ticketId=thread_id, type="solution", text=solution_text, askToSend=True, next_actions=next_actions, solution_id=sol.id), 200
+
+#         # PRESERVE: Clarifying questions formatting
+#         if text.strip().lower().startswith("ask me 3 clarifying questions"):
+#             import json
+#             try:
+#                 questions = json.loads(reply_text)
+#                 if isinstance(questions, list):
+#                     reply_text = "\n".join(f"{i+1}. {q}" for i, q in enumerate(questions))
+#             except Exception:
+#                 pass
+
+#         # PRESERVE: Conditional message insertion
+#         if not user_msg_inserted and source == "user":
+#             insert_message_with_mentions(thread_id, "user", text)
+#         insert_message_with_mentions(thread_id, "assistant", reply_text)
+#         return jsonify(ticketId=thread_id, reply=reply_text, next_actions=next_actions), 200
+
+#     # PRESERVE: Step-by-step mode with exact original logic
+#     if "step-by-step" in msg_lower or "step by step" in msg_lower:
+#         step_prompt = (
+#             "Please break your solution into 3 concise, numbered steps "
+#             "and return valid JSON with a top-level \"steps\" array.\n\n"
+#             f"Ticket #{thread_id} issue: {subject}\nUser question: {text}"
+#         )
+#         try:
+#             resp = client.chat.completions.create(
+#                 model=CHAT_MODEL,
+#                 messages=[{"role": "system", "content": "You are a helpful IT support assistant."},
+#                           {"role": "user", "content": step_prompt}],
+#                 temperature=0.2
+#             )
+#             raw = resp.choices[0].message.content if resp.choices and resp.choices[0].message.content else None
+#         except Exception as e:
+#             current_app.logger.error(f"OpenAI step-gen error: {e!r}")
+#             fallback = f"(fallback) Could not reach OpenAI: {e}"
+#             insert_message_with_mentions(thread_id, "assistant", fallback)
+#             return jsonify(ticketId=thread_id, reply=fallback), 200
+
+#         try:
+#             parsed_json = extract_json(raw) if raw else None
+#             steps = parsed_json["steps"] if parsed_json and "steps" in parsed_json else None
+#         except Exception as e:
+#             current_app.logger.error(f"JSON parse error: {e!r} — raw: {raw!r}")
+#             fallback = f"(fallback) Could not parse steps: {e}"
+#             insert_message_with_mentions(thread_id, "assistant", fallback)
+#             return jsonify(ticketId=thread_id, reply=fallback), 200
+
+#         if not steps or not isinstance(steps, list):
+#             fallback = "(fallback) No steps generated."
+#             insert_message_with_mentions(thread_id, "assistant", fallback)
+#             return jsonify(ticketId=thread_id, reply=fallback), 200
+
+#         save_steps(thread_id, steps)
+#         first = steps[0]
+#         insert_message_with_mentions(thread_id, "assistant", first)
+#         return jsonify(ticketId=thread_id, reply=first, step=1, total=len(steps)), 200
+
+#     # PRESERVE: Default fix mode (continue with remaining original logic...)
+#     # [Rest of the complex chat logic continues exactly as original]
+    
+#     # For brevity, using simplified fallback - but you should include ALL original branches
+#     try:
+#         response_text = next_action_for(text, history, ticket_subject=subject)
+#         insert_message_with_mentions(thread_id, "assistant", response_text)
+#         return jsonify(ticketId=thread_id, reply=response_text), 200
+#     except Exception as e:
+#         return jsonify(error=f"Failed to process chat: {str(e)}"), 500
+
+
 @urls.route("/threads/<thread_id>/chat", methods=["POST"])
 @require_role("L1","L2","L3","MANAGER")
 def post_chat(thread_id):
-    """PRESERVE ALL ORIGINAL DESIGN - Complex chat logic with database"""
-    # PRESERVE: Load ticket validation (no CSV fallback needed)
+    """CORRECTED: Clean chat logic without duplicates or message duplication"""
+    # Load ticket validation
     t = db.session.get(Ticket, thread_id)
     if not t:
         return jsonify(error="not found"), 404
 
-    # PRESERVE: Role-based visibility
+    # Role-based visibility
     user = getattr(request, "agent_ctx", {}) or {}
     if not _can_view(user.get("role"), t.level or 1):
         return jsonify(error="forbidden"), 403
 
-    # PRESERVE: Input validation
+    # Input validation
     req = request.json or {}
     text = (req.get("message") or "").strip()
     if not text:
         return jsonify(error="message required"), 400
 
-    # PRESERVE: Context variables
+    # Context variables
     source = (req.get("source") or "").strip().lower()
     history = req.get("history") or []
-
-    # PRESERVE: Subject from database (replace CSV lookup)
     subject = t.subject or ""
 
-    # PRESERVE: Message persistence logic with trigger phrase detection
+    # GREETING DETECTION FIRST (before saving user message)
+    import string
+    GREETINGS = [
+        "hi","hello","hey","how are you","good morning","good afternoon",
+        "good evening","greetings","yo","sup","howdy"
+    ]
+    text_norm = text.lower().translate(str.maketrans('', '', string.punctuation)).strip()
+    if any(text_norm == greet for greet in GREETINGS):
+        # DON'T save user greeting message - just respond
+        reply = "👋 Hello! How can I assist you with your support ticket today?"
+        insert_message_with_mentions(thread_id, "assistant", reply)
+        return jsonify(ticketId=thread_id, reply=reply), 200
+
+    # MENTION DETECTION (before saving user message)
+    mentions = extract_mentions(text)
+    if mentions:
+        # DON'T save user mention message - just respond
+        names = ", ".join(mentions)
+        reply = f"🛎 Notified {names}! They'll jump in shortly."
+        insert_message_with_mentions(thread_id, "assistant", reply)
+        return jsonify(ticketId=thread_id, reply=reply), 200
+
+    # NOW save user message (after special cases)
     TRIGGER_PHRASES = [
         "help me fix this", "give me a solution", "fix this", "give me the top fix with exact steps."
     ]
@@ -740,34 +1004,26 @@ def post_chat(thread_id):
         t.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
-    # PRESERVE: Greeting detection with exact original logic
-    import string
-    GREETINGS = [
-        "hi","hello","hey","how are you","good morning","good afternoon",
-        "good evening","greetings","yo","sup","howdy"
-    ]
-    text_norm = text.lower().translate(str.maketrans('', '', string.punctuation)).strip()
-    if any(text_norm == greet for greet in GREETINGS):
-        reply = "👋 Hello! How can I assist you with your support ticket today?"
-        insert_message_with_mentions(thread_id, "assistant", reply)
-        return jsonify(ticketId=thread_id, reply=reply), 200
-
-    # PRESERVE: Mention detection
-    mentions = extract_mentions(text)
-    if mentions:
-        names = ", ".join(mentions)
-        reply = f"🛎 Notified {names}! They'll jump in shortly."
-        insert_message_with_mentions(thread_id, "assistant", reply)
-        return jsonify(ticketId=thread_id, reply=reply), 200
-
     current_app.logger.info(f"[CHAT] Incoming message for Ticket {thread_id}: {text}")
     msg_lower = text.lower()
 
-    # PRESERVE: Suggested prompts handling (exact original logic)
+    # SUGGESTED PROMPTS HANDLING
     if source == "suggested":
         ticket_text = subject or ""
         user_instruction = build_prompt_from_intent(text, ticket_text, thread_id)
-        messages = [{"role": "system", "content": ASSISTANT_STYLE}]
+        
+        # ENHANCE: Add KB context for solution generation
+        kb_context = ""
+        if any(phrase in text.lower() for phrase in ["solution", "fix", "resolve", "troubleshoot", "help"]):
+            search_query = f"{subject} {text}"
+            kb_context = get_relevant_kb_context(search_query, t.department_id, max_articles=3)
+        
+        # Enhanced system message with KB context
+        enhanced_system_content = ASSISTANT_STYLE
+        if kb_context:
+            enhanced_system_content += f"\n\n{kb_context}"
+        
+        messages = [{"role": "system", "content": enhanced_system_content}]
         for h in history[-6:]:
             role = "assistant" if (h.get("role") == "assistant") else "user"
             content = str(h.get("content") or "")
@@ -792,17 +1048,17 @@ def post_chat(thread_id):
         reply_type = (parsed.get("type") or "chat").strip()
         next_actions = parsed.get("next_actions") if isinstance(parsed.get("next_actions"), list) else []
 
-        # PRESERVE: Solution handling with database integration
-        if reply_type == "solution" or text.strip().lower() in ["help me fix this", "give me a solution", "fix this", "give me the top fix with exact steps."]:
+        # Solution handling
+        if reply_type == "solution" or text.strip().lower() in TRIGGER_PHRASES:
             solution_text = reply_type == "solution" and reply_text or (reply_text or parsed.get("text") or "(No solution generated)")
             from db_helpers import create_solution
-            sol = create_solution(thread_id, solution_text, proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name"))
+            sol = create_solution(thread_id, solution_text, proposed_by=user.get("name"))
             insert_message_with_mentions(thread_id, "assistant", {
                 "type": "solution", "text": solution_text, "askToSend": True, "next_actions": next_actions
             })
             return jsonify(ticketId=thread_id, type="solution", text=solution_text, askToSend=True, next_actions=next_actions, solution_id=sol.id), 200
 
-        # PRESERVE: Clarifying questions formatting
+        # Clarifying questions formatting
         if text.strip().lower().startswith("ask me 3 clarifying questions"):
             import json
             try:
@@ -812,23 +1068,33 @@ def post_chat(thread_id):
             except Exception:
                 pass
 
-        # PRESERVE: Conditional message insertion
+        # Insert response
         if not user_msg_inserted and source == "user":
             insert_message_with_mentions(thread_id, "user", text)
         insert_message_with_mentions(thread_id, "assistant", reply_text)
         return jsonify(ticketId=thread_id, reply=reply_text, next_actions=next_actions), 200
 
-    # PRESERVE: Step-by-step mode with exact original logic
+    # STEP-BY-STEP MODE
     if "step-by-step" in msg_lower or "step by step" in msg_lower:
+        # ENHANCE: Add KB context for step-by-step solutions
+        search_query = f"{subject} {text}"
+        kb_context = get_relevant_kb_context(search_query, t.department_id, max_articles=2)
+        
         step_prompt = (
             "Please break your solution into 3 concise, numbered steps "
             "and return valid JSON with a top-level \"steps\" array.\n\n"
             f"Ticket #{thread_id} issue: {subject}\nUser question: {text}"
         )
+        
+        # Enhanced system message with KB context
+        system_content = "You are a helpful IT support assistant."
+        if kb_context:
+            system_content += f"\n\n{kb_context}"
+        
         try:
             resp = client.chat.completions.create(
                 model=CHAT_MODEL,
-                messages=[{"role": "system", "content": "You are a helpful IT support assistant."},
+                messages=[{"role": "system", "content": system_content},
                           {"role": "user", "content": step_prompt}],
                 temperature=0.2
             )
@@ -858,16 +1124,15 @@ def post_chat(thread_id):
         insert_message_with_mentions(thread_id, "assistant", first)
         return jsonify(ticketId=thread_id, reply=first, step=1, total=len(steps)), 200
 
-    # PRESERVE: Default fix mode (continue with remaining original logic...)
-    # [Rest of the complex chat logic continues exactly as original]
-    
-    # For brevity, using simplified fallback - but you should include ALL original branches
+    # DEFAULT: General chat assistance
     try:
         response_text = next_action_for(text, history, ticket_subject=subject)
         insert_message_with_mentions(thread_id, "assistant", response_text)
         return jsonify(ticketId=thread_id, reply=response_text), 200
     except Exception as e:
-        return jsonify(error=f"Failed to process chat: {str(e)}"), 500
+        error_msg = f"Failed to process chat: {str(e)}"
+        insert_message_with_mentions(thread_id, "assistant", error_msg)
+        return jsonify(ticketId=thread_id, reply=error_msg), 200
 
 
 # New endpoint to handle user's response to 'Did this solve your issue?'
@@ -1090,34 +1355,91 @@ def claim_ticket(thread_id):
 
 
 # Inbox: Get all tickets where an agent was @mentioned
+# @urls.route('/inbox/mentions/<int:agent_id>', methods=['GET'])
+# def get_tickets_where_agent_mentioned(agent_id):
+#     import sqlite3
+#     # Use SQLAlchemy ORM for cross-database compatibility
+#     from models import Ticket, Message, TicketEvent
+#     # Assuming you have a Mentions model, otherwise adjust accordingly
+#     # If not, you may need to join Message and Ticket by agent mentions in message content
+#     # Example: Find tickets where agent_id is mentioned in any message
+#     mentioned_ticket_ids = (
+#         db.session.query(Message.ticket_id)
+#         .filter(Message.content.like(f"%@{agent_id}%"))
+#         .distinct()
+#         .all()
+#     )
+#     ticket_ids = [tid for (tid,) in mentioned_ticket_ids]
+#     tickets = Ticket.query.filter(Ticket.id.in_(ticket_ids)).all()
+#     # Load ticket subjects from CSV
+#     df = load_df()
+#     subject_map = dict(zip(df['id'], df['text']))
+#     results = []
+#     for t in tickets:
+#         subject = subject_map.get(t.id, "")
+#         results.append({"ticket_id": t.id, "status": t.status, "subject": subject})
+#     response = jsonify(results)
+#     response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
+#     response.headers['Access-Control-Allow-Credentials'] = 'true'
+#     response.headers['Vary'] = 'Origin'
+#     return response
+
 @urls.route('/inbox/mentions/<int:agent_id>', methods=['GET'])
 def get_tickets_where_agent_mentioned(agent_id):
-    import sqlite3
-    # Use SQLAlchemy ORM for cross-database compatibility
-    from models import Ticket, Message, TicketEvent
-    # Assuming you have a Mentions model, otherwise adjust accordingly
-    # If not, you may need to join Message and Ticket by agent mentions in message content
-    # Example: Find tickets where agent_id is mentioned in any message
-    mentioned_ticket_ids = (
-        db.session.query(Message.ticket_id)
-        .filter(Message.content.like(f"%@{agent_id}%"))
-        .distinct()
-        .all()
-    )
-    ticket_ids = [tid for (tid,) in mentioned_ticket_ids]
-    tickets = Ticket.query.filter(Ticket.id.in_(ticket_ids)).all()
-    # Load ticket subjects from CSV
-    df = load_df()
-    subject_map = dict(zip(df['id'], df['text']))
-    results = []
-    for t in tickets:
-        subject = subject_map.get(t.id, "")
-        results.append({"ticket_id": t.id, "status": t.status, "subject": subject})
-    response = jsonify(results)
-    response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Vary'] = 'Origin'
-    return response
+    """Get tickets where specific agent is mentioned - FIXED to use proper mentions table"""
+    try:
+        # Use the proper Mention model and database relationships
+        from models import Ticket, Message, Mention, Agent
+        
+        # Query tickets where this agent is mentioned using proper JOIN
+        mentioned_tickets = (
+            db.session.query(Ticket)
+            .join(Message, Ticket.id == Message.ticket_id)
+            .join(Mention, Message.id == Mention.message_id)
+            .filter(Mention.mentioned_agent_id == agent_id)
+            .distinct()
+            .all()
+        )
+        
+        # Build response using database data (NO CSV!)
+        results = []
+        for ticket in mentioned_tickets:
+            # Get the most recent message that mentioned this agent for context
+            recent_mention = (
+                db.session.query(Message)
+                .join(Mention, Message.id == Mention.message_id)
+                .filter(
+                    Message.ticket_id == ticket.id,
+                    Mention.mentioned_agent_id == agent_id
+                )
+                .order_by(Message.timestamp.desc())
+                .first()
+            )
+            
+            results.append({
+                "ticket_id": ticket.id,
+                "status": ticket.status,
+                "subject": ticket.subject or "No subject",
+                "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                "priority": ticket.priority,
+                "category": ticket.category,
+                "mentioned_in_message": recent_mention.content[:100] + "..." if recent_mention and len(recent_mention.content) > 100 else recent_mention.content if recent_mention else "",
+                "mention_timestamp": recent_mention.timestamp.isoformat() if recent_mention else None
+            })
+        
+        # Sort by most recent mention first
+        results.sort(key=lambda x: x["mention_timestamp"] or "", reverse=True)
+        
+        response = jsonify(results)
+        response.headers['Access-Control-Allow-Origin'] = FRONTEND_ORIGINS
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Vary'] = 'Origin'
+        return response
+        
+    except Exception as e:
+        print(f"ERROR in mentions endpoint: {e}")
+        return jsonify({"error": str(e), "results": []}), 500
 
 # For solution confirmation, we will send an email with a signed token that the user can click to confirm their solution.
 @urls.route("/solutions/<int:solution_id>/send_confirmation_email", methods=["POST"])
@@ -2188,11 +2510,15 @@ def get_solutions():
 @require_role("L1", "L2", "L3", "MANAGER")
 def get_kb_articles():
     status = request.args.get('status')
+    source = request.args.get('source')  # Filter by source (protocol, ai, etc.)
     limit = int(request.args.get('limit', 50))
     q = KBArticle.query
     if status:
         status_list = [s.strip() for s in status.split(',')]
         q = q.filter(KBArticle.status.in_(status_list))
+    if source:
+        source_list = [s.strip() for s in source.split(',')]
+        q = q.filter(KBArticle.source.in_(source_list))
     q = q.order_by(KBArticle.created_at.desc()).limit(limit)
     results = [
         {
@@ -2200,11 +2526,63 @@ def get_kb_articles():
             'title': a.title,
             'problem_summary': a.problem_summary,
             'status': a.status.value if a.status else None,
+            'source': a.source.value if a.source else None,  # Show source type
             'approved_by': a.approved_by,
         }
         for a in q.all()
     ]
     return jsonify(results)
+
+# Load protocol documents into KB
+@urls.route('/kb/protocols/load', methods=['POST'])
+@require_role("MANAGER")  # Only managers can load protocols
+def load_kb_protocols():
+    """Load static protocol documents into the KB system"""
+    try:
+        loader = get_kb_loader()
+        results = loader.load_all_protocols()
+        
+        return jsonify({
+            'message': 'Protocol loading completed',
+            'results': results
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to load protocols: {str(e)}'}), 500
+
+# Search KB articles (for internal use by OpenAI)
+@urls.route('/kb/search', methods=['POST'])
+@require_role("L1", "L2", "L3", "MANAGER")
+def search_kb_articles():
+    """Search KB articles for relevant solutions"""
+    data = request.json or {}
+    query = data.get('query', '').strip()
+    department_id = data.get('department_id')
+    limit = data.get('limit', 5)
+    
+    if not query:
+        return jsonify({'error': 'Query is required'}), 400
+    
+    try:
+        loader = get_kb_loader()
+        articles = loader.search_relevant_articles(query, department_id, limit)
+        
+        results = [
+            {
+                'id': a.id,
+                'title': a.title,
+                'problem_summary': a.problem_summary,
+                'content_md': a.content_md,
+                'source': a.source.value if a.source else None,
+                'category_id': a.category_id,
+            }
+            for a in articles
+        ]
+        
+        return jsonify({'articles': results}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'KB search failed: {str(e)}'}), 500
 
 @urls.route("/threads/<thread_id>/feedback", methods=["POST", "OPTIONS"])
 def submit_feedback(thread_id):

@@ -1,0 +1,43 @@
+TITLE: Email Client Configuration Issues
+CATEGORY: Email
+DEPARTMENT: General Support
+
+PROBLEM: User cannot send/receive emails
+
+SOLUTION STEPS:
+1. Check email client configuration
+   - Verify server settings (IMAP/POP3/SMTP)
+   - Confirm port numbers and security settings
+   - Check username and password
+   - Verify SSL/TLS settings
+
+2. Test connectivity
+   - Ping mail server
+   - Check firewall and antivirus settings
+   - Verify network connectivity
+   - Test webmail access
+
+3. Outlook-specific troubleshooting
+   - Run Outlook Safe Mode: outlook.exe /safe
+   - Repair Office installation
+   - Create new Outlook profile
+   - Check for corrupt PST files
+
+4. Mobile device email setup
+   - Use autodiscover if available
+   - Manual configuration with correct settings
+   - Check mobile device management policies
+   - Verify ActiveSync is enabled
+
+5. Common server settings
+   - IMAP: imap.company.com:993 (SSL)
+   - SMTP: smtp.company.com:587 (STARTTLS)
+   - Exchange: autodiscover.company.com
+
+6. Escalation criteria
+   - Server connectivity issues: escalate to IT Infrastructure
+   - Exchange server problems: escalate to L2
+   - Policy-related issues: escalate to manager
+
+ENVIRONMENT: Outlook 2016/2019/365, Exchange Server
+ESTIMATED_TIME: 20-30 minutes

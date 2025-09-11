@@ -1,0 +1,43 @@
+TITLE: Network Connectivity Issues
+CATEGORY: Network
+DEPARTMENT: Network
+
+PROBLEM: User cannot connect to network/internet
+
+SOLUTION STEPS:
+1. Check physical network cable connections
+   - Ensure Ethernet cable is securely connected
+   - Try a different Ethernet cable if available
+   - Check for visible damage to cables
+
+2. Verify network adapter status
+   - Open Device Manager
+   - Check Network Adapters section
+   - Look for yellow warning icons
+   - Update drivers if needed
+
+3. Reset network configuration
+   - Open Command Prompt as Administrator
+   - Run: ipconfig /release
+   - Run: ipconfig /flushdns
+   - Run: ipconfig /renew
+   - Run: netsh winsock reset
+
+4. Check IP configuration
+   - Run: ipconfig /all
+   - Verify IP address assignment
+   - Check DNS server settings
+   - Ensure gateway is accessible
+
+5. Test connectivity
+   - Ping gateway: ping [gateway_ip]
+   - Ping external DNS: ping 8.8.8.8
+   - Test DNS resolution: nslookup google.com
+
+6. Escalation criteria
+   - If all steps fail, escalate to L2
+   - If physical infrastructure issue suspected, escalate to Network team
+   - Document all steps attempted
+
+ENVIRONMENT: Windows 10/11, Corporate Network
+ESTIMATED_TIME: 15-30 minutes

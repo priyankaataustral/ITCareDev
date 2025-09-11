@@ -27,6 +27,7 @@ export default function KBDashboard({ open, onClose }) {
 
   const [q, setQ] = useState(""); // search
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all"); // Filter by source type
 
   // --- Data fetchers (now use apiGet/apiPost which return parsed JSON) ---
   const refresh = useCallback(async () => {
@@ -35,7 +36,7 @@ export default function KBDashboard({ open, onClose }) {
     try {
       const [sol, art, fb, mx] = await Promise.all([
         apiGet('/solutions?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50'),
-        apiGet('/kb/articles?status=draft,published,archived&limit=50'),
+        apiGet('/kb/articles?status=draft,published,archived&limit=100'), // Increased limit to show more articles
         apiGet('/kb/feedback?limit=50'),
         apiGet('/kb/analytics').catch(() => null),
       ]);
@@ -90,6 +91,14 @@ export default function KBDashboard({ open, onClose }) {
     } catch (e) { toast(`Error: ${e.message || e}`, true); }
   };
 
+  const loadProtocols = async () => {
+    try {
+      const result = await apiPost('/kb/protocols/load', {});
+      toast(`Protocols loaded: ${result.results?.loaded || 0} loaded, ${result.results?.skipped || 0} skipped`);
+      refresh();
+    } catch (e) { toast(`Error loading protocols: ${e.message || e}`, true); }
+  };
+
   const publishArticle = async (article) => {
     try {
       await apiPost(`/kb/articles/${article.id}/publish`, {});
@@ -134,9 +143,11 @@ export default function KBDashboard({ open, onClose }) {
         String(a.title || '').toLowerCase().includes(term) ||
         String(a.problem_summary || '').toLowerCase().includes(term) ||
         String(a.status || '').toLowerCase().includes(term);
-      return hit && (statusFilter === 'all' || String(a.status || '').toLowerCase() === statusFilter);
+      const statusOk = statusFilter === 'all' || String(a.status || '').toLowerCase() === statusFilter;
+      const sourceOk = sourceFilter === 'all' || String(a.source || '').toLowerCase() === sourceFilter;
+      return hit && statusOk && sourceOk;
     });
-  }, [articles, q, statusFilter]);
+  }, [articles, q, statusFilter, sourceFilter]);
 
   const filteredFeedback = useMemo(() => {
     const term = q.toLowerCase();
@@ -178,7 +189,7 @@ export default function KBDashboard({ open, onClose }) {
           </div>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search…" className="flex-1 min-w-[120px] px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm" />
           <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm">
-            <option value="all">All</option>
+            <option value="all">All Status</option>
             <option value="draft">Draft</option>
             <option value="sent_for_confirm">Sent for confirm</option>
             <option value="confirmed_by_user">Confirmed</option>
@@ -186,6 +197,20 @@ export default function KBDashboard({ open, onClose }) {
             <option value="open">Open (feedback)</option>
             <option value="resolved">Resolved (feedback)</option>
           </select>
+          {tab === 'articles' && (
+            <>
+              <select value={sourceFilter} onChange={(e)=>setSourceFilter(e.target.value)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm">
+                <option value="all">All Sources</option>
+                <option value="protocol">Protocol Docs</option>
+                <option value="ai">AI Generated</option>
+                <option value="human">Human Created</option>
+                <option value="mixed">Mixed</option>
+              </select>
+              <button onClick={loadProtocols} className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700">
+                📄 Load Protocols
+              </button>
+            </>
+          )}
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">Refresh</button>
         </div>
 
@@ -267,6 +292,7 @@ export default function KBDashboard({ open, onClose }) {
                       <tr>
                         <th className="py-2 pr-3">ID</th>
                         <th className="py-2 pr-3">Title</th>
+                        <th className="py-2 pr-3">Source</th>
                         <th className="py-2 pr-3">Status</th>
                         <th className="py-2 pr-3">Approved By</th>
                         <th className="py-2 pr-3">Actions</th>
@@ -279,6 +305,19 @@ export default function KBDashboard({ open, onClose }) {
                           <td className="py-2 pr-3">
                             <div className="text-gray-800 dark:text-gray-100 font-medium line-clamp-1">{a.title || '(untitled)'}</div>
                             <div className="text-xs text-gray-500 line-clamp-2 max-w-[40ch]">{a.problem_summary}</div>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                              a.source === 'protocol' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                              a.source === 'ai' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                              a.source === 'human' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                            }`}>
+                              {a.source === 'protocol' ? '📄 Protocol' :
+                               a.source === 'ai' ? '🤖 AI' :
+                               a.source === 'human' ? '👤 Human' :
+                               a.source || 'Unknown'}
+                            </span>
                           </td>
                           <td className="py-2 pr-3"><StatusBadge value={a.status} /></td>
                           <td className="py-2 pr-3">{a.approved_by || '-'}</td>
@@ -297,7 +336,7 @@ export default function KBDashboard({ open, onClose }) {
                         </tr>
                       ))}
                       {filteredArticles.length===0 && (
-                        <tr><td colSpan={5} className="py-6 text-center text-gray-500">No articles found.</td></tr>
+                        <tr><td colSpan={6} className="py-6 text-center text-gray-500">No articles found.</td></tr>
                       )}
                     </tbody>
                   </table>

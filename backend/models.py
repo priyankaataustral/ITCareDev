@@ -29,6 +29,7 @@ class KBArticleSource(enum.Enum):
     ai = "ai"
     human = "human"
     mixed = "mixed"
+    protocol = "protocol"  # Static company protocol documents
 
 class KBArticleVisibility(enum.Enum):
     internal = "internal"
