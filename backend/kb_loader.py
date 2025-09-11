@@ -91,10 +91,14 @@ class KBProtocolLoader:
             fingerprint = hashlib.sha256(content_text.encode('utf-8')).hexdigest()
             
             # Check if article already exists
-            existing = KBArticle.query.filter_by(canonical_fingerprint=fingerprint).first()
-            if existing:
-                log.info(f"KB article already exists: {protocol_data['title']}")
-                return existing
+            try:
+                existing = KBArticle.query.filter_by(canonical_fingerprint=fingerprint).first()
+                if existing:
+                    log.info(f"KB article already exists: {protocol_data['title']}")
+                    return existing
+            except Exception as e:
+                log.warning(f"Could not check for existing article: {e}")
+                # Continue with creation
             
             # Generate embedding for semantic search
             embedding_text = f"{protocol_data['title']} {protocol_data['problem_summary']} {protocol_data['solution_content']}"
@@ -116,13 +120,20 @@ class KBProtocolLoader:
 *Source: Company Protocol Document*
 """
             
-            # Create KB article
+            # Create KB article with safe enum handling
+            try:
+                source_value = KBArticleSource.protocol
+            except (AttributeError, ValueError):
+                # Fallback if 'protocol' enum doesn't exist yet - use 'human' for protocol docs
+                source_value = KBArticleSource.human
+                log.info("Using 'human' source for protocol document (protocol enum not available)")
+                
             article = KBArticle(
                 title=protocol_data['title'],
                 problem_summary=protocol_data['problem_summary'][:500],  # Truncate for summary
                 content_md=markdown_content,
                 category_id=dept_id,
-                source=KBArticleSource.protocol,
+                source=source_value,
                 visibility=KBArticleVisibility.internal,
                 status=KBArticleStatus.published,
                 canonical_fingerprint=fingerprint,
@@ -152,14 +163,31 @@ class KBProtocolLoader:
         results = {"loaded": 0, "skipped": 0, "errors": 0}
         
         if not os.path.exists(self.protocols_dir):
-            log.error(f"Protocols directory not found: {self.protocols_dir}")
+            log.warning(f"Protocols directory not found: {self.protocols_dir}")
+            try:
+                os.makedirs(self.protocols_dir, exist_ok=True)
+                log.info(f"Created protocols directory: {self.protocols_dir}")
+            except Exception as e:
+                log.error(f"Could not create protocols directory: {e}")
+                return results
+        
+        try:
+            files = os.listdir(self.protocols_dir)
+        except Exception as e:
+            log.error(f"Could not list files in {self.protocols_dir}: {e}")
             return results
         
-        for filename in os.listdir(self.protocols_dir):
-            if filename.endswith('.txt'):
-                file_path = os.path.join(self.protocols_dir, filename)
-                log.info(f"Processing protocol file: {filename}")
-                
+        protocol_files = [f for f in files if f.endswith('.txt')]
+        
+        if not protocol_files:
+            log.info(f"No .txt protocol files found in {self.protocols_dir}")
+            return results
+        
+        for filename in protocol_files:
+            file_path = os.path.join(self.protocols_dir, filename)
+            log.info(f"Processing protocol file: {filename}")
+            
+            try:
                 # Parse the file
                 protocol_data = self.parse_protocol_file(file_path)
                 if not protocol_data:
@@ -173,6 +201,10 @@ class KBProtocolLoader:
                     log.info(f"Loaded protocol: {protocol_data['title']}")
                 else:
                     results["skipped"] += 1
+                    
+            except Exception as e:
+                log.error(f"Error processing {filename}: {e}")
+                results["errors"] += 1
         
         try:
             db.session.commit()
@@ -208,11 +240,19 @@ class KBProtocolLoader:
                     )
                 )
             
-            articles = search_query.order_by(
-                # Prioritize protocol articles, then by creation date
-                KBArticle.source == KBArticleSource.protocol.value,
-                KBArticle.created_at.desc()
-            ).limit(limit).all()
+            # Safe ordering with fallback
+            try:
+                articles = search_query.order_by(
+                    # Try to prioritize protocol articles if enum exists
+                    KBArticle.source == 'protocol',
+                    KBArticle.created_at.desc()
+                ).limit(limit).all()
+            except Exception as e:
+                log.warning(f"Could not order by protocol source: {e}")
+                # Fallback to simple ordering
+                articles = search_query.order_by(
+                    KBArticle.created_at.desc()
+                ).limit(limit).all()
             
             return articles
             

@@ -18,11 +18,11 @@ from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
-from kb_loader import get_kb_loader
-
 def get_relevant_kb_context(query: str, department_id: int = None, max_articles: int = 3) -> str:
     """Get relevant KB articles as context for OpenAI"""
     try:
+        # Import here to avoid startup issues if KB system has problems
+        from kb_loader import get_kb_loader
         loader = get_kb_loader()
         articles = loader.search_relevant_articles(query, department_id, max_articles)
         
@@ -2517,8 +2517,12 @@ def get_kb_articles():
         status_list = [s.strip() for s in status.split(',')]
         q = q.filter(KBArticle.status.in_(status_list))
     if source:
-        source_list = [s.strip() for s in source.split(',')]
-        q = q.filter(KBArticle.source.in_(source_list))
+        try:
+            source_list = [s.strip() for s in source.split(',')]
+            q = q.filter(KBArticle.source.in_(source_list))
+        except Exception as e:
+            current_app.logger.warning(f"Could not filter by source: {e}")
+            # Continue without source filtering
     q = q.order_by(KBArticle.created_at.desc()).limit(limit)
     results = [
         {
@@ -2539,6 +2543,8 @@ def get_kb_articles():
 def load_kb_protocols():
     """Load static protocol documents into the KB system"""
     try:
+        # Import here to avoid startup issues
+        from kb_loader import get_kb_loader
         loader = get_kb_loader()
         results = loader.load_all_protocols()
         
@@ -2548,6 +2554,7 @@ def load_kb_protocols():
         }), 200
         
     except Exception as e:
+        current_app.logger.error(f"Protocol loading failed: {e}")
         return jsonify({'error': f'Failed to load protocols: {str(e)}'}), 500
 
 # Search KB articles (for internal use by OpenAI)
@@ -2564,6 +2571,8 @@ def search_kb_articles():
         return jsonify({'error': 'Query is required'}), 400
     
     try:
+        # Import here to avoid startup issues
+        from kb_loader import get_kb_loader
         loader = get_kb_loader()
         articles = loader.search_relevant_articles(query, department_id, limit)
         
@@ -2573,7 +2582,7 @@ def search_kb_articles():
                 'title': a.title,
                 'problem_summary': a.problem_summary,
                 'content_md': a.content_md,
-                'source': a.source.value if a.source else None,
+                'source': a.source.value if hasattr(a.source, 'value') and a.source else str(a.source) if a.source else None,
                 'category_id': a.category_id,
             }
             for a in articles
@@ -2582,6 +2591,7 @@ def search_kb_articles():
         return jsonify({'articles': results}), 200
         
     except Exception as e:
+        current_app.logger.error(f"KB search failed: {e}")
         return jsonify({'error': f'KB search failed: {str(e)}'}), 500
 
 @urls.route("/threads/<thread_id>/feedback", methods=["POST", "OPTIONS"])
