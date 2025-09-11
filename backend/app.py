@@ -108,7 +108,7 @@ def create_app():
     register_cli_commands(app)
 
     # ---------------------------------------------------------------------
-    # Health
+    # Health Check Endpoint
     # ---------------------------------------------------------------------
     @app.get("/health")
     def health():
