@@ -8,8 +8,6 @@ load_dotenv()
 # General demo mode (for UI features, etc.)
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
 
-# Email-specific demo mode (separate from general demo mode)
-EMAIL_DEMO_MODE = os.getenv("SEND_REAL_EMAILS", "false").lower() != "true"
 
 FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS")
 if not FRONTEND_ORIGINS:
