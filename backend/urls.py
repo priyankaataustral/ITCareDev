@@ -1886,12 +1886,23 @@ INSTEAD USE:
 @urls.route('/threads/<thread_id>/send-email', methods=['POST'])
 @require_role("L1","L2","L3","MANAGER")
 def send_email(thread_id):
-
     data = request.json or {}
     email_body = (data.get('email') or '').strip()
     solution_id = data.get('solution_id')  # optional
 
-    # --- CC parsing/validation ---
+    if not email_body:
+        return jsonify(error="Missing email body"), 400
+
+    # --- Config sanity (prevent hidden 500s) ---
+    FRONTEND = (os.getenv("FRONTEND_ORIGINS") or current_app.config.get("FRONTEND_ORIGINS") or "").strip().rstrip("/")
+    if not FRONTEND.startswith(("http://", "https://")):
+        return jsonify(error="Server misconfiguration: FRONTEND_ORIGINS must be an absolute URL"), 500
+
+    SECRET = os.getenv("SECRET_KEY") or current_app.config.get("SECRET_KEY")
+    if not SECRET:
+        return jsonify(error="Server misconfiguration: SECRET_KEY is not set"), 500
+
+    # --- CC parsing/validation (accept string or list) ---
     cc_raw = data.get('cc') or []
     if isinstance(cc_raw, str):
         parts = re.split(r'[,\s;]+', cc_raw)
@@ -1903,36 +1914,34 @@ def send_email(thread_id):
     def is_email(s: str) -> bool:
         return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', s))
 
-    cc = sorted({p.strip().lower() for p in parts if p and is_email(p)})
+    cc_input = sorted({p.strip().lower() for p in parts if p and is_email(p)})
 
-    if not email_body:
-        return jsonify(error="Missing email body"), 400
-
-    # --- Ensure ticket + recipient ---
-    ensure_ticket_record_from_csv(thread_id)
+    # --- Ticket & recipient strictly from DB (no CSV fallbacks) ---
     t = db.session.get(Ticket, thread_id)
-    recipient_email = (t.requester_email or '').strip().lower() if t else ''
-    if not recipient_email:
-        df = load_df()
-        row = df[df["id"] == thread_id]
-        recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
-    if not recipient_email:
-        return jsonify(error="No recipient email found for this ticket"), 400
+    if not t:
+        return jsonify(error="Ticket not found"), 404
 
-    # --- Persist CC so future mails include them ---
-    if cc:
-        existing = {r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}
-        for addr in cc:
-            if addr not in existing:
-                db.session.add(TicketCC(ticket_id=thread_id, email=addr))
-        try:
+    recipient_email = (t.requester_email or '').strip().lower()
+    if not recipient_email or not is_email(recipient_email):
+        return jsonify(error="No valid recipient email found for this ticket"), 400
+
+    # --- Persist NEW CCs; non-fatal on failure ---
+    try:
+        existing_cc = {r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}
+        new_ccs = [addr for addr in cc_input if addr not in existing_cc]
+        if new_ccs:
+            db.session.add_all([TicketCC(ticket_id=thread_id, email=a) for a in new_ccs])
             db.session.commit()
-        except Exception:
-            db.session.rollback()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to persist CCs; continuing.")
+
+    # Always include stored + provided CCs (deduped)
+    all_cc = sorted({r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}.union(cc_input))
 
     subject = f"Support Ticket #{thread_id} Update"
 
-    # --- Resolve or create a Solution record ---
+    # --- Resolve or create Solution (text mirrors email being sent) ---
     s = None
     if solution_id:
         try:
@@ -1946,82 +1955,241 @@ def send_email(thread_id):
                 .order_by(Solution.created_at.desc())
                 .first())
 
-    # If still none, create a minimal Solution that matches your schema
     if s is None:
         try:
+            proposed_by = None
+            agent_ctx = getattr(request, "agent_ctx", None) or {}
+            if isinstance(agent_ctx, dict):
+                proposed_by = (agent_ctx.get("name") or None)
+
             s = Solution(
                 ticket_id=thread_id,
-                text=email_body,                         # store what we're sending
-                proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name") or None,  # optional
-                generated_by="HUMAN",                    # <=5 chars fits your schema
-                status="proposed",                       # optional; will set to sent_for_confirm below
+                text=email_body,
+                proposed_by=proposed_by,
+                generated_by="HUMAN",  # <=5 chars fits your schema
+                status="proposed",
                 created_at=_utcnow(),
                 updated_at=_utcnow(),
             )
             db.session.add(s)
-            db.session.flush()  # get s.id
+            db.session.flush()  # need s.id
         except Exception as e:
             db.session.rollback()
+            current_app.logger.exception("Failed to create Solution")
             return jsonify(error=f"failed to create solution: {e}"), 500
 
-    # --- Gate checks only if we have a real solution to compare against ---
-    if s is not None:
+    # --- Gates: pending attempt + similarity to last rejected ---
+    try:
         if has_pending_attempt(thread_id):
             return jsonify(error="A previous solution is still pending user confirmation."), 409
 
         last_rejected = (Solution.query
-                         .filter_by(ticket_id=thread_id, status=SolutionStatus.rejected)
-                         .order_by(Solution.id.desc())
-                         .first())
+                         .filter_by(ticket_id=thread_id, status=getattr(SolutionStatus, "rejected", "rejected")))
+        last_rejected = last_rejected.order_by(Solution.id.desc()).first()
         if last_rejected and not is_materially_different(s.text or "", last_rejected.text or ""):
             return jsonify(error="New solution is too similar to the last rejected fix. Please revise or escalate."), 422
+    except Exception as e:
+        current_app.logger.exception("Gate checks failed")
+        return jsonify(error=f"Gate checks failed: {e}"), 500
 
-    # --- Create an attempt tied to this solution ---
+    # --- Create ResolutionAttempt (token needs attempt_id) ---
     try:
         att_no = get_next_attempt_no(thread_id)
-        att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no)
+        att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no, created_at=_utcnow())
         db.session.add(att)
-        db.session.flush()
+        db.session.flush()  # need att.id
     except Exception as e:
         db.session.rollback()
+        current_app.logger.exception("Failed to create ResolutionAttempt")
         return jsonify(error=f"failed to create attempt: {e}"), 500
 
-    # --- Build signed links & append to body ---
-    serializer = _serializer(SECRET_KEY)
-    authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
-
-    confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
-    reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
-
-    final_body = (
-        f"{email_body}\n\n"
-        f"---\n"
-        f"Please let us know if this solved your issue:\n"
-        f"Confirm: {confirm_url}\n"
-        f"Not fixed: {reject_url}\n"
-    )
-
-    # Mark solution as sent-for-confirm (use enum.value if SolutionStatus is an Enum)
+    # --- Build signed links + final body ---
     try:
-        s.status = SolutionStatus.sent_for_confirm
-        s.sent_for_confirmation_at = _utcnow()
-        s.updated_at = _utcnow()
-        db.session.commit()
-    except Exception:
+        serializer = _serializer(SECRET)
+        token_payload = {"solution_id": int(s.id), "ticket_id": str(thread_id), "attempt_id": int(att.id)}
+        authToken = serializer.dumps(token_payload)
+
+        confirm_url = f"{FRONTEND}/confirm?token={authToken}&a=confirm"
+        reject_url  = f"{FRONTEND}/confirm?token={authToken}&a=not_confirm"
+
+        final_body = (
+            f"{email_body}\n\n"
+            f"---\n"
+            f"Please let us know if this solved your issue:\n"
+            f"Confirm: {confirm_url}\n"
+            f"Not fixed: {reject_url}\n"
+        )
+    except Exception as e:
         db.session.rollback()
-        current_app.logger.exception("Failed to mark solution sent_for_confirm")
-        # not fatal for sending—continue
+        current_app.logger.exception("Failed to build confirmation links")
+        return jsonify(error=f"Failed to build confirmation links: {e}"), 500
 
-    # --- Send mail ---
+    # --- Send email first; update status/log only after success ---
     try:
-        send_via_gmail(recipient_email, subject, final_body, cc_list=cc)
-        log_event(thread_id, 'EMAIL_SENT', {
-            "subject": subject, "manual": True, "to": recipient_email, "cc": cc
-        })
-        return jsonify(status="sent", recipient=recipient_email, cc=cc)
+        send_via_gmail(recipient_email, subject, final_body, cc_list=all_cc)
     except Exception as e:
         current_app.logger.exception("Manual send failed")
         return jsonify(error=f"Failed to send email: {e}"), 500
+
+    # --- Mark sent + log event (best-effort) ---
+    try:
+        s.status = getattr(SolutionStatus, "sent_for_confirm", "sent_for_confirm")
+        s.sent_for_confirmation_at = _utcnow()
+        s.updated_at = _utcnow()
+
+        log_event(thread_id, 'EMAIL_SENT', {
+            "subject": subject, "manual": True, "to": recipient_email, "cc": all_cc, "attempt_id": att.id
+        })
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to mark solution sent_for_confirm / log event")
+        return jsonify(status="sent", recipient=recipient_email, cc=all_cc, warning="Status/log update failed"), 200
+
+    return jsonify(status="sent", recipient=recipient_email, cc=all_cc), 200
+
+
+# # ... keep your decorators
+# @urls.route('/threads/<thread_id>/send-email', methods=['POST'])
+# @require_role("L1","L2","L3","MANAGER")
+# def send_email(thread_id):
+
+#     data = request.json or {}
+#     email_body = (data.get('email') or '').strip()
+#     solution_id = data.get('solution_id')  # optional
+
+#     # --- CC parsing/validation ---
+#     cc_raw = data.get('cc') or []
+#     if isinstance(cc_raw, str):
+#         parts = re.split(r'[,\s;]+', cc_raw)
+#     elif isinstance(cc_raw, list):
+#         parts = cc_raw
+#     else:
+#         parts = []
+
+#     def is_email(s: str) -> bool:
+#         return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', s))
+
+#     cc = sorted({p.strip().lower() for p in parts if p and is_email(p)})
+
+#     if not email_body:
+#         return jsonify(error="Missing email body"), 400
+
+#     # --- Ensure ticket + recipient ---
+#     ensure_ticket_record_from_csv(thread_id)
+#     t = db.session.get(Ticket, thread_id)
+#     recipient_email = (t.requester_email or '').strip().lower() if t else ''
+#     if not recipient_email:
+#         df = load_df()
+#         row = df[df["id"] == thread_id]
+#         recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
+#     if not recipient_email:
+#         return jsonify(error="No recipient email found for this ticket"), 400
+
+#     # --- Persist CC so future mails include them ---
+#     if cc:
+#         existing = {r.email.lower() for r in TicketCC.query.filter_by(ticket_id=thread_id).all()}
+#         for addr in cc:
+#             if addr not in existing:
+#                 db.session.add(TicketCC(ticket_id=thread_id, email=addr))
+#         try:
+#             db.session.commit()
+#         except Exception:
+#             db.session.rollback()
+
+#     subject = f"Support Ticket #{thread_id} Update"
+
+#     # --- Resolve or create a Solution record ---
+#     s = None
+#     if solution_id:
+#         try:
+#             s = db.session.get(Solution, int(solution_id))
+#         except Exception:
+#             s = None
+
+#     if s is None:
+#         s = (Solution.query
+#                 .filter_by(ticket_id=thread_id)
+#                 .order_by(Solution.created_at.desc())
+#                 .first())
+
+#     # If still none, create a minimal Solution that matches your schema
+#     if s is None:
+#         try:
+#             s = Solution(
+#                 ticket_id=thread_id,
+#                 text=email_body,                         # store what we're sending
+#                 proposed_by=(getattr(request, "agent_ctx", {}) or {}).get("name") or None,  # optional
+#                 generated_by="HUMAN",                    # <=5 chars fits your schema
+#                 status="proposed",                       # optional; will set to sent_for_confirm below
+#                 created_at=_utcnow(),
+#                 updated_at=_utcnow(),
+#             )
+#             db.session.add(s)
+#             db.session.flush()  # get s.id
+#         except Exception as e:
+#             db.session.rollback()
+#             return jsonify(error=f"failed to create solution: {e}"), 500
+
+#     # --- Gate checks only if we have a real solution to compare against ---
+#     if s is not None:
+#         if has_pending_attempt(thread_id):
+#             return jsonify(error="A previous solution is still pending user confirmation."), 409
+
+#         last_rejected = (Solution.query
+#                          .filter_by(ticket_id=thread_id, status=SolutionStatus.rejected)
+#                          .order_by(Solution.id.desc())
+#                          .first())
+#         if last_rejected and not is_materially_different(s.text or "", last_rejected.text or ""):
+#             return jsonify(error="New solution is too similar to the last rejected fix. Please revise or escalate."), 422
+
+#     # --- Create an attempt tied to this solution ---
+#     try:
+#         att_no = get_next_attempt_no(thread_id)
+#         att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no)
+#         db.session.add(att)
+#         db.session.flush()
+#     except Exception as e:
+#         db.session.rollback()
+#         return jsonify(error=f"failed to create attempt: {e}"), 500
+
+#     # --- Build signed links & append to body ---
+#     serializer = _serializer(SECRET_KEY)
+#     authToken = serializer.dumps({"solution_id": s.id, "ticket_id": thread_id, "attempt_id": att.id})
+
+#     confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+#     reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
+
+#     final_body = (
+#         f"{email_body}\n\n"
+#         f"---\n"
+#         f"Please let us know if this solved your issue:\n"
+#         f"Confirm: {confirm_url}\n"
+#         f"Not fixed: {reject_url}\n"
+#     )
+
+#     # Mark solution as sent-for-confirm (use enum.value if SolutionStatus is an Enum)
+#     try:
+#         s.status = SolutionStatus.sent_for_confirm
+#         s.sent_for_confirmation_at = _utcnow()
+#         s.updated_at = _utcnow()
+#         db.session.commit()
+#     except Exception:
+#         db.session.rollback()
+#         current_app.logger.exception("Failed to mark solution sent_for_confirm")
+#         # not fatal for sending—continue
+
+#     # --- Send mail ---
+#     try:
+#         send_via_gmail(recipient_email, subject, final_body, cc_list=cc)
+#         log_event(thread_id, 'EMAIL_SENT', {
+#             "subject": subject, "manual": True, "to": recipient_email, "cc": cc
+#         })
+#         return jsonify(status="sent", recipient=recipient_email, cc=cc)
+#     except Exception as e:
+#         current_app.logger.exception("Manual send failed")
+#         return jsonify(error=f"Failed to send email: {e}"), 500
 
 
 
