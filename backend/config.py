@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get environment variables and fallbacks.
-DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
+# Demo mode should be OFF if SEND_REAL_EMAILS is true
+DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true" and os.getenv("SEND_REAL_EMAILS", "false").lower() != "true"
 FRONTEND_ORIGINS = os.getenv("FRONTEND_ORIGINS")
 if not FRONTEND_ORIGINS:
     print("Warning: FRONTEND_ORIGINS environment variable is not set. Defaulting to localhost.")
@@ -33,11 +34,11 @@ if not OPENAI_KEY:
 
 
 # ─── SMTP / Email config ──────────────────────────────────────────────────────
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT   = 465
-SMTP_USER   = os.getenv("SMTP_USER", "testmailaiassistant@gmail.com")
-SMTP_PASS   = os.getenv("SMTP_PASS", "ydop igne ijhw azws")  # consider env in prod
-FROM_NAME   = "AI Support Assistant"  # optional display name
+SMTP_SERVER = os.getenv("SMTP_SERVER") or os.getenv("MAIL_SERVER", "smtp.gmail.com")
+SMTP_PORT   = int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "465"))
+SMTP_USER   = os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", "testmailaiassistant@gmail.com")
+SMTP_PASS   = os.getenv("SMTP_PASS") or os.getenv("MAIL_PASSWORD", "ydop igne ijhw azws")
+FROM_NAME   = os.getenv("FROM_NAME") or os.getenv("MAIL_DEFAULT_SENDER", "AI Support Assistant")
 CONFIRM_SALT = "solution-confirm-v1"
 
 # ─── Additional Configs ───────────────────────────────────────────────────────

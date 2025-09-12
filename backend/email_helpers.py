@@ -2,6 +2,7 @@ import hashlib
 import json
 import ssl
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.message import EmailMessage
@@ -10,8 +11,7 @@ from flask import app
 from itsdangerous import URLSafeTimedSerializer
 from extensions import db
 from models import Ticket, TicketCC, EmailQueue
-from config import DEMO_MODE
-from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_NAME, SECRET_KEY # Import from new config
+from config import DEMO_MODE, SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_NAME, SECRET_KEY
 
 
 def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
@@ -49,20 +49,30 @@ def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
 
 def send_via_gmail(to_email: str, subject: str, body: str, cc_list: list[str] | None = None):
     """Send a plain‑text email via the unified Gmail account."""
-   
     
     cc_list = cc_list or []
     
-    # # In demo mode, just log the email instead of sending
-    # if DEMO_MODE:
-    #     print(f"📧 [DEMO MODE] Email would be sent:")
-    #     print(f"   To: {to_email}")
-    #     print(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
-    #     print(f"   Subject: {subject}")
-    #     print(f"   Body: {body[:100]}...")
-    #     return  # Don't actually send in demo mode
+    # Check if we're in demo mode
+    if DEMO_MODE:
+        print(f"📧 [DEMO MODE] Email would be sent:")
+        print(f"   To: {to_email}")
+        print(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
+        print(f"   Subject: {subject}")
+        print(f"   Body: {body[:100]}...")
+        return  # Don't actually send in demo mode
+    
+    # Validate required settings
+    if not SMTP_USER or not SMTP_PASS:
+        raise Exception("SMTP credentials not configured. Check SMTP_USER and SMTP_PASS environment variables.")
+    
+    if not to_email or not to_email.strip():
+        raise Exception("Recipient email address is required.")
     
     try:
+        print(f"📧 Attempting to send email to {to_email}")
+        print(f"📧 Using SMTP server: {SMTP_SERVER}:{SMTP_PORT}")
+        print(f"📧 Using SMTP user: {SMTP_USER}")
+        
         em = EmailMessage()
         em["From"] = f"{FROM_NAME} <{SMTP_USER}>"
         em["To"] = to_email
@@ -73,14 +83,25 @@ def send_via_gmail(to_email: str, subject: str, body: str, cc_list: list[str] | 
 
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as smtp:
+            smtp.set_debuglevel(1)  # Enable debug output
+            print(f"📧 Connecting to {SMTP_SERVER}:{SMTP_PORT}")
             smtp.login(SMTP_USER, SMTP_PASS)
+            print(f"📧 Login successful, sending message...")
             smtp.send_message(em)
             print(f"📧 Email sent successfully to {to_email}")
+            
+    except smtplib.SMTPAuthenticationError as e:
+        error_msg = f"SMTP Authentication failed: {str(e)}. Check your email credentials."
+        print(f"❌ {error_msg}")
+        raise Exception(error_msg)
+    except smtplib.SMTPException as e:
+        error_msg = f"SMTP error occurred: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise Exception(error_msg)
     except Exception as e:
-        # Log the error but don't crash the application
-        print(f"❌ Email send failed: {e}")
-        # In production, you might want to queue the email for retry
-        raise Exception(f"Failed to send email: {str(e)}")
+        error_msg = f"Email send failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise Exception(error_msg)
 
 
 def _serializer(secret_key: str, salt: str = "solution-confirm-v1"):
