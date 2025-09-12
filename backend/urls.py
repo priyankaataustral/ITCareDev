@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from time import time, sleep
 from flask import Blueprint, redirect, request, jsonify, abort, make_response, send_file, current_app
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import func
+from sqlalchemy import func, text
 import re
 from extensions import db
 from db_helpers import get_next_attempt_no, has_pending_attempt, save_steps, insert_message_with_mentions, get_messages, ensure_ticket_record_from_csv, log_event, add_event, _derive_subject_from_text
