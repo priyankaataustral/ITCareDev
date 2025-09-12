@@ -1946,15 +1946,20 @@ def send_email(thread_id):
     s = None
     if solution_id:
         try:
+            current_app.logger.info(f"[DEBUG] Attempting to fetch Solution by id: {solution_id}")
             s = db.session.get(Solution, int(solution_id))
-        except Exception:
+            current_app.logger.info(f"[DEBUG] Fetched Solution: {s}")
+        except Exception as e:
+            current_app.logger.error(f"[DEBUG] Error fetching Solution: {e}")
             s = None
 
     if s is None:
+        current_app.logger.info(f"[DEBUG] Attempting to fetch latest Solution for ticket_id: {thread_id}")
         s = (Solution.query
                 .filter_by(ticket_id=thread_id)
                 .order_by(Solution.created_at.desc())
                 .first())
+        current_app.logger.info(f"[DEBUG] Fetched latest Solution: {s}")
 
     if s is None:
         try:
@@ -1963,6 +1968,7 @@ def send_email(thread_id):
             if isinstance(agent_ctx, dict):
                 proposed_by = (agent_ctx.get("name") or None)
 
+            current_app.logger.info(f"[DEBUG] Creating new Solution for ticket_id: {thread_id}")
             s = Solution(
                 ticket_id=thread_id,
                 text=email_body,
@@ -1974,6 +1980,7 @@ def send_email(thread_id):
             )
             db.session.add(s)
             db.session.flush()  # need s.id
+            current_app.logger.info(f"[DEBUG] Created Solution: {s}")
         except Exception as e:
             db.session.rollback()
             current_app.logger.exception("Failed to create Solution")
@@ -1995,10 +2002,12 @@ def send_email(thread_id):
 
     # --- Create ResolutionAttempt (token needs attempt_id) ---
     try:
+        current_app.logger.info(f"[DEBUG] Creating ResolutionAttempt for ticket_id: {thread_id}, solution_id: {s.id}")
         att_no = get_next_attempt_no(thread_id)
         att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no, sent_at=_utcnow())
         db.session.add(att)
         db.session.flush()  # need att.id
+        current_app.logger.info(f"[DEBUG] Created ResolutionAttempt: {att}")
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Failed to create ResolutionAttempt")
@@ -2034,6 +2043,7 @@ def send_email(thread_id):
 
     # --- Mark sent + log event (best-effort) ---
     try:
+        current_app.logger.info(f"[DEBUG] Marking Solution as sent_for_confirm and committing to DB")
         s.status = getattr(SolutionStatus, "sent_for_confirm", "sent_for_confirm")
         s.sent_for_confirmation_at = _utcnow()
         s.updated_at = _utcnow()
@@ -2043,6 +2053,7 @@ def send_email(thread_id):
         })
 
         db.session.commit()
+        current_app.logger.info(f"[DEBUG] DB commit successful for Solution and ResolutionAttempt")
     except Exception:
         db.session.rollback()
         current_app.logger.exception("Failed to mark solution sent_for_confirm / log event")
