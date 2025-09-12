@@ -1,0 +1,54 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "ITCare-app-001",
+  "packageName": "com.itcare.app",
+  "developer": {
+    "name": "ITCare",
+    "websiteUrl": "https://proud-tree-0c99b8f00.1.azurestaticapps.net",
+    "privacyUrl": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/privacy",
+    "termsOfUseUrl": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/terms"
+  },
+  "name": {
+    "short": "ITCare",
+    "full": "ITCare Support Application"
+  },
+  "description": {
+    "short": "ITCare - Support and Ticketing for Teams",
+    "full": "ITCare provides support ticketing and AI-powered helpdesk features for your organization, integrated with Microsoft Teams."
+  },
+  "icons": {
+    "color": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/icon-color.png",
+    "outline": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/icon-outline.png"
+  },
+  "accentColor": "#0078d4",
+  "staticTabs": [
+    {
+      "entityId": "itcare-dashboard",
+      "name": "Dashboard",
+      "contentUrl": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/dashboard",
+      "websiteUrl": "https://proud-tree-0c99b8f00.1.azurestaticapps.net/dashboard",
+      "scopes": ["personal"]
+    }
+  ],
+  "webApplicationInfo": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "resource": "https://proud-tree-0c99b8f00.1.azurestaticapps.net"
+  },
+  "bots": [
+    {
+      "botId": "itcare-bot-001",
+      "scopes": ["personal", "team", "groupchat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": [
+    "identity", "messageTeamMembers"
+  ],
+  "validDomains": [
+    "proud-tree-0c99b8f00.1.azurestaticapps.net",
+    "itcaredev-hkeyh9cheucmbfbf.australiaeast-01.azurewebsites.net"
+  ]
+}

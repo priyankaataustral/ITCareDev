@@ -1996,7 +1996,7 @@ def send_email(thread_id):
     # --- Create ResolutionAttempt (token needs attempt_id) ---
     try:
         att_no = get_next_attempt_no(thread_id)
-        att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no, created_at=_utcnow())
+        att = ResolutionAttempt(ticket_id=thread_id, solution_id=s.id, attempt_no=att_no, sent_at=_utcnow())
         db.session.add(att)
         db.session.flush()  # need att.id
     except Exception as e:
