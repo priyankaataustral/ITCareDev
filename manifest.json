@@ -33,12 +33,12 @@
     }
   ],
   "webApplicationInfo": {
-    "id": "00000000-0000-0000-0000-000000000000",
+    "id": "5e3ee487-0e71-4626-b4d4-a983a016f46f",
     "resource": "https://proud-tree-0c99b8f00.1.azurestaticapps.net"
   },
   "bots": [
     {
-      "botId": "itcare-bot-001",
+      "botId": "5e3ee487-0e71-4626-b4d4-a983a016f46f",
       "scopes": ["personal", "team", "groupchat"],
       "supportsFiles": false,
       "isNotificationOnly": false
