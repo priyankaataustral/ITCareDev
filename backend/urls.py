@@ -1618,7 +1618,80 @@ def send_confirmation_email(solution_id):
 
     return jsonify(ok=True)
 
-
+@urls.route('/debug/send-email-test/<thread_id>', methods=['POST'])
+@require_role("L1","L2","L3","MANAGER")
+def debug_send_email(thread_id):
+    """Debug version of send-email to find the exact error"""
+    try:
+        print(f"🔍 Debug: Starting send-email for {thread_id}")
+        
+        # Test 1: Basic data parsing
+        data = request.json or {}
+        email_body = (data.get('email') or '').strip()
+        print(f"🔍 Debug: Email body length: {len(email_body)}")
+        
+        if not email_body:
+            return jsonify(error="Missing email body", debug="step1_validation"), 400
+            
+        # Test 2: Database connection
+        try:
+            from extensions import db
+            ticket_count = db.session.execute(text("SELECT COUNT(*) FROM tickets")).scalar()
+            print(f"🔍 Debug: Database working, {ticket_count} tickets found")
+        except Exception as e:
+            return jsonify(error=f"Database error: {str(e)}", debug="step2_database"), 500
+            
+        # Test 3: Get ticket
+        try:
+            t = db.session.get(Ticket, thread_id)
+            print(f"🔍 Debug: Ticket found: {t is not None}")
+            if t:
+                print(f"🔍 Debug: Ticket email: {t.requester_email}")
+        except Exception as e:
+            return jsonify(error=f"Ticket lookup error: {str(e)}", debug="step3_ticket"), 500
+            
+        # Test 4: CSV fallback (if needed)
+        recipient_email = (t.requester_email or '').strip().lower() if t else ''
+        if not recipient_email:
+            try:
+                print("🔍 Debug: Trying CSV fallback...")
+                df = load_df()
+                print(f"🔍 Debug: CSV loaded, {len(df)} rows")
+                row = df[df["id"] == thread_id]
+                recipient_email = row.iloc[0].get('email', '').strip().lower() if not row.empty else None
+                print(f"🔍 Debug: CSV email: {recipient_email}")
+            except Exception as e:
+                return jsonify(error=f"CSV error: {str(e)}", debug="step4_csv"), 500
+                
+        if not recipient_email:
+            return jsonify(error="No recipient email found", debug="step5_no_email"), 400
+            
+        # Test 5: SMTP Configuration
+        try:
+            from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS
+            config_ok = all([SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS])
+            print(f"🔍 Debug: SMTP config: {config_ok}")
+            print(f"🔍 Debug: SMTP_USER: {SMTP_USER}")
+            print(f"🔍 Debug: SMTP_SERVER: {SMTP_SERVER}:{SMTP_PORT}")
+        except Exception as e:
+            return jsonify(error=f"Config error: {str(e)}", debug="step6_config"), 500
+            
+        # Test 6: Try sending a simple email
+        try:
+            print("🔍 Debug: Attempting to send test email...")
+            send_via_gmail(
+                to_email=recipient_email,
+                subject="Test Email from Debug Endpoint", 
+                body="This is a test email to verify functionality."
+            )
+            print("🔍 Debug: Email sent successfully!")
+            return jsonify(success=True, recipient=recipient_email, debug="all_steps_passed")
+            
+        except Exception as e:
+            return jsonify(error=f"Email send error: {str(e)}", debug="step7_email_send"), 500
+            
+    except Exception as e:
+        return jsonify(error=f"Unexpected error: {str(e)}", debug="unexpected"), 500
 
 
 # ─── Draft Email Endpoint ─────────────────────────────────────────────────────
