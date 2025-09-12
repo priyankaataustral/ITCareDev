@@ -85,9 +85,13 @@ def create_app():
     # ---------------------------------------------------------------------
     # OpenAI client (optional)
     # ---------------------------------------------------------------------
-    openai_key = os.getenv("OPENAI_KEY", "")
-    if openai_key:
-        app.config["OPENAI_CLIENT"] = OpenAI(api_key=openai_key)
+    from config import OPENAI_KEY
+    if OPENAI_KEY:
+        try:
+            app.config["OPENAI_CLIENT"] = OpenAI(api_key=OPENAI_KEY)
+            log.info("OpenAI client initialized successfully")
+        except Exception as e:
+            log.warning(f"Failed to initialize OpenAI client: {e}")
     else:
         log.info("OPENAI_KEY is not set; skipping OpenAI client initialization.")
 

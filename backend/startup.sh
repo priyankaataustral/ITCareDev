@@ -1,4 +1,4 @@
-#!/bin/baut
+#!/bin/bash
 
 # Azure App Service startup script
 echo "Starting AI Support Assistant Backend..."
@@ -41,5 +41,5 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Starting Gunicorn server..."
-# Start Gunicorn
-gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers=4 run:app
+# Start Gunicorn with better configuration for Azure
+gunicorn --bind=0.0.0.0:$PORT --timeout 600 --workers=2 --max-requests=1000 --preload run:app

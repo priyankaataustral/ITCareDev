@@ -12,7 +12,7 @@ from openai_helpers import categorize_department_with_gpt
 from openai import OpenAI
 
 # Initialize OpenAI client here for CLI commands
-client = OpenAI(api_key=os.environ.get("OPENAI_KEY"))
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Utility function to load data
 def load_df():

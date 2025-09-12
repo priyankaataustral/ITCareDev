@@ -10,6 +10,7 @@ from flask import app
 from itsdangerous import URLSafeTimedSerializer
 from extensions import db
 from models import Ticket, TicketCC, EmailQueue
+from config import DEMO_MODE
 from config import SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_NAME, SECRET_KEY # Import from new config
 
 
@@ -48,18 +49,18 @@ def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
 
 def send_via_gmail(to_email: str, subject: str, body: str, cc_list: list[str] | None = None):
     """Send a plain‑text email via the unified Gmail account."""
-    from config import DEMO_MODE
+   
     
     cc_list = cc_list or []
     
-    # In demo mode, just log the email instead of sending
-    if DEMO_MODE:
-        print(f"📧 [DEMO MODE] Email would be sent:")
-        print(f"   To: {to_email}")
-        print(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
-        print(f"   Subject: {subject}")
-        print(f"   Body: {body[:100]}...")
-        return  # Don't actually send in demo mode
+    # # In demo mode, just log the email instead of sending
+    # if DEMO_MODE:
+    #     print(f"📧 [DEMO MODE] Email would be sent:")
+    #     print(f"   To: {to_email}")
+    #     print(f"   CC: {', '.join(cc_list) if cc_list else 'None'}")
+    #     print(f"   Subject: {subject}")
+    #     print(f"   Body: {body[:100]}...")
+    #     return  # Don't actually send in demo mode
     
     try:
         em = EmailMessage()

@@ -28,7 +28,8 @@ SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_KEY:
-    raise RuntimeError("Missing OPENAI_API_KEY in .env")
+    print("Warning: OPENAI_API_KEY not set. AI features will be disabled.")
+    OPENAI_KEY = None  # Don't crash the app
 
 
 # ─── SMTP / Email config ──────────────────────────────────────────────────────
