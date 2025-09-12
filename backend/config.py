@@ -35,7 +35,7 @@ if not OPENAI_KEY:
 
 # ─── SMTP / Email config ──────────────────────────────────────────────────────
 SMTP_SERVER = os.getenv("SMTP_SERVER") or os.getenv("MAIL_SERVER", "smtp.gmail.com")
-SMTP_PORT   = int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT", "465"))
+SMTP_PORT   = int(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT") or "465")
 SMTP_USER   = os.getenv("SMTP_USER") or os.getenv("MAIL_USERNAME", "testmailaiassistant@gmail.com")
 SMTP_PASS   = os.getenv("SMTP_PASS") or os.getenv("MAIL_PASSWORD", "ydop igne ijhw azws")
 FROM_NAME   = os.getenv("FROM_NAME") or os.getenv("MAIL_DEFAULT_SENDER", "AI Support Assistant")
