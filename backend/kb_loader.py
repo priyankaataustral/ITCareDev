@@ -112,11 +112,23 @@ class KBProtocolLoader:
             return None
             
         try:
-            response = self.client.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
-            )
-            return response.data[0].embedding
+            # Try text-embedding-3-small first, fallback to ada-002 if not available
+            try:
+                response = self.client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=text
+                )
+                return response.data[0].embedding
+            except Exception as e:
+                if "model_not_found" in str(e) or "403" in str(e):
+                    log.warning("text-embedding-3-small not available, falling back to text-embedding-ada-002")
+                    response = self.client.embeddings.create(
+                        model="text-embedding-ada-002",
+                        input=text
+                    )
+                    return response.data[0].embedding
+                else:
+                    raise e
         except Exception as e:
             log.error(f"Error generating embedding: {e}")
             return None
@@ -178,13 +190,20 @@ class KBProtocolLoader:
                 existing.updated_at = datetime.utcnow()
                 return existing
             
-            # Create KB article with safe enum handling
+            # Create KB article with safe enum handling and database compatibility
             try:
+                # First try to use the protocol enum
                 source_value = KBArticleSource.protocol
+                log.info("Using 'protocol' source for protocol document")
             except (AttributeError, ValueError):
                 # Fallback if 'protocol' enum doesn't exist yet - use 'human' for protocol docs
                 source_value = KBArticleSource.human
                 log.info("Using 'human' source for protocol document (protocol enum not available)")
+                
+            # Determine embedding model name based on what was used
+            embedding_model_name = None
+            if embedding:
+                embedding_model_name = "text-embedding-ada-002"  # Default to ada-002 since it's more widely available
                 
             article = KBArticle(
                 title=protocol_data['title'],
@@ -195,7 +214,7 @@ class KBProtocolLoader:
                 visibility=KBArticleVisibility.internal,
                 status=KBArticleStatus.published,
                 canonical_fingerprint=fingerprint,
-                embedding_model="text-embedding-3-small" if embedding else None,
+                embedding_model=embedding_model_name,
                 embedding_hash=hashlib.md5(str(embedding).encode()).hexdigest() if embedding else None,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
@@ -214,6 +233,42 @@ class KBProtocolLoader:
         except Exception as e:
             log.error(f"Error creating KB article: {e}")
             db.session.rollback()
+            
+            # Try again with 'human' source if the error seems to be related to enum values
+            if "Data truncated for column 'source'" in str(e) or "protocol" in str(e).lower():
+                log.warning("Retrying with 'human' source due to database schema issue")
+                try:
+                    # Determine embedding model name for retry
+                    retry_embedding_model_name = None
+                    if embedding:
+                        retry_embedding_model_name = "text-embedding-ada-002"
+                        
+                    # Retry with human source
+                    article = KBArticle(
+                        title=protocol_data['title'],
+                        problem_summary=protocol_data['problem_summary'][:500],
+                        content_md=markdown_content,
+                        category_id=dept_id,
+                        source=KBArticleSource.human,  # Use human instead of protocol
+                        visibility=KBArticleVisibility.internal,
+                        status=KBArticleStatus.published,
+                        canonical_fingerprint=fingerprint,
+                        embedding_model=retry_embedding_model_name,
+                        embedding_hash=hashlib.md5(str(embedding).encode()).hexdigest() if embedding else None,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                        approved_by="system"
+                    )
+                    
+                    db.session.add(article)
+                    db.session.flush()
+                    log.info(f"Successfully created KB article with 'human' source: {protocol_data['title']}")
+                    return article
+                    
+                except Exception as retry_e:
+                    log.error(f"Retry also failed: {retry_e}")
+                    db.session.rollback()
+                    
             return None
     
     def load_all_protocols(self) -> Dict[str, int]:
