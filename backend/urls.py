@@ -3026,34 +3026,40 @@ def get_kb_articles():
 @urls.route('/kb/protocols/load', methods=['POST'])
 @require_role("L2", "L3", "MANAGER")
 def load_kb_protocols():
-    """Load static protocol documents - DEMO VERSION"""
+    """Load static protocol documents from HTTP URLs"""
     try:
-        # Try real loading first
+        current_app.logger.info("Starting KB protocol loading from HTTP URLs...")
+        
         from kb_loader import get_kb_loader
         loader = get_kb_loader()
+        
+        # Log the configuration being used
+        current_app.logger.info(f"Loading protocols from: {loader.protocols_base_url}")
+        current_app.logger.info(f"Known protocol files: {loader.known_protocol_files}")
+        
         results = loader.load_all_protocols()
+        
+        current_app.logger.info(f"Protocol loading completed: {results}")
+        
         return jsonify({
-            'message': 'Protocol loading completed',
-            'results': results
+            'message': 'Protocol loading completed successfully',
+            'results': results,
+            'source': 'http',
+            'base_url': loader.protocols_base_url
         }), 200
+        
     except Exception as e:
-        # Return demo success for presentation
-        current_app.logger.warning(f"Protocol loading failed, using demo: {e}")
+        # Log the actual error for debugging
+        current_app.logger.error(f"Protocol loading failed: {e}")
+        import traceback
+        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Return the actual error instead of hiding it
         return jsonify({
-            'message': 'Protocol loading completed (demo mode)',
-            'results': {
-                'loaded': 5,
-                'skipped': 0,
-                'errors': 0,
-                'files_processed': [
-                    'email_troubleshooting.txt',
-                    'password_reset.txt', 
-                    'vpn_setup.txt',
-                    'software_install.txt',
-                    'printer_config.txt'
-                ]
-            }
-        }), 200
+            'error': f'Failed to load protocols: {str(e)}',
+            'message': 'Protocol loading failed',
+            'details': 'Check server logs for more information'
+        }), 500
 
         
 # GET /kb/articles?status=...&limit=... for kb dashboard 
@@ -3144,6 +3150,77 @@ def search_kb_articles():
     except Exception as e:
         current_app.logger.error(f"KB search failed: {e}")
         return jsonify({'error': f'KB search failed: {str(e)}'}), 500
+
+# Archive KB Article endpoint
+@urls.route('/kb/articles/<int:article_id>/archive', methods=['POST', 'OPTIONS'])
+@require_role("L2", "L3", "MANAGER")
+def archive_kb_article(article_id):
+    """Archive a KB article"""
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return ("", 204)
+    
+    try:
+        article = db.session.get(KBArticle, article_id)
+        if not article:
+            return jsonify({'error': 'Article not found'}), 404
+        
+        # Update status to archived
+        article.status = KBArticleStatus.archived
+        article.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"Archived KB article {article_id}: {article.title}")
+        
+        return jsonify({
+            'message': f'Article {article_id} archived successfully',
+            'article_id': article_id,
+            'new_status': 'archived'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to archive KB article {article_id}: {e}")
+        return jsonify({'error': f'Failed to archive article: {str(e)}'}), 500
+
+# Publish KB Article endpoint (if not already exists)
+@urls.route('/kb/articles/<int:article_id>/publish', methods=['POST', 'OPTIONS'])
+@require_role("L2", "L3", "MANAGER")
+def publish_kb_article(article_id):
+    """Publish a KB article"""
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return ("", 204)
+    
+    try:
+        article = db.session.get(KBArticle, article_id)
+        if not article:
+            return jsonify({'error': 'Article not found'}), 404
+        
+        # Update status to published
+        article.status = KBArticleStatus.published
+        article.updated_at = datetime.utcnow()
+        
+        # Set approved_by to current agent
+        agent = getattr(request, 'agent_ctx', {})
+        if agent and isinstance(agent, dict):
+            article.approved_by = agent.get('name') or agent.get('email') or agent.get('sub') or 'system'
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"Published KB article {article_id}: {article.title}")
+        
+        return jsonify({
+            'message': f'Article {article_id} published successfully',
+            'article_id': article_id,
+            'new_status': 'published'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to publish KB article {article_id}: {e}")
+        return jsonify({'error': f'Failed to publish article: {str(e)}'}), 500
 
 @urls.route("/threads/<thread_id>/feedback", methods=["POST", "OPTIONS"])
 def submit_feedback(thread_id):
