@@ -1614,7 +1614,8 @@ def send_confirmation_email(solution_id):
 
     send_via_gmail(to_email, subject, body)
 
-    s.status = SolutionStatus.sent_for_confirm
+    # Use shorter status value to fit VARCHAR(5) database constraint
+    s.status = "sent"  # Instead of SolutionStatus.sent_for_confirm
     s.sent_for_confirmation_at = _utcnow()
     db.session.commit()
 
@@ -2044,8 +2045,8 @@ def send_email(thread_id):
 
     # --- Mark sent + log event (best-effort) ---
     try:
-        current_app.logger.info(f"[DEBUG] Marking Solution as sent_for_confirm and committing to DB")
-        s.status = getattr(SolutionStatus, "sent_for_confirm", "sent_for_confirm")
+        current_app.logger.info(f"[DEBUG] Marking Solution as sent and committing to DB")
+        s.status = "sent"  # Use shorter status to fit VARCHAR(5)
         s.sent_for_confirmation_at = _utcnow()
         s.updated_at = _utcnow()
 
@@ -2713,10 +2714,10 @@ def confirm_solution_via_link():
         s = Solution(
             id=sid,
             ticket_id=ticket_id,
-            status=SolutionStatus.confirmed_by_user,
+            status="conf",  # Use shorter status to fit VARCHAR(5)
             confirmed_by_user=True,
             confirmed_at=_utcnow(),
-            confirmed_via=SolutionConfirmedVia.web,
+            confirmed_via="web",  # Use shorter value to fit VARCHAR(5)
             confirmed_ip=request.headers.get("X-Forwarded-For", request.remote_addr),
             created_at=_utcnow(),
             updated_at=_utcnow(),
@@ -2734,10 +2735,11 @@ def confirm_solution_via_link():
     is_confirm = (action == "confirm")
 
     # --- Update solution + attempt outcomes (idempotent-ish) ---
-    s.status = SolutionStatus.confirmed_by_user if is_confirm else SolutionStatus.rejected
+    # Use shorter status values to fit VARCHAR(5) constraint
+    s.status = "conf" if is_confirm else "rej"  # confirmed/rejected
     s.confirmed_by_user = is_confirm
     s.confirmed_at = _utcnow()
-    s.confirmed_via = SolutionConfirmedVia.web
+    s.confirmed_via = "web"  # Use shorter value to fit VARCHAR(5)
     s.confirmed_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
 
     if att:
