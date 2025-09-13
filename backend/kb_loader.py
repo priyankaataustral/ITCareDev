@@ -3,6 +3,7 @@ import os
 import re
 import hashlib
 import logging
+import requests
 from datetime import datetime
 from typing import List, Dict, Optional
 from openai import OpenAI
@@ -15,19 +16,52 @@ log = logging.getLogger(__name__)
 class KBProtocolLoader:
     """Load static protocol documents into KB system"""
     
-    def __init__(self, protocols_dir: str = None):
-        if protocols_dir is None:
-            # Get absolute path to protocols directory
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            protocols_dir = os.path.join(base_dir, "kb_protocols")
-            self.protocols_dir = protocols_dir
-            self.client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
+    def __init__(self, protocols_base_url: str = None):
+        if protocols_base_url is None:
+            # Default to Azure Static Apps URL for kb_protocols
+            self.protocols_base_url = "https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols"
+        else:
+            self.protocols_base_url = protocols_base_url.rstrip('/')
+        self.client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
         
-    def parse_protocol_file(self, file_path: str) -> Optional[Dict]:
-        """Parse a protocol text file into structured data"""
+        # List of known protocol files (since we can't directory-list via HTTP)
+        self.known_protocol_files = [
+            "email_issues.txt",
+            "network_troubleshooting.txt", 
+            "password_reset.txt"
+        ]
+    
+    def add_protocol_file(self, filename: str):
+        """Add a protocol file to the known files list"""
+        if filename not in self.known_protocol_files:
+            self.known_protocol_files.append(filename)
+            log.info(f"Added protocol file to loading list: {filename}")
+    
+    def set_protocol_files(self, filenames: List[str]):
+        """Set the complete list of protocol files to load"""
+        self.known_protocol_files = filenames
+        log.info(f"Updated protocol files list: {filenames}")
+        
+    def fetch_protocol_content(self, filename: str) -> Optional[str]:
+        """Fetch protocol file content from HTTP URL"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
+            url = f"{self.protocols_base_url}/{filename}"
+            log.info(f"Fetching protocol from: {url}")
+            
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()  # Raises HTTPError for bad responses
+            
+            return response.text.strip()
+        except requests.exceptions.RequestException as e:
+            log.error(f"Error fetching protocol file {filename}: {e}")
+            return None
+        except Exception as e:
+            log.error(f"Unexpected error fetching protocol file {filename}: {e}")
+            return None
+    
+    def parse_protocol_content(self, content: str, filename: str) -> Optional[Dict]:
+        """Parse protocol content into structured data"""
+        try:
             
             # Extract metadata using regex (fixed patterns to handle spaces in headers)
             title_match = re.search(r'^TITLE:\s*(.+)$', content, re.MULTILINE)
@@ -39,12 +73,12 @@ class KBProtocolLoader:
             solution_match = re.search(r'^SOLUTION STEPS:\s*(.+?)(?=^[A-Z][A-Z_ ]*:|$)', content, re.MULTILINE | re.DOTALL)
             
             if not title_match:
-                log.warning(f"No title found in {file_path}")
+                log.warning(f"No title found in {filename}")
                 log.debug(f"First 200 chars of content: {content[:200]}")
                 return None
             
             # Debug logging for parsing results
-            log.debug(f"Parsed {file_path}:")
+            log.debug(f"Parsed {filename}:")
             log.debug(f"  Title: {title_match.group(1) if title_match else 'None'}")
             log.debug(f"  Category: {category_match.group(1) if category_match else 'None'}")
             log.debug(f"  Problem found: {bool(problem_match)}")
@@ -62,13 +96,13 @@ class KBProtocolLoader:
                 'problem_summary': problem_match.group(1).strip() if problem_match else '',
                 'solution_content': solution_match.group(1).strip() if solution_match else '',
                 'full_content': content,
-                'file_path': file_path
+                'source_url': f"{self.protocols_base_url}/{filename}"
             }
             
             return protocol_data
             
         except Exception as e:
-            log.error(f"Error parsing protocol file {file_path}: {e}")
+            log.error(f"Error parsing protocol content from {filename}: {e}")
             return None
     
     def generate_embedding(self, text: str) -> Optional[List[float]]:
@@ -183,37 +217,28 @@ class KBProtocolLoader:
             return None
     
     def load_all_protocols(self) -> Dict[str, int]:
-        """Load all protocol files from the protocols directory"""
-        results = {"loaded": 0, "skipped": 0, "errors": 0}
+        """Load all protocol files from HTTP URLs"""
+        results = {"loaded": 0, "skipped": 0, "errors": 0, "files_processed": []}
         
-        if not os.path.exists(self.protocols_dir):
-            log.warning(f"Protocols directory not found: {self.protocols_dir}")
-            try:
-                os.makedirs(self.protocols_dir, exist_ok=True)
-                log.info(f"Created protocols directory: {self.protocols_dir}")
-            except Exception as e:
-                log.error(f"Could not create protocols directory: {e}")
-                return results
+        log.info(f"Loading protocols from: {self.protocols_base_url}")
+        log.info(f"Known protocol files: {self.known_protocol_files}")
         
-        try:
-            files = os.listdir(self.protocols_dir)
-        except Exception as e:
-            log.error(f"Could not list files in {self.protocols_dir}: {e}")
+        if not self.known_protocol_files:
+            log.warning("No protocol files configured to load")
             return results
         
-        protocol_files = [f for f in files if f.endswith('.txt')]
-        
-        if not protocol_files:
-            log.info(f"No .txt protocol files found in {self.protocols_dir}")
-            return results
-        
-        for filename in protocol_files:
-            file_path = os.path.join(self.protocols_dir, filename)
+        for filename in self.known_protocol_files:
             log.info(f"Processing protocol file: {filename}")
             
             try:
-                # Parse the file
-                protocol_data = self.parse_protocol_file(file_path)
+                # Fetch the file content via HTTP
+                content = self.fetch_protocol_content(filename)
+                if not content:
+                    results["errors"] += 1
+                    continue
+                
+                # Parse the content
+                protocol_data = self.parse_protocol_content(content, filename)
                 if not protocol_data:
                     results["errors"] += 1
                     continue
@@ -224,6 +249,7 @@ class KBProtocolLoader:
                     article = self.create_kb_article(protocol_data)
                     if article:
                         results["loaded"] += 1
+                        results["files_processed"].append(filename)
                         log.info(f"✅ Successfully loaded protocol: {protocol_data['title']}")
                     else:
                         results["skipped"] += 1
