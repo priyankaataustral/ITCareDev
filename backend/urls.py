@@ -2022,8 +2022,8 @@ def send_email(thread_id):
         token_payload = {"solution_id": int(s.id), "ticket_id": str(thread_id), "attempt_id": int(att.id)}
         authToken = serializer.dumps(token_payload)
 
-        confirm_url = f"{FRONTEND}/confirm?token={authToken}&a=confirm"
-        reject_url  = f"{FRONTEND}/confirm?token={authToken}&a=not_confirm"
+        confirm_url = f"{FRONTEND}/confirm_2?token={authToken}&solution_id={s.id}"
+        reject_url  = f"{FRONTEND}/confirm_2?token={authToken}&solution_id={s.id}&action=reject"
 
         final_body = (
             f"{email_body}\n\n"
