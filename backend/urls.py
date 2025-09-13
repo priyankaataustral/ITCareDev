@@ -19,42 +19,6 @@ from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
-def get_relevant_kb_context(query: str, department_id: int = None, max_articles: int = 3) -> str:
-    """Get relevant KB articles as context for OpenAI"""
-    try:
-        # Import here to avoid startup issues if KB system has problems
-        from kb_loader import get_kb_loader
-        loader = get_kb_loader()
-        articles = loader.search_relevant_articles(query, department_id, max_articles)
-        
-        if not articles:
-            return ""
-        
-        context_parts = ["## Relevant Company Knowledge Base Articles:"]
-        
-        for i, article in enumerate(articles, 1):
-            context_parts.append(f"\n### KB Article {i}: {article.title}")
-            context_parts.append(f"**Source:** {'Protocol Document' if article.source.value == 'protocol' else 'Previous Solution'}")
-            context_parts.append(f"**Problem:** {article.problem_summary}")
-            
-            # Extract key solution points from markdown content
-            content = article.content_md or ""
-            solution_section = ""
-            if "## Solution" in content:
-                solution_section = content.split("## Solution")[1].split("##")[0].strip()
-            elif "SOLUTION STEPS:" in content:
-                solution_section = content.split("SOLUTION STEPS:")[1].split("ENVIRONMENT:")[0].strip()
-            
-            if solution_section:
-                context_parts.append(f"**Solution Steps:** {solution_section[:800]}...")  # Limit length
-        
-        context_parts.append("\n**Instructions:** Use the above KB articles as reference when generating solutions. Prioritize protocol documents. Adapt steps to the specific user issue.\n")
-        
-        return "\n".join(context_parts)
-        
-    except Exception as e:
-        current_app.logger.error(f"Error getting KB context: {e}")
-        return ""
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -946,6 +910,43 @@ def get_thread(thread_id):
 #         return jsonify(ticketId=thread_id, reply=response_text), 200
 #     except Exception as e:
 #         return jsonify(error=f"Failed to process chat: {str(e)}"), 500
+
+def get_relevant_kb_context(query: str, department_id: int = None, max_articles: int = 3) -> str:
+    """Get relevant KB articles as context for OpenAI"""
+    try:
+        # Import here to avoid startup issues if KB system has problems
+        from kb_loader import get_kb_loader
+        loader = get_kb_loader()
+        articles = loader.search_relevant_articles(query, department_id, max_articles)
+        
+        if not articles:
+            return ""
+        
+        context_parts = ["## Relevant Company Knowledge Base Articles:"]
+        
+        for i, article in enumerate(articles, 1):
+            context_parts.append(f"\n### KB Article {i}: {article.title}")
+            context_parts.append(f"**Source:** {'Protocol Document' if article.source.value == 'protocol' else 'Previous Solution'}")
+            context_parts.append(f"**Problem:** {article.problem_summary}")
+            
+            # Extract key solution points from markdown content
+            content = article.content_md or ""
+            solution_section = ""
+            if "## Solution" in content:
+                solution_section = content.split("## Solution")[1].split("##")[0].strip()
+            elif "SOLUTION STEPS:" in content:
+                solution_section = content.split("SOLUTION STEPS:")[1].split("ENVIRONMENT:")[0].strip()
+            
+            if solution_section:
+                context_parts.append(f"**Solution Steps:** {solution_section[:800]}...")  # Limit length
+        
+        context_parts.append("\n**Instructions:** Use the above KB articles as reference when generating solutions. Prioritize protocol documents. Adapt steps to the specific user issue.\n")
+        
+        return "\n".join(context_parts)
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting KB context: {e}")
+        return ""
 
 
 @urls.route("/threads/<thread_id>/chat", methods=["POST"])
@@ -3645,6 +3646,4 @@ def not_fixed_feedback():
 
 # # TODO: Fix the original endpoint below and remove temporary one above
 # # Original complex endpoint that's failing:
-
-
 
