@@ -2669,6 +2669,64 @@ def deescalate_ticket(thread_id):
     return jsonify(status=t.status, level=to_level), 200
 
 
+@urls.route("/solutions/confirm/debug", methods=["GET"])
+def debug_confirm():
+    """Debug endpoint to test token decoding"""
+    authToken = request.args.get("token", "")
+    if not authToken:
+        return jsonify(error="No token provided"), 400
+    
+    try:
+        from itsdangerous import URLSafeTimedSerializer
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        payload = ts.loads(authToken, max_age=7*24*3600)
+        return jsonify(payload=payload, token_valid=True), 200
+    except Exception as e:
+        return jsonify(error=str(e), token_valid=False), 400
+
+@urls.route("/solutions/confirm/simple", methods=["GET", "OPTIONS"])
+def simple_confirm():
+    """Simplified confirmation endpoint for testing"""
+    if request.method == "OPTIONS":
+        return ("", 204)
+        
+    authToken = request.args.get("token", "")
+    action = (request.args.get("a") or "confirm").lower()
+    
+    if not authToken:
+        return jsonify(ok=False, reason="missing_token"), 400
+    
+    try:
+        from itsdangerous import URLSafeTimedSerializer
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        payload = ts.loads(authToken, max_age=7*24*3600)
+        
+        sid = payload.get("solution_id")
+        s = db.session.get(Solution, sid)
+        
+        if not s:
+            return jsonify(ok=False, reason="solution_not_found"), 404
+        
+        is_confirm = (action == "confirm")
+        
+        # Simple status update
+        s.status = "conf" if is_confirm else "rej"
+        s.confirmed_by_user = is_confirm
+        s.confirmed_at = _utcnow()
+        s.confirmed_via = "web"
+        
+        db.session.commit()
+        
+        return jsonify(
+            ok=True,
+            confirmed=is_confirm,
+            solution_id=s.id,
+            ticket_id=s.ticket_id
+        ), 200
+        
+    except Exception as e:
+        return jsonify(ok=False, reason=f"error: {str(e)}"), 400
+
 @urls.route("/solutions/confirm", methods=["GET", "OPTIONS"])
 def confirm_solution_via_link():
     import logging
@@ -2789,21 +2847,25 @@ def confirm_solution_via_link():
         except Exception as e:
             logging.error(f"[CONFIRM] Failed to determine next action: {e}")
             nxt = {"action": "none"}  # Safe fallback
-        if nxt["action"] == "collect_diagnostics":
-            _start_step_sequence_basic(s.ticket_id)
-            _inject_system_message(s.ticket_id, "User reported Not fixed. Started diagnostics (Pack A).")
-        elif nxt["action"] == "new_solution":
-            _inject_system_message(s.ticket_id, "Not fixed. Draft a materially different fix or escalate.")
-        elif nxt["action"] == "escalate":
-            old = t.level or 1
-            t.level = max(old, nxt.get("to_level", old+1))
-            t.status = "escalated"
-            t.updated_at = datetime.utcnow()
-            db.session.commit()
-            log_event(s.ticket_id, "ESCALATED", {"auto": True, "policy": "after_not_fixed", "from_level": old, "to_level": t.level})
-            _inject_system_message(s.ticket_id, f"Auto-escalated to L{t.level} after Not fixed.")
-        elif nxt["action"] == "live_assist":
-            _inject_system_message(s.ticket_id, "Recommend scheduling a live assist/remote session.")
+        try:
+            if nxt["action"] == "collect_diagnostics":
+                _start_step_sequence_basic(s.ticket_id)
+                _inject_system_message(s.ticket_id, "User reported Not fixed. Started diagnostics (Pack A).")
+            elif nxt["action"] == "new_solution":
+                _inject_system_message(s.ticket_id, "Not fixed. Draft a materially different fix or escalate.")
+            elif nxt["action"] == "escalate":
+                old = t.level or 1
+                t.level = max(old, nxt.get("to_level", old+1))
+                t.status = "escalated"
+                t.updated_at = datetime.utcnow()
+                db.session.commit()
+                log_event(s.ticket_id, "ESCALATED", {"auto": True, "policy": "after_not_fixed", "from_level": old, "to_level": t.level})
+                _inject_system_message(s.ticket_id, f"Auto-escalated to L{t.level} after Not fixed.")
+            elif nxt["action"] == "live_assist":
+                _inject_system_message(s.ticket_id, "Recommend scheduling a live assist/remote session.")
+        except Exception as e:
+            logging.error(f"[CONFIRM] Failed to execute next action: {e}")
+            # Continue despite action failure
 
     # Build payload the SPA needs
     # (Ticket email may be in your Ticket model; if not, keep None)
