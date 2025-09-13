@@ -210,6 +210,33 @@ export default function KBDashboard({ open, onClose }) {
               <button onClick={loadProtocols} className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700">
                 📄 Load Protocols
               </button>
+              <div className="ml-4 flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Quick Access:</span>
+                <a 
+                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                >
+                  📧 Email Issues
+                </a>
+                <a 
+                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                >
+                  🌐 Network Issues
+                </a>
+                <a 
+                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                >
+                  🔑 Password Reset
+                </a>
+              </div>
             </>
           )}
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">Refresh</button>
@@ -324,6 +351,21 @@ export default function KBDashboard({ open, onClose }) {
                           <td className="py-2 pr-3">{a.approved_by || '-'}</td>
                           <td className="py-2 pr-3">
                             <div className="flex flex-wrap gap-2">
+                              {a.source === 'protocol' && (
+                                <a 
+                                  href={`https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/${
+                                    a.title?.includes('Email') ? 'email_issues.txt' :
+                                    a.title?.includes('Network') ? 'network_troubleshooting.txt' :
+                                    a.title?.includes('Password') ? 'password_reset.txt' :
+                                    'email_issues.txt'
+                                  }`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                                >
+                                  📄 View Source
+                                </a>
+                              )}
                               <Gate roles={["L2","L3","MANAGER"]}>
                                 {String(a.status).toLowerCase()==='draft' && (
                                   <button className="btn-subtle" onClick={()=>publishArticle(a)}>🚀 Publish</button>
