@@ -1596,12 +1596,13 @@ def send_confirmation_email(solution_id):
     att = ResolutionAttempt(ticket_id=s.ticket_id, solution_id=s.id, attempt_no=attempt_no, agent_id=agent_id)
     db.session.add(att); db.session.commit()
 
-    # Token includes attempt_id
+    # Token includes attempt_id - matching original design
     ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
-    confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
-    reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
+    # Use original working URL pattern: /confirm_2?token=...&solution_id=...
+    confirm_url = f"{FRONTEND_ORIGINS}/confirm_2?token={authToken}&solution_id={s.id}"
+    reject_url  = f"{FRONTEND_ORIGINS}/confirm_2?token={authToken}&solution_id={s.id}&action=reject"
 
     subject = f"Please review the solution for Ticket {s.ticket_id}"
     body = (
@@ -2684,51 +2685,84 @@ def debug_confirm():
     except Exception as e:
         return jsonify(error=str(e), token_valid=False), 400
 
-@urls.route("/solutions/confirm/simple", methods=["GET", "OPTIONS"])
-def simple_confirm():
-    """Simplified confirmation endpoint for testing"""
+@urls.route("/confirm-solution-original", methods=["POST", "OPTIONS"])
+def confirm_solution_original():
+    """Original design: Frontend POST with token and solution_id in body"""
     if request.method == "OPTIONS":
         return ("", 204)
-        
-    authToken = request.args.get("token", "")
-    action = (request.args.get("a") or "confirm").lower()
+
+    data = request.json or {}
+    token = data.get("token")
+    solution_id = data.get("solution_id")
+    action = data.get("action", "confirm")  # "confirm" or "reject"
     
-    if not authToken:
+    if not token:
         return jsonify(ok=False, reason="missing_token"), 400
     
+    if not solution_id:
+        return jsonify(ok=False, reason="missing_solution_id"), 400
+
+    # Verify token
     try:
         from itsdangerous import URLSafeTimedSerializer
         ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
-        payload = ts.loads(authToken, max_age=7*24*3600)
+        payload = ts.loads(token, max_age=7*24*3600)  # 7 days
         
-        sid = payload.get("solution_id")
-        s = db.session.get(Solution, sid)
-        
-        if not s:
-            return jsonify(ok=False, reason="solution_not_found"), 404
-        
-        is_confirm = (action == "confirm")
-        
-        # Simple status update
-        s.status = "conf" if is_confirm else "rej"
+        # Verify solution_id matches token
+        if payload.get("solution_id") != solution_id:
+            return jsonify(ok=False, reason="token_solution_mismatch"), 400
+            
+    except Exception as e:
+        return jsonify(ok=False, reason=f"invalid_token: {str(e)}"), 400
+
+    # Get solution
+    s = db.session.get(Solution, solution_id)
+    if not s:
+        return jsonify(ok=False, reason="solution_not_found"), 404
+
+    # Update solution
+    is_confirm = (action == "confirm")
+    
+    try:
         s.confirmed_by_user = is_confirm
         s.confirmed_at = _utcnow()
-        s.confirmed_via = "web"
-        
+        s.status = "conf" if is_confirm else "rej"  # Fit VARCHAR(5)
+        s.confirmed_via = "web"  # Fit VARCHAR(5)
+        s.confirmed_ip = request.remote_addr or "unknown"
+
+        # Update ResolutionAttempt if exists
+        attempt_id = payload.get("attempt_id")
+        if attempt_id:
+            att = db.session.get(ResolutionAttempt, attempt_id)
+            if att:
+                att.outcome = "user_confirmed" if is_confirm else "user_rejected"
+                att.completed_at = _utcnow()
+
         db.session.commit()
-        
+
+        # Log event
+        from utils import log_event
+        log_event(s.ticket_id, "SOLUTION_FEEDBACK", {
+            "solution_id": s.id,
+            "confirmed": is_confirm,
+            "reason": "confirmed" if is_confirm else "rejected",
+            "method": "email_link"
+        })
+
         return jsonify(
             ok=True,
             confirmed=is_confirm,
             solution_id=s.id,
-            ticket_id=s.ticket_id
+            ticket_id=s.ticket_id,
+            message="Solution confirmed successfully" if is_confirm else "Feedback recorded - solution not fixed"
         ), 200
-        
-    except Exception as e:
-        return jsonify(ok=False, reason=f"error: {str(e)}"), 400
 
-@urls.route("/solutions/confirm", methods=["GET", "OPTIONS"])
-def confirm_solution_via_link():
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(ok=False, reason=f"update_failed: {str(e)}"), 500
+
+@urls.route("/confirm-solution", methods=["POST", "OPTIONS"])
+def confirm_solution():
     import logging
     
     # Handle CORS preflight
