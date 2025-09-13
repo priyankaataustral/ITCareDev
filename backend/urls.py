@@ -2672,12 +2672,22 @@ def deescalate_ticket(thread_id):
 @urls.route("/solutions/confirm", methods=["GET", "OPTIONS"])
 def confirm_solution_via_link():
     import logging
+    
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return ("", 204)
+        
     authToken  = request.args.get("token", "")
     action = (request.args.get("a") or "confirm").lower()
     wants_json = "application/json" in (request.headers.get("Accept") or "").lower()
 
     logging.warning(f"[CONFIRM] Incoming token: {authToken}")
     logging.warning(f"[CONFIRM] Action: {action}")
+    
+    # Validate token exists
+    if not authToken:
+        logging.error("[CONFIRM] No token provided")
+        return (jsonify(ok=False, reason="missing_token"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
 
     from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
     # SECRET_KEY is already imported at the top of this file from config.py
@@ -2735,33 +2745,50 @@ def confirm_solution_via_link():
     is_confirm = (action == "confirm")
 
     # --- Update solution + attempt outcomes (idempotent-ish) ---
-    # Use shorter status values to fit VARCHAR(5) constraint
-    s.status = "conf" if is_confirm else "rej"  # confirmed/rejected
-    s.confirmed_by_user = is_confirm
-    s.confirmed_at = _utcnow()
-    s.confirmed_via = "web"  # Use shorter value to fit VARCHAR(5)
-    s.confirmed_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    try:
+        # Use shorter status values to fit VARCHAR(5) constraint
+        s.status = "conf" if is_confirm else "rej"  # confirmed/rejected
+        s.confirmed_by_user = is_confirm
+        s.confirmed_at = _utcnow()
+        s.confirmed_via = "web"  # Use shorter value to fit VARCHAR(5)
+        s.confirmed_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
 
-    if att:
-        att.outcome = "confirmed" if is_confirm else "rejected"
-        att.closed_at = datetime.utcnow()
+        if att:
+            att.outcome = "confirmed" if is_confirm else "rejected"
+            att.closed_at = datetime.utcnow()
 
-    db.session.commit()
+        db.session.commit()
+        logging.warning(f"[CONFIRM] Successfully updated solution {s.id} status to {'conf' if is_confirm else 'rej'}")
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"[CONFIRM] Failed to update solution: {e}")
+        return (jsonify(ok=False, reason=f"update_failed: {str(e)}"), 400) if wants_json else redirect(CONFIRM_REDIRECT_URL)
 
     # --- Timeline event: use types the UI already understands ---
-    log_event(
-        s.ticket_id,
-        "CONFIRMED" if is_confirm else "NOT_FIXED",
-        {"attempt_id": (att.id if att else None)}
-    )
+    try:
+        log_event(
+            s.ticket_id,
+            "CONFIRMED" if is_confirm else "NOT_FIXED",
+            {"attempt_id": (att.id if att else None)}
+        )
+        logging.warning(f"[CONFIRM] Logged event for ticket {s.ticket_id}")
+    except Exception as e:
+        logging.error(f"[CONFIRM] Failed to log event: {e}")
+        # Continue despite logging failure
 
     # --- If NOT fixed: optional policy handling (no emails here) ---
     nxt = None
     if not is_confirm:
-        t = db.session.get(Ticket, s.ticket_id) or ensure_ticket_record_from_csv(s.ticket_id)
-        from db_helpers import get_next_attempt_no
-        att_no = att.attempt_no if att else (get_next_attempt_no(s.ticket_id) - 1)
-        nxt = next_action_for(t, att_no, reason_code=None)
+        try:
+            t = db.session.get(Ticket, s.ticket_id) or ensure_ticket_record_from_csv(s.ticket_id)
+            from db_helpers import get_next_attempt_no
+            att_no = att.attempt_no if att else (get_next_attempt_no(s.ticket_id) - 1)
+            nxt = next_action_for(t, att_no, reason_code=None)
+            logging.warning(f"[CONFIRM] Next action determined: {nxt}")
+        except Exception as e:
+            logging.error(f"[CONFIRM] Failed to determine next action: {e}")
+            nxt = {"action": "none"}  # Safe fallback
         if nxt["action"] == "collect_diagnostics":
             _start_step_sequence_basic(s.ticket_id)
             _inject_system_message(s.ticket_id, "User reported Not fixed. Started diagnostics (Pack A).")
@@ -2780,16 +2807,27 @@ def confirm_solution_via_link():
 
     # Build payload the SPA needs
     # (Ticket email may be in your Ticket model; if not, keep None)
-    ticket = db.session.get(Ticket, s.ticket_id)
-    payload = {
-        "ok": True,
-        "confirmed": is_confirm,
-        "ticket_id": s.ticket_id,
-        "attempt_id": att.id if att else None,
-        "solution_id": s.id,
-        "user_email": getattr(ticket, "requester_email", None),
-        "next": nxt,
-    }
+    try:
+        ticket = db.session.get(Ticket, s.ticket_id)
+        payload = {
+            "ok": True,
+            "confirmed": is_confirm,
+            "ticket_id": s.ticket_id,
+            "attempt_id": att.id if att else None,
+            "solution_id": s.id,
+            "user_email": getattr(ticket, "requester_email", None),
+            "next": nxt,
+        }
+        logging.warning(f"[CONFIRM] Built response payload: {payload}")
+    except Exception as e:
+        logging.error(f"[CONFIRM] Failed to build response payload: {e}")
+        # Minimal fallback payload
+        payload = {
+            "ok": True,
+            "confirmed": is_confirm,
+            "ticket_id": s.ticket_id,
+            "solution_id": s.id,
+        }
 
     if wants_json:
         return jsonify(payload), 200
