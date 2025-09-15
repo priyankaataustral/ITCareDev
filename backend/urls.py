@@ -18,7 +18,7 @@ from utils import _can_view, extract_json
 from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
-from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary
+from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -3158,16 +3158,16 @@ def log_audit_event():
     if not entity_type or not entity_id or not event:
         return jsonify(error="Missing required fields"), 400
 
-    # Create audit record
-    audit_log = KBAudit(
-        entity_type=entity_type,
-        entity_id=entity_id,
-        event=event,
-        actor_id=actor_id,
-        meta_json=json.dumps(meta),
-        created_at=datetime.utcnow()
-    )
-    db.session.add(audit_log)
+    # # Create audit record
+    # audit_log = KBAudit(
+    #     entity_type=entity_type,
+    #     entity_id=entity_id,
+    #     event=event,
+    #     actor_id=actor_id,
+    #     meta_json=json.dumps(meta),
+    #     created_at=datetime.utcnow()
+    # )
+    # db.session.add(audit_log)
     db.session.commit()
 
     return jsonify(message="Audit event logged successfully"), 200
