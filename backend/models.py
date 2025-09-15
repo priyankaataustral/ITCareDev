@@ -2,6 +2,7 @@
 import enum
 import numpy as np
 from datetime import datetime, timezone
+from sqlalchemy.dialects.mysql import JSON as MySQLJSON
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from sqlalchemy import Enum, Float, UniqueConstraint, ForeignKey, Integer, String, Boolean, DateTime, Text, JSON
 from sqlalchemy import Enum as SAEnum
@@ -59,6 +60,21 @@ class Agent(db.Model):
     password = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(10), default='L1')  # L1, L2, L3, MANAGER
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
+
+class EscalationSummary(db.Model):
+    __tablename__ = 'escalation_summaries'
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id'), nullable=False)
+    escalated_to_department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
+    escalated_to_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    escalated_by_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    reason = db.Column(db.Text, nullable=False)
+    summary_note = db.Column(db.Text, nullable=True)
+    from_level = db.Column(db.Integer, nullable=False)
+    to_level = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    read_by_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    read_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 # Solution table
 class Solution(db.Model):
@@ -178,10 +194,10 @@ class Message(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(45),  nullable=False)
     sender    = db.Column(db.String(100),  nullable=False)
-    content   = db.Column(db.Text(collation='utf8mb4_unicode_ci'), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    content   = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     type      = db.Column(db.String(100), default='assistant')
-    meta      = db.Column(SQLiteJSON, nullable=True)
+    meta      = db.Column(JSON, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     sender_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
 
@@ -191,11 +207,11 @@ class ResolutionAttempt(db.Model):
     ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id'), index=True, nullable=False)
     solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id'), index=True, nullable=False)
     attempt_no = db.Column(db.Integer, nullable=False)
-    sent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    sent_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     outcome = db.Column(db.String(16), default='pending', index=True)  # pending|confirmed|rejected
     rejected_reason = db.Column(db.String(64))
     rejected_detail_json = db.Column(db.Text)   # JSON string
-    closed_at = db.Column(db.DateTime)
+    closed_at = db.Column(db.DateTime(timezone=True))
     agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)  # The agent who sent the solution
 
 class Mention(db.Model):
@@ -208,7 +224,7 @@ class Mention(db.Model):
 class StepSequence(db.Model):
     __tablename__ = 'step_sequences'
     ticket_id     = db.Column(db.String(45), primary_key=True)
-    steps         = db.Column(SQLiteJSON, nullable=False)
+    steps         = db.Column(JSON, nullable=False)
     current_index = db.Column(db.Integer, default=0)
 
 class TicketAssignment(db.Model):

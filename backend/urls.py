@@ -18,7 +18,7 @@ from utils import _can_view, extract_json
 from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
-from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback
+from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBAudit, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -1283,6 +1283,16 @@ def escalate_ticket(thread_id):
     if not ticket:
         return jsonify(error="Ticket not found"), 404
     
+    # Get request data for new escalation form
+    data = request.json or {}
+    escalation_reason = data.get('reason', '').strip()
+    target_department_id = data.get('department_id')
+    target_agent_id = data.get('agent_id')
+    
+    # Require reason for escalation
+    if not escalation_reason:
+        return jsonify(error="Escalation reason is required"), 400
+    
     # Get current agent role for escalation rules
     agent = getattr(request, 'agent_ctx', {}) or {}
     current_role = agent.get('role', 'L1')
@@ -1306,14 +1316,58 @@ def escalate_ticket(thread_id):
     if old_level >= to_level and current_role != "MANAGER":
         return jsonify(error=f"Ticket already at level {old_level} or higher"), 400
     
+    # Update ticket
     ticket.level = to_level
     ticket.status = 'escalated'
     ticket.updated_at = datetime.now(timezone.utc)
-    add_event(ticket.id, 'ESCALATED', actor_agent_id=agent.get('id'), from_level=old_level, to_level=to_level)
+    
+    # Update department and assignment if specified
+    if target_department_id:
+        ticket.department_id = target_department_id
+    if target_agent_id:
+        ticket.assigned_to = target_agent_id
+    
+    # Create escalation summary record
+    summary = EscalationSummary(
+        ticket_id=thread_id,
+        escalated_to_department_id=target_department_id,
+        escalated_to_agent_id=target_agent_id,
+        escalated_by_agent_id=agent.get('id'),
+        reason=escalation_reason,
+        from_level=old_level,
+        to_level=to_level
+    )
+    db.session.add(summary)
+    
+    # Log event with additional details
+    event_details = {
+        'from_level': old_level, 
+        'to_level': to_level,
+        'reason': escalation_reason
+    }
+    if target_department_id:
+        dept = db.session.get(Department, target_department_id)
+        if dept:
+            event_details['target_department'] = dept.name
+    if target_agent_id:
+        target_agent = db.session.get(Agent, target_agent_id)
+        if target_agent:
+            event_details['target_agent'] = target_agent.name
+    
+    add_event(ticket.id, 'ESCALATED', actor_agent_id=agent.get('id'), **event_details)
     db.session.commit()
     
     level_name = "Manager" if to_level == 4 else f"L{to_level}"
     escalation_msg = f"🚀 Ticket escalated to {level_name} support."
+    if target_department_id:
+        dept = db.session.get(Department, target_department_id)
+        if dept:
+            escalation_msg += f" Department: {dept.name}."
+    if target_agent_id:
+        target_agent = db.session.get(Agent, target_agent_id)
+        if target_agent:
+            escalation_msg += f" Assigned to: {target_agent.name}."
+    escalation_msg += f" Reason: {escalation_reason}"
     
     insert_message_with_mentions(thread_id, "assistant", escalation_msg)
     insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been escalated to {level_name} support.")
@@ -3724,6 +3778,99 @@ def get_kb_analytics():
 #     # sort: solved desc then active desc
 #     result.sort(key=lambda x: (-x["solved"], -x["active"]))
 #     return jsonify({"agents": result})
+
+@urls.route("/agents", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def get_agents():
+    """Get list of all agents for dropdowns/selection"""
+    try:
+        agents = Agent.query.all()
+        result = [{
+            "id": agent.id,
+            "name": agent.name,
+            "email": agent.email,
+            "role": agent.role,
+            "department_id": agent.department_id
+        } for agent in agents]
+        return jsonify({"agents": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/escalation-summaries", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def get_escalation_summaries():
+    """Get escalation summaries for agent's department or assigned to them"""
+    try:
+        agent = getattr(request, 'agent_ctx', {}) or {}
+        agent_id = agent.get('id')
+        agent_dept_id = agent.get('department_id')
+        
+        # Get summaries where the agent is the target or in target department
+        query = EscalationSummary.query
+        
+        # Filter by agent assignment or department
+        filters = []
+        if agent_id:
+            filters.append(EscalationSummary.escalated_to_agent_id == agent_id)
+        if agent_dept_id:
+            filters.append(EscalationSummary.escalated_to_department_id == agent_dept_id)
+            
+        if filters:
+            from sqlalchemy import or_
+            query = query.filter(or_(*filters))
+        
+        summaries = query.order_by(EscalationSummary.created_at.desc()).limit(50).all()
+        
+        result = []
+        for summary in summaries:
+            # Get related data
+            ticket = db.session.get(Ticket, summary.ticket_id)
+            escalated_by = db.session.get(Agent, summary.escalated_by_agent_id) if summary.escalated_by_agent_id else None
+            target_dept = db.session.get(Department, summary.escalated_to_department_id) if summary.escalated_to_department_id else None
+            target_agent = db.session.get(Agent, summary.escalated_to_agent_id) if summary.escalated_to_agent_id else None
+            
+            result.append({
+                "id": summary.id,
+                "ticket_id": summary.ticket_id,
+                "ticket_subject": ticket.subject if ticket else None,
+                "reason": summary.reason,
+                "summary_note": summary.summary_note,
+                "from_level": summary.from_level,
+                "to_level": summary.to_level,
+                "created_at": summary.created_at.isoformat() if summary.created_at else None,
+                "escalated_by": escalated_by.name if escalated_by else None,
+                "target_department": target_dept.name if target_dept else None,
+                "target_agent": target_agent.name if target_agent else None,
+                "is_read": summary.read_by_agent_id == agent_id,
+                "read_at": summary.read_at.isoformat() if summary.read_at else None
+            })
+        
+        return jsonify({"summaries": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/escalation-summaries/<int:summary_id>/mark-read", methods=["POST"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def mark_escalation_summary_read(summary_id):
+    """Mark escalation summary as read by current agent"""
+    try:
+        agent = getattr(request, 'agent_ctx', {}) or {}
+        agent_id = agent.get('id')
+        
+        if not agent_id:
+            return jsonify({"error": "Agent not found"}), 403
+            
+        summary = db.session.get(EscalationSummary, summary_id)
+        if not summary:
+            return jsonify({"error": "Summary not found"}), 404
+            
+        summary.read_by_agent_id = agent_id
+        summary.read_at = datetime.now(timezone.utc)
+        db.session.commit()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @urls.route("/kb/analytics/agents", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER") 

@@ -1,6 +1,7 @@
 'use client';
 import KBDashboard from './KBDashboard';
 import Gate from './Gate';
+import EscalationPopup from './EscalationPopup';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -552,7 +553,10 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
   const [confirmLinks, setConfirmLinks] = useState({ confirm: '', notConfirm: '' });
-  const [panelOpen, setPanelOpen] = useState(true); 
+  const [panelOpen, setPanelOpen] = useState(true);
+  
+  // Escalation popup state
+  const [showEscalationPopup, setShowEscalationPopup] = useState(false); 
 
 
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
@@ -1614,75 +1618,93 @@ const openDraftEditor = (prefill) => {
     }
   };
 
-  // Escalate / Close (with downloadable report)
+  // New escalation function that uses the popup form data
+  const handleEscalateWithForm = async (escalationData) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const reportLines = [];
+      reportLines.push(`Ticket ID: ${tid}`);
+      if (ticket?.status) reportLines.push(`Status: ${ticket.status}`);
+      if (ticket?.category) reportLines.push(`Category: ${ticket.category}`);
+      if (ticket?.subject) reportLines.push(`Subject: ${ticket.subject}`);
+      if (ticket?.text) reportLines.push(`Text: ${ticket.text}`);
+      reportLines.push('--- Chat History ---');
+      messages.forEach(msg => {
+        reportLines.push(`[${msg.sender}] ${typeof msg.content === 'string' ? msg.content : '[non-text content]'}`);
+      });
+      const reportText = reportLines.join('\n');
+
+      const data = await apiPost(`/threads/${tid}/escalate`, escalationData);
+      
+      // Update ticket status and level
+      setTicket(t => ({ ...t, status: data.status, level: data.level }));
+
+      // Add escalation message from backend response
+      if (data.message) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `temp-${Date.now()}-escalate`,
+            sender: 'bot',
+            content: data.message.content + (notifyUser ? ' (notification sent)' : ' (no notification)'),
+            timestamp: data.message.timestamp,
+          }
+        ]);
+      }
+
+      // Generate and offer download of report
+      const blob = new Blob([reportText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      setMessages(prev => [
+        ...prev,
+        { 
+          id: `temp-${Date.now()}-dl`, 
+          sender: 'bot', 
+          content: <a href={url} download={`ticket_${tid}_report.txt`} className="underline text-blue-600">📄 Download Report: ticket_{tid}_report.txt</a>, 
+          timestamp: new Date().toISOString() 
+        }
+      ]);
+      
+      // Refresh timeline and mentions
+      setTimelineRefresh(x => x + 1);
+      // Trigger mentions refresh to update sidebar counts
+    } catch (e) {
+      setActionError(e.message || String(e));
+      throw e; // Re-throw to be handled by popup
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Escalate / Close (with downloadable report) - Legacy function for non-popup escalations
   const handleAction = async action => {
     setActionLoading(true);
     setActionError(null);
     try {
       if (action === 'escalate') {
-        const reportLines = [];
-        reportLines.push(`Ticket ID: ${tid}`);
-        if (ticket?.status) reportLines.push(`Status: ${ticket.status}`);
-        if (ticket?.category) reportLines.push(`Category: ${ticket.category}`);
-        if (ticket?.subject) reportLines.push(`Subject: ${ticket.subject}`);
-        if (ticket?.text) reportLines.push(`Text: ${ticket.text}`);
-        reportLines.push('--- Chat History ---');
-        messages.forEach(msg => {
-          reportLines.push(`[${msg.sender}] ${typeof msg.content === 'string' ? msg.content : '[non-text content]'}`);
-        });
-        const reportText = reportLines.join('\n');
-
-        const data = await apiPost(`/threads/${tid}/escalate`, {});
-        
-        // Update ticket status and level
-        setTicket(t => ({ ...t, status: data.status, level: data.level }));
-
-        // Add escalation message from backend response
-        if (data.message) {
-          setMessages(prev => [
-            ...prev,
-            {
-              id: `temp-${Date.now()}-escalate`,
-              sender: 'bot',
-              content: data.message.content + (notifyUser ? ' (notification sent)' : ' (no notification)'),
-              timestamp: data.message.timestamp,
-            }
-          ]);
-        }
-
-        // Generate and offer download of report
-        const blob = new Blob([reportText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
+        // Use the new form-based escalation with default reason
+        await handleEscalateWithForm({ reason: 'Standard escalation request' });
+        return;
+      }
+      
+      // Keep existing logic for close action
+      if (action === 'close') {
+        const data = await apiPost(`/threads/${tid}/close`, { notify: notifyUser });
+        setTicket(t => ({ ...t, status: data.status }));
         setMessages(prev => [
           ...prev,
-          { 
-            id: `temp-${Date.now()}-dl`, 
-            sender: 'bot', 
-            content: <a href={url} download={`ticket_${tid}_report.txt`} className="underline text-blue-600">📄 Download Report: ticket_{tid}_report.txt</a>, 
-            timestamp: new Date().toISOString() 
+          {
+            id: `temp-${Date.now()}-close`,
+            sender: 'bot',
+            content: `✅ Ticket closed.${notifyUser ? ' (notification sent)' : ' (no notification)'}`,
+            timestamp: new Date().toISOString()
           }
         ]);
         
         // Refresh timeline and mentions
         setTimelineRefresh(x => x + 1);
-        // Trigger mentions refresh to update sidebar counts
         window.dispatchEvent(new CustomEvent('refreshMentions'));
-      } else {
-        const data = await apiPost(`/threads/${tid}/close`, { notify: notifyUser });
-
-        if (!resp.ok) throw new Error(data.error || 'Failed to close');
-
-        setTicket(t => ({ ...t, status: data.status }));
-        setMessages(prev => [
-          ...prev,
-          {
-            ...(data.message || {}),
-            id: `temp-${Date.now()}-close`,
-            sender: 'bot',
-            content: `${data.message?.content || 'Ticket closed.'}${notifyUser ? ' (notification sent)' : ' (no notification)'}`
-          }
-        ]);
-        setTimelineRefresh(x => x + 1);
       }
     } catch (e) {
       setActionError('Failed to update ticket.');
@@ -1777,7 +1799,7 @@ const openDraftEditor = (prefill) => {
           {/* Escalate: L1, L2, L3, MANAGER */}
           <Gate roles={["L1", "L2", "L3", "MANAGER"]}>
             <button
-              onClick={() => handleAction('escalate')}
+              onClick={() => setShowEscalationPopup(true)}
               disabled={actionLoading}
               className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50 text-sm"
             >🛠 Escalate</button>
@@ -2093,6 +2115,14 @@ const openDraftEditor = (prefill) => {
           </div>
         </div>
       </div>
+      
+      {/* Escalation Popup */}
+      <EscalationPopup
+        isOpen={showEscalationPopup}
+        onClose={() => setShowEscalationPopup(false)}
+        onEscalate={handleEscalateWithForm}
+        ticketId={tid}
+      />
     </>
   );
 }

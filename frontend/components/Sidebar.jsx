@@ -3,6 +3,7 @@ import MentionsPanel from './MentionsPanel';
 import { useMentions } from '../hooks/useMentions';
 import GroupedTickets from './GroupedTickets';
 import ThreadList from './ThreadList';
+import EscalationSummaries from './EscalationSummaries';
 
 export default function Sidebar({
   agentId,
@@ -42,6 +43,10 @@ export default function Sidebar({
             )}
           </span>
         </button>
+        <button
+          className={view === 'escalations' ? 'active' : ''}
+          onClick={() => setView('escalations')}
+        >📋 Escalations</button>
       </div>
       {view === 'all' ? (
         useNewList
@@ -52,9 +57,11 @@ export default function Sidebar({
               departments={departments}
             />
           : <GroupedTickets threads={threads} onSelect={onSelect} selectedId={selectedId} />
-      ) : (
+      ) : view === 'mentions' ? (
         <MentionsPanel agentId={agentId} onSelect={onSelect} selectedId={selectedId} />
-      )}
+      ) : view === 'escalations' ? (
+        <EscalationSummaries />
+      ) : null}
     </div>
   );
 }
