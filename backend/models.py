@@ -284,9 +284,15 @@ class TicketFeedback(db.Model):
     __tablename__ = 'ticket_feedback'
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('resolution_attempts.id'), nullable=True)
+    user_email = db.Column(db.String(255), nullable=True)
+    feedback_type = db.Column(db.String(20), nullable=True)  # 'CONFIRM'/'REJECT'
+    reason = db.Column(db.String(255), nullable=True)  # rejection reason
     rating = db.Column(db.Integer)
     comment = db.Column(db.Text)
-    submitted_at = db.Column(db.String(100))
+    submitted_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    resolved_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    resolved_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 
 class KBDraft(db.Model):

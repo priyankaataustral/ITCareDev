@@ -397,18 +397,19 @@ export default function KBDashboard({ open, onClose }) {
           {tab === 'feedback' && (
             <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
               <header className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Feedback Inbox</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Unified Feedback Inbox</h3>
                 <span className="text-xs text-gray-500">{filteredFeedback.length} shown</span>
               </header>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-gray-500">
                     <tr>
-                      <th className="py-2 pr-3">ID</th>
-                      <th className="py-2 pr-3">Article</th>
+                      <th className="py-2 pr-3">Source</th>
+                      <th className="py-2 pr-3">Subject</th>
                       <th className="py-2 pr-3">Type</th>
                       <th className="py-2 pr-3">Rating</th>
                       <th className="py-2 pr-3">Comment</th>
+                      <th className="py-2 pr-3">User</th>
                       <th className="py-2 pr-3">When</th>
                       <th className="py-2 pr-3">Actions</th>
                     </tr>
@@ -416,18 +417,67 @@ export default function KBDashboard({ open, onClose }) {
                   <tbody>
                     {filteredFeedback.map(f => {
                       const st = f.resolved_at ? 'resolved' : 'open';
+                      const isTicketFeedback = f.source === 'ticket_solution';
+                      const isKBFeedback = f.source === 'kb_article';
+                      
+                      // Display different info based on source
+                      const sourceDisplay = isTicketFeedback ? '🎫 Ticket' : '📚 KB Article';
+                      const subjectDisplay = isTicketFeedback 
+                        ? (f.ticket_subject || `Ticket #${f.ticket_id}`)
+                        : (f.article_title || `Article #${f.kb_article_id}`);
+                      
+                      // Rating display with stars
+                      const ratingDisplay = f.rating ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-yellow-400">{'★'.repeat(f.rating)}</span>
+                          <span className="text-gray-300">{'★'.repeat(5 - f.rating)}</span>
+                          <span className="text-xs text-gray-500">({f.rating}/5)</span>
+                        </div>
+                      ) : '-';
+                      
                       return (
                         <tr key={f.id} className="border-t border-gray-100 dark:border-gray-800 align-top">
-                          <td className="py-2 pr-3">#{f.id}</td>
-                          <td className="py-2 pr-3">#{f.kb_article_id}</td>
-                          <td className="py-2 pr-3"><StatusBadge value={f.feedback_type} /></td>
-                          <td className="py-2 pr-3">{f.rating ?? '-'}</td>
-                          <td className="py-2 pr-3 max-w-[40ch]"><div className="line-clamp-2 text-gray-800 dark:text-gray-100">{f.comment}</div></td>
-                          <td className="py-2 pr-3 text-gray-500">{fmt(f.created_at)}</td>
+                          <td className="py-2 pr-3">
+                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700">
+                              {sourceDisplay}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 max-w-[25ch]">
+                            <div className="line-clamp-1 font-medium text-gray-900 dark:text-gray-100">
+                              {subjectDisplay}
+                            </div>
+                            {isTicketFeedback && f.reason && (
+                              <div className="text-xs text-red-600 dark:text-red-400">
+                                Reason: {f.reason}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <StatusBadge value={f.feedback_type} />
+                          </td>
+                          <td className="py-2 pr-3">
+                            {ratingDisplay}
+                          </td>
+                          <td className="py-2 pr-3 max-w-[30ch]">
+                            <div className="line-clamp-2 text-gray-800 dark:text-gray-100">
+                              {f.comment || '-'}
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3 text-xs text-gray-600 dark:text-gray-400">
+                            {f.user_email || 'Anonymous'}
+                          </td>
+                          <td className="py-2 pr-3 text-gray-500 text-xs">
+                            {fmt(f.created_at)}
+                          </td>
                           <td className="py-2 pr-3">
                             <div className="flex flex-wrap gap-2">
                               {st === 'open' ? (
-                                <button className="btn-subtle" onClick={()=>resolveFeedback(f)}>✅ Resolve</button>
+                                <button 
+                                  className="btn-subtle text-xs" 
+                                  onClick={() => resolveFeedback(f)}
+                                >
+                                  ✅ Resolve
+                                </button>
                               ) : (
                                 <span className="text-xs text-gray-400">Resolved</span>
                               )}
@@ -436,8 +486,16 @@ export default function KBDashboard({ open, onClose }) {
                         </tr>
                       );
                     })}
-                    {filteredFeedback.length===0 && (
-                      <tr><td colSpan={7} className="py-6 text-center text-gray-500">No feedback yet.</td></tr>
+                    {filteredFeedback.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-gray-500">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="text-2xl">📝</div>
+                            <div>No feedback received yet</div>
+                            <div className="text-xs">Feedback from solution confirmations and KB articles will appear here</div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>

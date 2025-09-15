@@ -3530,12 +3530,15 @@ def submit_feedback(thread_id):
         rating = None
 
     # Persist end-user feedback on the ticket (use your TicketFeedback table)
-    if rating is not None or comment:
+    if rating is not None or comment or reason:
         tf = TicketFeedback(
             ticket_id=thread_id,
+            attempt_id=attempt_id,
+            user_email=user_email,
+            feedback_type=type_,
+            reason=reason if type_ == "REJECT" else None,
             rating=rating,
-            comment=comment,
-            submitted_at=datetime.utcnow().isoformat()
+            comment=comment
         )
         db.session.add(tf)
 
@@ -3578,18 +3581,32 @@ def submit_feedback(thread_id):
 
 @urls.get("/kb/feedback")
 @require_role("L1", "L2", "L3", "MANAGER")
-def kb_feedback_inbox():
-    rows = (KBFeedback.query.order_by(KBFeedback.created_at.desc()).limit(100).all())
-    data = []
-    for f in rows:
+def unified_feedback_inbox():
+    """Unified feedback inbox showing both KB article feedback and ticket solution feedback"""
+    feedback_data = []
+    
+    # Get KB article feedback
+    kb_feedback = (KBFeedback.query.order_by(KBFeedback.created_at.desc()).limit(50).all())
+    for f in kb_feedback:
         ctx = f.context_json or {}
         if isinstance(ctx, str):
             try: ctx = json.loads(ctx)
             except: ctx = {}
-        data.append({
-            "id": f.id,
-            "article_title": getattr(f, "kb_article", None).title if hasattr(f, "kb_article") and f.kb_article else None,
+        
+        # Get KB article title
+        article_title = None
+        if f.kb_article_id:
+            article = db.session.get(KBArticle, f.kb_article_id)
+            if article:
+                article_title = article.title
+        
+        feedback_data.append({
+            "id": f"kb_{f.id}",
+            "source": "kb_article",
+            "article_title": article_title,
+            "ticket_id": None,
             "feedback_type": f.feedback_type.value if isinstance(f.feedback_type, enum.Enum) else f.feedback_type,
+            "reason": None,
             "rating": f.rating,
             "comment": f.comment,
             "user_email": f.user_email,
@@ -3598,7 +3615,36 @@ def kb_feedback_inbox():
             "resolved_at": f.resolved_at.isoformat() if f.resolved_at else None,
             "resolved_by": f.resolved_by,
         })
-    return jsonify({"feedback": data})
+    
+    # Get ticket solution feedback
+    ticket_feedback = (TicketFeedback.query.order_by(TicketFeedback.submitted_at.desc()).limit(50).all())
+    for f in ticket_feedback:
+        # Get ticket subject
+        ticket = db.session.get(Ticket, f.ticket_id) if f.ticket_id else None
+        ticket_subject = ticket.subject if ticket else f"Ticket #{f.ticket_id}"
+        
+        feedback_data.append({
+            "id": f"ticket_{f.id}",
+            "source": "ticket_solution",
+            "article_title": None,
+            "ticket_id": f.ticket_id,
+            "ticket_subject": ticket_subject,
+            "attempt_id": f.attempt_id,
+            "feedback_type": f.feedback_type,
+            "reason": f.reason,
+            "rating": f.rating,
+            "comment": f.comment,
+            "user_email": f.user_email,
+            "created_at": f.submitted_at.isoformat() if f.submitted_at else None,
+            "context": {},
+            "resolved_at": f.resolved_at.isoformat() if f.resolved_at else None,
+            "resolved_by": f.resolved_by,
+        })
+    
+    # Sort all feedback by creation date (newest first)
+    feedback_data.sort(key=lambda x: x["created_at"] or "", reverse=True)
+    
+    return jsonify({"feedback": feedback_data[:100]})
 
 
 # @urls.route('/kb/analytics', methods=['GET'])

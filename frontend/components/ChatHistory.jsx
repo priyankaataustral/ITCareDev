@@ -593,8 +593,6 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [activeThreadId, setActiveThreadId] = useState(threadId);
   const tid = activeThreadId || threadId;
 
-  // KB overlay
-  const [showKB, setShowKB] = useState(false);
 
   // Timeline
   const [timeline, setTimeline] = useState([]);
@@ -1750,7 +1748,7 @@ const openDraftEditor = (prefill) => {
   };
 
   // TicketHeader
-  function TicketHeader({ ticket, onBack, onEscalate, onClose, actionLoading, darkMode, setDarkMode, showKB, setShowKB }) {
+  function TicketHeader({ ticket, onBack, onEscalate, onClose, actionLoading, darkMode, setDarkMode}) {
     const handleDeescalate = async () => {
       const note = window.prompt('Add a short note for de-escalation (optional):') || '';
       setActionLoading(true);
@@ -1781,11 +1779,6 @@ const openDraftEditor = (prefill) => {
           <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             Ticket #{ticket?.id || tid}
           </span>
-          <button
-            onClick={() => setShowKB(v => !v)}
-            className="px-2.5 py-1 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-100 text-xs"
-            aria-label="Show Knowledge Base"
-          >📚 KB</button>
         </div>
         <div className="flex items-center gap-3">
           {typeof ticket?.level === 'number' && (
@@ -1947,13 +1940,10 @@ const openDraftEditor = (prefill) => {
   // =========================
   return (
     <>
-      {showKB && <KBDashboard open={showKB} onClose={() => setShowKB(false)} />}
 
       <div className={`flex flex-col h-full min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
         <TicketHeader
           ticket={ticket}
-          showKB={showKB}
-          setShowKB={setShowKB}
           onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
           onEscalate={() => handleAction('escalate')}
           onClose={() => handleAction('close')}
