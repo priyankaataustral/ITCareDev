@@ -21,9 +21,12 @@ export default function Sidebar({
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
   const filterOptions = [
-    { value: 'open', label: '🟢 Open Tickets', icon: '🟢' },
-    { value: 'closed', label: '✅ Closed Tickets', icon: '✅' },
-    { value: 'archived', label: '📦 Archived Tickets', icon: '📦' }
+    { value: 'all', label: 'All Active', icon: '📋' },
+    { value: 'open', label: 'Open Tickets', icon: '🟢' },
+    { value: 'escalated', label: 'Escalated Tickets', icon: '⬆️' },
+    { value: 'closed', label: 'Closed Tickets', icon: '✅' },
+    { value: 'resolved', label: 'Resolved Tickets', icon: '🎯' },
+    { value: 'archived', label: 'Archived Tickets', icon: '📦' }
   ];
 
   const currentFilter = filterOptions.find(opt => opt.value === ticketFilter) || filterOptions[0];

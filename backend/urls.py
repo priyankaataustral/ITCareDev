@@ -230,13 +230,16 @@ def list_threads():
         else:  # L1 and MANAGER see all
             threads_filtered = threads_all
 
-        # Apply status filtering if specified
+        # Apply status filtering 
         if status_filter != "all":
             if status_filter == "open":
-                threads_filtered = [t for t in threads_filtered if t.get("status") in ["open", "in_progress", "escalated"]]
+                threads_filtered = [t for t in threads_filtered if t.get("status") == "open"]
+            elif status_filter == "escalated":
+                threads_filtered = [t for t in threads_filtered if t.get("status") == "escalated"]
             elif status_filter == "closed":
-                threads_filtered = [t for t in threads_filtered if t.get("status") in ["closed", "resolved"]]
-
+                threads_filtered = [t for t in threads_filtered if t.get("status") == "closed"]
+            elif status_filter == "resolved":
+                threads_filtered = [t for t in threads_filtered if t.get("status") == "resolved"]
         # Apply pagination after filtering (preserve original logic)
         total = len(threads_filtered)
         threads = threads_filtered[offset:offset+limit]

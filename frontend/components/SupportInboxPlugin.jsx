@@ -20,7 +20,7 @@ export default function SupportInboxPlugin() {
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived'
+  const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
   const { agent } = useAuth();
 
   useEffect(() => {
@@ -36,12 +36,14 @@ export default function SupportInboxPlugin() {
       let apiUrl = '/threads?limit=50&offset=0';
       
       if (filter === 'archived') {
+        // Show archived tickets (regardless of status)
         apiUrl += '&archived=true';
-      } else {
+      } else if (filter === 'all') {
+        // Show all non-archived tickets (all statuses)
         apiUrl += '&archived=false';
-        if (filter !== 'all') {
-          apiUrl += `&status=${filter}`;
-        }
+      } else {
+        // Show non-archived tickets with specific status
+        apiUrl += '&archived=false&status=' + filter;
       }
       
       const payload = await apiGet(apiUrl);

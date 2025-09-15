@@ -1856,7 +1856,7 @@ const openDraftEditor = (prefill) => {
 
           {/* Archive/Unarchive: L2, L3, MANAGER only for closed tickets */}
           <Gate roles={["L2", "L3", "MANAGER"]}>
-            {ticket?.status === 'closed' && !ticket?.archived && (
+          {(ticket?.status === 'closed' || ticket?.status === 'resolved') && !ticket?.archived && (
               <button
                 onClick={() => handleAction('archive')}
                 disabled={actionLoading}
