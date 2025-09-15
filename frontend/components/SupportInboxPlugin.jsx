@@ -20,23 +20,45 @@ export default function SupportInboxPlugin() {
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived'
   const { agent } = useAuth();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
 
-  // Load threads
-  useEffect(() => {
+  // Function to load threads based on filter
+  const loadThreads = React.useCallback(async (filter = ticketFilter) => {
     setLoading(true);
-    apiGet(`/threads?limit=20&offset=0`)
-      .then((payload) => {
-        const list = Array.isArray(payload) ? payload : (payload.threads || []);
-        setThreads(list);
-      })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
-  }, []);
+    setError(null);
+    
+    try {
+      let apiUrl = '/threads?limit=50&offset=0';
+      
+      if (filter === 'archived') {
+        apiUrl += '&archived=true';
+      } else {
+        apiUrl += '&archived=false';
+        if (filter !== 'all') {
+          apiUrl += `&status=${filter}`;
+        }
+      }
+      
+      const payload = await apiGet(apiUrl);
+      const list = Array.isArray(payload) ? payload : (payload.threads || []);
+      setThreads(list);
+    } catch (err) {
+      setError(err);
+      console.error('Failed to load threads:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketFilter]);
+
+  // Load threads when component mounts or filter changes
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
 
   // Load departments
   useEffect(() => {
@@ -71,6 +93,11 @@ export default function SupportInboxPlugin() {
           threads={threads}
           departments={departments}
           useNewList={true}
+          ticketFilter={ticketFilter}
+          onFilterChange={(filter) => {
+            setTicketFilter(filter);
+            loadThreads(filter);
+          }}
         />
       </div>
 

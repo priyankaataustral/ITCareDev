@@ -1706,6 +1706,42 @@ const openDraftEditor = (prefill) => {
         setTimelineRefresh(x => x + 1);
         window.dispatchEvent(new CustomEvent('refreshMentions'));
       }
+
+      // Archive action
+      if (action === 'archive') {
+        const data = await apiPost(`/threads/${tid}/archive`, {});
+        setTicket(t => ({ ...t, archived: data.archived }));
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `temp-${Date.now()}-archive`,
+            sender: 'bot',
+            content: data.message?.content || '📦 Ticket archived.',
+            timestamp: data.message?.timestamp || new Date().toISOString()
+          }
+        ]);
+        
+        // Refresh timeline
+        setTimelineRefresh(x => x + 1);
+      }
+
+      // Unarchive action
+      if (action === 'unarchive') {
+        const data = await apiPost(`/threads/${tid}/unarchive`, {});
+        setTicket(t => ({ ...t, archived: data.archived, status: data.status }));
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `temp-${Date.now()}-unarchive`,
+            sender: 'bot',
+            content: data.message?.content || '📤 Ticket unarchived.',
+            timestamp: data.message?.timestamp || new Date().toISOString()
+          }
+        ]);
+        
+        // Refresh timeline
+        setTimelineRefresh(x => x + 1);
+      }
     } catch (e) {
       setActionError('Failed to update ticket.');
     } finally {
@@ -1823,6 +1859,24 @@ const openDraftEditor = (prefill) => {
               disabled={actionLoading}
               className="flex items-center gap-1 px-3 py-1 bg-gray-700 text-white rounded-full hover:bg-gray-900 transition disabled:opacity-50 text-sm"
             >🚫 Close</button>
+          </Gate>
+
+          {/* Archive/Unarchive: L2, L3, MANAGER only for closed tickets */}
+          <Gate roles={["L2", "L3", "MANAGER"]}>
+            {ticket?.status === 'closed' && !ticket?.archived && (
+              <button
+                onClick={() => handleAction('archive')}
+                disabled={actionLoading}
+                className="flex items-center gap-1 px-3 py-1 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-50 text-sm"
+              >📦 Archive</button>
+            )}
+            {ticket?.archived && (
+              <button
+                onClick={() => handleAction('unarchive')}
+                disabled={actionLoading}
+                className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 text-sm"
+              >📤 Unarchive</button>
+            )}
           </Gate>
 
         </div>

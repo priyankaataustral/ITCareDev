@@ -158,13 +158,22 @@ def list_threads():
         # Get pagination parameters
         limit = int(request.args.get("limit", 20))
         offset = int(request.args.get("offset", 0))
+        
+        # Get filter parameters
+        show_archived = request.args.get("archived", "false").lower() == "true"
+        status_filter = request.args.get("status", "all")  # all, open, closed, archived
 
         # Get user role from JWT
         user = getattr(request, "agent_ctx", None)
         role = user.get("role") if user else None
 
-        # Query all tickets from database (we'll filter by role later)
-        tickets = Ticket.query.all()
+        # Query tickets based on archive filter
+        if show_archived:
+            # Show only archived tickets
+            tickets = Ticket.query.filter_by(archived=True).all()
+        else:
+            # Show non-archived tickets (default behavior)
+            tickets = Ticket.query.filter_by(archived=False).all()
         dept_map = {d.id: d.name for d in Department.query.all()}
         
         # Build all threads with full enrichment (like original)
@@ -196,7 +205,7 @@ def list_threads():
                 "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
                 "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
                 "department_id": ticket.department_id,
-            "department": department,
+                "department": department,
                 "level": ticket.level or 1,  # Critical for role filtering
                 "escalated": escalated,       # From TicketEvent query
                 "priority": ticket.priority,
@@ -206,36 +215,44 @@ def list_threads():
                 "assigned_to": ticket.assigned_to,
                 "urgency_level": ticket.urgency_level,
                 "impact_level": ticket.impact_level,
+                "archived": ticket.archived or False,  # Include archived status
                 "lastActivity": ticket.updated_at.isoformat() if ticket.updated_at else None
             }
             threads_all.append(enriched_ticket)
 
-    except ValueError:
-            return jsonify(error="limit and offset must be integers"), 400
-    
-    except Exception as e:
-            return jsonify({"error": str(e)}), 500
-        
         # PRESERVE ORIGINAL ROLE-BASED FILTERING
-    if role == "L2":
+        if role == "L2":
             # L2 sees tickets with level >= 2 (escalated tickets)
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
-    elif role == "L3":
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
+        elif role == "L3":
             # L3 sees only tickets with level == 3 (highest escalation)
-        threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
-    else:  # L1 and MANAGER see all
-        threads_filtered = threads_all
+            threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
+        else:  # L1 and MANAGER see all
+            threads_filtered = threads_all
+
+        # Apply status filtering if specified
+        if status_filter != "all":
+            if status_filter == "open":
+                threads_filtered = [t for t in threads_filtered if t.get("status") in ["open", "in_progress", "escalated"]]
+            elif status_filter == "closed":
+                threads_filtered = [t for t in threads_filtered if t.get("status") in ["closed", "resolved"]]
 
         # Apply pagination after filtering (preserve original logic)
-    total = len(threads_filtered)
-    threads = threads_filtered[offset:offset+limit]
+        total = len(threads_filtered)
+        threads = threads_filtered[offset:offset+limit]
 
-        # Return exact same format as original
+    except ValueError:
+        return jsonify(error="limit and offset must be integers"), 400
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # Return exact same format as original
     return jsonify(
-            total=total,
-            limit=limit,
-            offset=offset,
-            threads=threads
+        total=total,
+        limit=limit,
+        offset=offset,
+        threads=threads
     ), 200
         
 
@@ -1327,17 +1344,21 @@ def escalate_ticket(thread_id):
     if target_agent_id:
         ticket.assigned_to = target_agent_id
     
-    # Create escalation summary record
-    summary = EscalationSummary(
-        ticket_id=thread_id,
-        escalated_to_department_id=target_department_id,
-        escalated_to_agent_id=target_agent_id,
-        escalated_by_agent_id=agent.get('id'),
-        reason=escalation_reason,
-        from_level=old_level,
-        to_level=to_level
-    )
-    db.session.add(summary)
+    # Create escalation summary record (with fallback if table doesn't exist)
+    try:
+        summary = EscalationSummary(
+            ticket_id=thread_id,
+            escalated_to_department_id=target_department_id,
+            escalated_to_agent_id=target_agent_id,
+            escalated_by_agent_id=agent.get('id'),
+            reason=escalation_reason,
+            from_level=old_level,
+            to_level=to_level
+        )
+        db.session.add(summary)
+        current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
+    except Exception as e:
+        current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
     
     # Log event with additional details
     event_details = {
@@ -1399,6 +1420,68 @@ def close_ticket(thread_id):
     insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been closed.")
     enqueue_status_email(thread_id, "closed", "Your ticket was closed.")
     return jsonify(status="closed", message={"sender":"assistant","content":"✅ Ticket has been closed.","timestamp":now}), 200
+
+@urls.route("/threads/<thread_id>/archive", methods=["POST"])
+@require_role("L2","L3","MANAGER")
+def archive_ticket(thread_id):
+    """Archive a ticket - removes it from main view but keeps in database"""
+    ensure_ticket_record_from_csv(thread_id)
+
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
+        return jsonify(error="Ticket not found"), 404
+    
+    # Only allow archiving closed or resolved tickets
+    if ticket.status not in ['closed', 'resolved']:
+        return jsonify(error="Only closed or resolved tickets can be archived"), 400
+        
+    now = datetime.now(timezone.utc).isoformat()
+    ticket.archived = True
+    ticket.updated_at = now
+    add_event(ticket.id, 'ARCHIVED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    db.session.commit()
+    
+    insert_message_with_mentions(thread_id, "assistant", "📦 Ticket has been archived.")
+    insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been archived.")
+    
+    return jsonify(
+        status="archived", 
+        archived=True,
+        message={
+            "sender": "assistant",
+            "content": "📦 Ticket has been archived.",
+            "timestamp": now
+        }
+    ), 200
+
+@urls.route("/threads/<thread_id>/unarchive", methods=["POST"])
+@require_role("L2","L3","MANAGER")
+def unarchive_ticket(thread_id):
+    """Unarchive a ticket - brings it back to main view"""
+    ensure_ticket_record_from_csv(thread_id)
+
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
+        return jsonify(error="Ticket not found"), 404
+        
+    now = datetime.now(timezone.utc).isoformat()
+    ticket.archived = False
+    ticket.updated_at = now
+    add_event(ticket.id, 'UNARCHIVED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    db.session.commit()
+    
+    insert_message_with_mentions(thread_id, "assistant", "📤 Ticket has been unarchived.")
+    insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been unarchived.")
+    
+    return jsonify(
+        status=ticket.status,
+        archived=False, 
+        message={
+            "sender": "assistant",
+            "content": "📤 Ticket has been unarchived.",
+            "timestamp": now
+        }
+    ), 200
 
 @urls.route("/threads/<thread_id>/timeline", methods=["GET"])
 @require_role("L1","L2","L3","MANAGER")

@@ -187,6 +187,7 @@ class Ticket(db.Model):
     level = db.Column(db.Integer, default=1)
     resolved_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
     assigned_to = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    archived = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class Message(db.Model):
