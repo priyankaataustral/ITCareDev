@@ -1268,6 +1268,7 @@ def solution_response(thread_id):
     if solved:
         insert_message_with_mentions(thread_id, "assistant", "🎉 Glad we could help! Closing the ticket.")
         t.status = "closed"
+        t.resolved_by = user.get("id")  # Track who resolved the ticket
         t.updated_at = now
         db.session.commit()
         log_event(thread_id, "RESOLVED", {"note": "User confirmed solved"})
@@ -1416,8 +1417,9 @@ def close_ticket(thread_id):
         return jsonify(error="Ticket not found"), 404
     now = datetime.now(timezone.utc).isoformat()
     ticket.status = 'closed'
+    ticket.resolved_by = getattr(request, 'agent_ctx', {}).get('id')  # Track who closed the ticket
     ticket.updated_at = now
-    add_event(ticket.id, 'CLOSED', actor_agent_id=None)
+    add_event(ticket.id, 'CLOSED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
     db.session.commit()
     insert_message_with_mentions(thread_id, "assistant", "✅ Ticket has been closed.")
     insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been closed.")
@@ -1600,8 +1602,9 @@ def claim_ticket(thread_id):
         assigned_at=datetime.utcnow().isoformat()
     ))
 
-    # 4) set owner field (legacy UI)
+    # 4) set owner field (legacy UI) AND sync assigned_to
     ticket.owner = agent_name
+    ticket.assigned_to = agent.id  # Sync with TicketAssignment
     ticket.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -3922,9 +3925,15 @@ def get_kb_analytics():
 @urls.route("/agents", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER")
 def get_agents():
-    """Get list of all agents for dropdowns/selection"""
+    """Get list of all agents for dropdowns/selection, optionally filtered by department"""
     try:
-        agents = Agent.query.all()
+        department_id = request.args.get("department_id")
+        
+        query = Agent.query
+        if department_id:
+            query = query.filter(Agent.department_id == department_id)
+        
+        agents = query.all()
         result = [{
             "id": agent.id,
             "name": agent.name,
@@ -3935,6 +3944,66 @@ def get_agents():
         return jsonify({"agents": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@urls.route("/threads/<thread_id>/assign", methods=["POST"])
+@require_role("L2", "L3", "MANAGER")
+def assign_ticket(thread_id):
+    """Assign ticket to specific agent"""
+    data = request.json or {}
+    agent_id = data.get("agent_id")
+    
+    # Get ticket
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
+        return jsonify(error="Ticket not found"), 404
+    
+    if agent_id:
+        # Verify agent exists
+        agent = db.session.get(Agent, agent_id)
+        if not agent:
+            return jsonify(error="Agent not found"), 404
+        
+        # Close any open assignments
+        db.session.execute(_sql_text("""
+            UPDATE ticket_assignments SET unassigned_at = :now
+            WHERE ticket_id = :tid AND (unassigned_at IS NULL OR unassigned_at = '')
+        """), {"tid": thread_id, "now": datetime.utcnow().isoformat()})
+        
+        # Create new assignment
+        db.session.add(TicketAssignment(
+            ticket_id=thread_id,
+            agent_id=agent.id,
+            assigned_at=datetime.utcnow().isoformat()
+        ))
+        
+        # Sync tickets table
+        ticket.assigned_to = agent.id
+        ticket.owner = agent.name
+        message = f"Assigned to {agent.name}"
+    else:
+        # Unassign ticket
+        db.session.execute(_sql_text("""
+            UPDATE ticket_assignments SET unassigned_at = :now
+            WHERE ticket_id = :tid AND (unassigned_at IS NULL OR unassigned_at = '')
+        """), {"tid": thread_id, "now": datetime.utcnow().isoformat()})
+        
+        ticket.assigned_to = None
+        ticket.owner = None
+        message = "Unassigned"
+    
+    ticket.updated_at = datetime.utcnow()
+    
+    # Log event
+    add_event(thread_id, 'ASSIGNMENT_CHANGED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    
+    db.session.commit()
+    
+    return jsonify(
+        status="success", 
+        message=message,
+        assigned_to=ticket.assigned_to
+    ), 200
 
 @urls.route("/escalation-summaries", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER")

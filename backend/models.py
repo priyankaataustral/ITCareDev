@@ -83,21 +83,14 @@ class Solution(db.Model):
     ticket_id = db.Column(db.String(64))
     proposed_by = db.Column(db.String(64))
     generated_by = db.Column(db.String(5))
-    ai_contribution_pct = db.Column(db.Float)
-    ai_confidence = db.Column(db.Float)
     text = db.Column(db.Text)
-    normalized_text = db.Column(db.Text)
-    fingerprint_sha256 = db.Column(db.String(64))
     sent_for_confirmation_at = db.Column(db.DateTime)
-    confirmed_by_user = db.Column(db.Boolean)
-    confirmed_at = db.Column(db.DateTime)
-    confirmed_ip = db.Column(db.String(64))
-    confirmed_via = db.Column(db.String(5))
-    dedup_score = db.Column(db.Float)
-    published_article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
     status = db.Column(db.String(17))
     created_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime)
+    # Removed unused AI fields: ai_contribution_pct, ai_confidence, normalized_text,
+    # fingerprint_sha256, confirmed_by_user, confirmed_at, confirmed_ip, 
+    # confirmed_via, dedup_score, published_article_id
 
 class KBArticle(db.Model):
     __tablename__ = 'kb_articles'
@@ -105,31 +98,18 @@ class KBArticle(db.Model):
     title = db.Column(db.String(1000))
     problem_summary = db.Column(db.Text)
     content_md = db.Column(db.Text)
-    environment_json = db.Column(JSON)
     category_id = db.Column(db.Integer)
-    origin_ticket_id = db.Column(db.String(45))
-    origin_solution_id = db.Column(db.Integer, db.ForeignKey('solutions.id'))
     source = db.Column(Enum(KBArticleSource), default=KBArticleSource.ai)
-    ai_contribution_pct = db.Column(Float)
     visibility = db.Column(Enum(KBArticleVisibility), default=KBArticleVisibility.internal)
-    embedding_model = db.Column(db.String(100))
-    embedding_hash = db.Column(db.String(64))
-    faiss_id = db.Column(db.Integer)
     canonical_fingerprint = db.Column(db.String(64), unique=True, index=True)
+    # Removed unused fields: environment_json, origin_ticket_id, origin_solution_id,
+    # ai_contribution_pct, embedding_model, embedding_hash, faiss_id
     status = db.Column(Enum(KBArticleStatus), default=KBArticleStatus.draft)
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
     approved_by = db.Column(db.String(45))  # Agent who promoted the article
 
-class KBArticleVersion(db.Model):
-    __tablename__ = 'kb_article_versions'
-    id = db.Column(db.Integer, primary_key=True)
-    article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
-    version = db.Column(db.Integer)
-    content_md = db.Column(db.Text)
-    changelog = db.Column(db.Text)
-    editor_agent_id = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+# KBArticleVersion model removed - unused versioning feature
 
 class KBFeedback(db.Model):
     __tablename__ = 'kb_feedback'
@@ -149,26 +129,7 @@ class KBFeedback(db.Model):
     )
 
 
-class KBIndex(db.Model):
-    __tablename__ = 'kb_index'
-    id = db.Column(db.Integer, primary_key=True)
-    article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'))
-    faiss_id = db.Column(db.Integer)
-    embedding_model = db.Column(db.String(100))
-    embedding_hash = db.Column(db.String(64))
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    is_active = db.Column(db.Boolean, default=True)
-
-class KBAudit(db.Model):
-    __tablename__ = 'kb_audit'
-    id = db.Column(db.Integer, primary_key=True)
-    entity_type = db.Column(db.String(100))
-    entity_id = db.Column(db.Integer)
-    event = db.Column(db.String(100))
-    actor_id = db.Column(db.Integer)
-    meta_json = db.Column(JSON)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-
+# KB Index and Audit models removed - unused features
 class Ticket(db.Model):
     __tablename__ = 'tickets'
     id = db.Column(db.String(45), primary_key=True)
@@ -236,7 +197,6 @@ class TicketAssignment(db.Model):
     assigned_at   = db.Column(db.String(100))
     unassigned_at = db.Column(db.String(100))
 
-
 class TicketEvent(db.Model):
     __tablename__ = 'ticket_events'
     id = db.Column(db.Integer, primary_key=True)
@@ -267,6 +227,8 @@ class TicketWatcher(db.Model):
 
 
 
+# TicketWatcher model removed - unused feature
+
 class EmailQueue(db.Model):
     __tablename__ = 'email_queue'
     id = db.Column(db.Integer, primary_key=True)
@@ -295,14 +257,5 @@ class TicketFeedback(db.Model):
     resolved_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 
-class KBDraft(db.Model):
-    __tablename__ = 'kb_drafts'
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
-    title = db.Column(db.String(100))
-    body  = db.Column(db.Text)
-    status = db.Column(db.String(100), default='DRAFT')
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
-
+# KBDraft model removed - unused drafting feature
     

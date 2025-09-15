@@ -18,6 +18,87 @@ const FALLBACK_DEPTS = [
   { id: 5, name: 'Security' },
 ];
 
+// Assignment Pill Component
+const AssignmentPill = ({ ticket, onAssignmentChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentAgent, setCurrentAgent] = useState(null);
+  
+  useEffect(() => {
+    // Find current assigned agent name
+    if (ticket.assigned_to && agents.length > 0) {
+      const agent = agents.find(a => a.id === ticket.assigned_to);
+      setCurrentAgent(agent);
+    }
+  }, [ticket.assigned_to, agents]);
+  
+  const handleDropdownOpen = async () => {
+    if (!isOpen && ticket.department_id) {
+      setLoading(true);
+      try {
+        const response = await apiGet(`/agents?department_id=${ticket.department_id}`);
+        setAgents(response.agents || []);
+      } catch (error) {
+        console.error('Failed to fetch agents:', error);
+      }
+      setLoading(false);
+    }
+    setIsOpen(!isOpen);
+  };
+  
+  const handleAssign = (agentId) => {
+    onAssignmentChange(ticket.id, agentId);
+    setIsOpen(false);
+  };
+  
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={handleDropdownOpen}
+        className="px-2 py-0.5 bg-green-50 dark:bg-green-900 text-green-800 dark:text-green-200 text-[11px] font-medium rounded-full hover:bg-green-100 transition-colors flex items-center gap-1"
+      >
+        <span>👤</span>
+        {currentAgent ? (
+          <span>Assigned: {currentAgent.name}</span>
+        ) : (
+          <span>Unassigned</span>
+        )}
+        <span className="text-[10px]">▼</span>
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 min-w-[150px]">
+          <div className="p-1">
+            <button
+              onClick={() => handleAssign(null)}
+              className="w-full text-left px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            >
+              🚫 Unassign
+            </button>
+            {loading ? (
+              <div className="px-2 py-1 text-xs text-gray-500">Loading...</div>
+            ) : (
+              agents.map(agent => (
+                <button
+                  key={agent.id}
+                  onClick={() => handleAssign(agent.id)}
+                  className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
+                    ticket.assigned_to === agent.id ? 'bg-green-50 dark:bg-green-900' : ''
+                  }`}
+                >
+                  👤 {agent.name} ({agent.role})
+                  {ticket.assigned_to === agent.id && ' ✓'}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function ThreadList({
   onSelect,
   threads: threadsProp = [],
@@ -48,248 +129,172 @@ export default function ThreadList({
     setLoading(true);
 
     apiGet(`/threads?limit=20&offset=0`)
-      .then((payload) => {
-        const list = Array.isArray(payload) ? payload : payload.threads || [];
-        setThreads(list);
+      .then((response) => {
+        setThreads(response.threads || []);
+        setLoading(false);
       })
-      .catch((err) => setError(err.message || String(err)))
-      .finally(() => setLoading(false));
-  }, [threadsProp, token]); // keep token in deps so list refreshes after login
+      .catch((err) => {
+        console.error('Failed to load threads:', err);
+        setError('Failed to load threads');
+        setLoading(false);
+      });
+  }, [threadsProp]);
 
-  // (Optional) fetch short summaries for each ticket
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      const out = {};
-      for (const t of threads) {
-        try {
-          const resp = await apiPost(`/summarize`, {
-            text: t.text || t.subject || '',
-          });
-          out[t.id] = (resp && resp.summary) ? resp.summary : '';
-        } catch {
-          out[t.id] = '';
-        }
-      }
-      if (!cancelled) setSummaries(out);
+  // Load escalation summaries for tickets
+  const loadSummary = async (threadId) => {
+    if (summaries[threadId]) return summaries[threadId];
+    try {
+      const response = await apiGet(`/escalation-summaries?ticket_id=${threadId}`);
+      const summary = response.escalation_summaries?.[0];
+      setSummaries(prev => ({ ...prev, [threadId]: summary }));
+      return summary;
+    } catch (err) {
+      console.error(`Failed to load summary for ${threadId}:`, err);
+      return null;
     }
-    if (threads.length) run();
-    return () => {
-      cancelled = true;
-    };
-  }, [threads]);
+  };
 
-  if (loading) return <div className="p-6 text-center text-gray-500">Loading tickets…</div>;
-  if (error)   return <div className="p-6 text-center text-red-500">Error: {error}</div>;
+  // Handle assignment change
+  const handleAssignmentChange = async (ticketId, agentId) => {
+    try {
+      const response = await apiPost(`/threads/${ticketId}/assign`, {
+        agent_id: agentId
+      });
+      
+      // Update local state
+      setThreads(prevThreads =>
+        prevThreads.map(thread =>
+          thread.id === ticketId
+            ? { ...thread, assigned_to: agentId }
+            : thread
+        )
+      );
+      
+    } catch (error) {
+      console.error('Failed to assign ticket:', error);
+      alert('Failed to update assignment');
+    }
+  };
 
-  // Build department options, add Unassigned
-  const deptOptions = [
-    ...((departments?.length ? departments : FALLBACK_DEPTS).map(d => ({
-      id: Number(d.id),
-      name: String(d.name),
-    })))
-  ];
-  const deptNameById = Object.fromEntries(deptOptions.map(d => [d.id, d.name]));
+  const handleBulkUpdate = async (threadId) => {
+    if (saving[threadId]) return;
 
-  // Add Unassigned option to dropdown
-  const filterOptions = [
-    { id: 'all', name: 'All' },
-    ...deptOptions,
-    { id: 'unassigned', name: 'Unassigned' },
-  ];
+    const summary = summaries[threadId];
+    if (!summary) {
+      alert('Please load the summary first');
+      return;
+    }
 
-  const role = agent?.role;
-  const roleFiltered = (threads || []).filter(t => {
-    const lvl = Number(t.level ?? 1);
-    if (role === 'L2') return lvl >= 2;
-    if (role === 'L3') return lvl === 3;
-    return true; // L1 & MANAGER see all
+    if (!overrideDept[threadId] || !overrideReason[threadId]?.trim()) {
+      alert('Please select a department and provide a reason');
+      return;
+    }
+
+    setSaving(prev => ({ ...prev, [threadId]: true }));
+
+    try {
+      const payload = {
+        department_id: overrideDept[threadId],
+        reason: overrideReason[threadId].trim(),
+        agent_id: null
+      };
+
+      const response = await apiPost(`/threads/${threadId}/escalate`, payload);
+
+      // Reset states
+      setOverrideOpen(prev => ({ ...prev, [threadId]: false }));
+      setOverrideDept(prev => ({ ...prev, [threadId]: null }));
+      setOverrideReason(prev => ({ ...prev, [threadId]: '' }));
+
+      // Update thread status locally
+      setThreads(prevThreads =>
+        prevThreads.map(thread =>
+          thread.id === threadId
+            ? { ...thread, status: 'escalated', department_id: payload.department_id }
+            : thread
+        )
+      );
+
+      alert('Ticket escalated successfully');
+    } catch (error) {
+      console.error('Escalation failed:', error);
+      alert('Failed to escalate ticket');
+    } finally {
+      setSaving(prev => ({ ...prev, [threadId]: false }));
+    }
+  };
+
+  if (loading) return <div className="p-4 text-center text-gray-500">Loading tickets...</div>;
+  if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
+
+  const filteredThreads = threads.filter(t => {
+    if (activeDeptId === 'all') return true;
+    return t.department_id === parseInt(activeDeptId);
   });
 
-  // Filter by department, including unassigned
-  const filteredThreads =
-    activeDeptId === 'all'
-      ? roleFiltered
-      : activeDeptId === 'unassigned'
-        ? roleFiltered.filter(t =>
-            t.department === null ||
-            t.department_id === null ||
-            t.department === undefined ||
-            t.department_id === undefined ||
-            t.department === '' ||
-            t.department_id === ''
-          )
-        : roleFiltered.filter(t =>
-            (t.department_id ?? t.department?.id) === Number(activeDeptId)
-          );
+  const departmentsList = departments.length > 0 ? departments : FALLBACK_DEPTS;
 
   return (
-    <div className="overflow-auto pr-2 bg-gray-50 dark:bg-gray-900 p-4 space-y-3 max-w-sm w-full rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
-      {/* Header + filter */}
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-bold text-blue-700 dark:text-blue-300">Open Tickets</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-600 dark:text-gray-300">Department</span>
-          <select
-            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-            value={activeDeptId}
-            onChange={(e) => setActiveDeptId(e.target.value)}
-          >
-            {filterOptions.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Ticket cards */}
+    <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
       {filteredThreads.map((t) => {
-        const isActive = selectedId === t.id;
-        const depId = t.department_id ?? t.department?.id ?? null;
-        const depName = t.department?.name || t.department || (depId ? deptNameById[depId] : 'Unassigned');
+        const isSelected = selectedId === t.id;
+        const dept = departmentsList.find(d => d.id === t.department_id);
+        const deptName = dept?.name || 'Unknown';
+        
         const updatedTs = t.updated_at || t.lastActivity;
 
         return (
           <div
             key={t.id}
-            className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm transition cursor-pointer mb-2 px-3 py-2
-              ${isActive ? 'ring-2 ring-indigo-300 dark:ring-indigo-600 shadow-md z-10 border-transparent' : 'border-gray-200 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900'}`}
-            tabIndex={0}
-            aria-label={`Open ticket ${t.id}`}
             onClick={() => onSelect?.(t.id)}
+            className={`relative p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+              isSelected
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm'
+            }`}
           >
-            {/* Header row */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                  #{t.id}
+            {/* Header */}
+            <div className="flex justify-between items-start mb-2">
+              <h3 className={`font-medium text-sm ${
+                isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'
+              }`}>
+                #{t.id} - {t.subject}
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                  t.status === 'open' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                  t.status === 'closed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
+                  t.status === 'escalated' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                  'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                }`}>
+                  {t.status.toUpperCase()}
                 </span>
-                <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-[11px] font-medium rounded-full max-w-[120px] truncate">
-                  {depName || 'Unassigned'}
-                </span>
-              </div>
-              <div className="flex flex-col items-end gap-1 min-w-0">
-                <Gate roles={['MANAGER']}>
-                  <button
-                    className="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-[11px] rounded-full text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const current = t.department_id ?? t.department?.id ?? '';
-                      setOverrideOpen((o) => ({ ...o, [t.id]: !o[t.id] }));
-                      setOverrideDept((d) => ({ ...d, [t.id]: current }));
-                    }}
-                    disabled={saving[t.id]}
-                  >
-                    Override
-                  </button>
-                </Gate>
-                {updatedTs && (
-                  <span className="text-xs text-gray-400 mt-0.5 whitespace-nowrap">
-                    {dayjs(updatedTs).format('M/D/YYYY, h:mm A')}
-                  </span>
-                )}
               </div>
             </div>
 
-            {/* Override controls */}
-            {overrideOpen[t.id] && (
-              <div className="mt-2 bg-gray-50 dark:bg-gray-900 border-t border-b border-gray-200 dark:border-gray-700 flex flex-col gap-2 px-2 py-2 rounded">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-200">Department:</label>
-                <select
-                  className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                  value={overrideDept[t.id] ?? ''}
-                  onChange={(e) => setOverrideDept((d) => ({ ...d, [t.id]: e.target.value ? Number(e.target.value) : '' }))}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <option value="">Unassigned</option>
-                  {deptOptions.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+            {/* Content */}
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+              <strong>From:</strong> {t.requester_name} ({t.requester_email})
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              <strong>Department:</strong> {deptName}
+            </p>
 
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-200 mt-2">Reason:</label>
-                <input
-                  className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
-                  value={overrideReason[t.id] || ''}
-                  onChange={(e) => setOverrideReason((r) => ({ ...r, [t.id]: e.target.value }))}
-                  onClick={(e) => e.stopPropagation()}
-                  placeholder="Reason for override"
-                />
-
-                <div className="flex gap-2 mt-2">
-                  <button
-                    className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
-                    disabled={saving[t.id] || overrideDept[t.id] === undefined}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setSaving((s) => ({ ...s, [t.id]: true }));
-                      const prevDeptId = t.department_id ?? t.department?.id ?? null;
-                      try {
-                        await apiPatch(`/threads/${t.id}/department`, {
-                          department_id: overrideDept[t.id],
-                          reason: overrideReason[t.id],
-                        });
-                        setThreads((cur) =>
-                          cur.map((ticket) =>
-                            ticket.id === t.id ? { ...ticket, department_id: overrideDept[t.id] } : ticket
-                          )
-                        );
-                        setOverrideOpen((o) => ({ ...o, [t.id]: false }));
-                        alert('Department updated successfully.');
-                      } catch (err) {
-                        alert('Failed to update department: ' + (err.message || err));
-                        setThreads((cur) =>
-                          cur.map((ticket) =>
-                            ticket.id === t.id ? { ...ticket, department_id: prevDeptId } : ticket
-                          )
-                        );
-                      } finally {
-                        setSaving((s) => ({ ...s, [t.id]: false }));
-                      }
-                    }}
-                  >
-                    Save
-                  </button>
-                  <button
-                    className="px-3 py-1 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs font-semibold hover:bg-gray-400 dark:hover:bg-gray-600"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOverrideOpen((o) => ({ ...o, [t.id]: false }));
-                    }}
-                    disabled={saving[t.id]}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Summary (2 lines) */}
-            {summaries[t.id] && (
-              <div className="mt-2">
-                <p className="line-clamp-2 text-sm text-gray-800 dark:text-gray-200">{summaries[t.id]}</p>
-              </div>
-            )}
-
-            {/* Metadata pills */}
-            <div className="flex flex-wrap gap-1 mt-2 mb-1">
+            {/* Pills */}
+            <div className="flex flex-wrap gap-1 mb-2">
               <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-[11px] font-medium rounded-full">
                 Level: {t.level}
-              </span>
-              <span className="px-2 py-0.5 bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-[11px] font-medium rounded-full">
-                Urgency: {t.urgency_level}
-              </span>
-              <span className="px-2 py-0.5 bg-pink-50 dark:bg-pink-900 text-pink-800 dark:text-pink-200 text-[11px] font-medium rounded-full">
-                Impact: {t.impact_level}
               </span>
               <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-[11px] font-medium rounded-full">
                 Status: {t.status}
               </span>
             </div>
+
+            {/* Assignment Pill */}
+            <AssignmentPill 
+              ticket={t} 
+              onAssignmentChange={handleAssignmentChange}
+            />
 
             {/* Footer */}
             <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
