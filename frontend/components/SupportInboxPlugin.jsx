@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import LoadingBot from './LoadingBot';
 import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
+import KBDashboard from './KBDashboard';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
 import { apiGet } from '../lib/apiClient'; // only import what we use
@@ -18,6 +19,7 @@ export default function SupportInboxPlugin() {
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const { agent } = useAuth();
 
   useEffect(() => {
@@ -81,13 +83,21 @@ export default function SupportInboxPlugin() {
             <div className="text-indigo-900">Select a ticket</div>
           )}
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAnalytics(true)}
+            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+            aria-label="Open Analytics Dashboard"
+          >
+            <i className="bi bi-graph-up mr-2"></i>
+            Analytics
+          </button>
           <button
             onClick={() => setDark((d) => !d)}
-            className="bg-white text-black dark:bg-black dark:text-white"
+            className="bg-white text-black dark:bg-black dark:text-white p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             aria-label="Toggle dark mode"
           >
-            {dark ? <i className="bi bi-sun" id="icon"></i> : <i className="bi bi-moon-stars" id="icon"></i>}
+            {dark ? <i className="bi bi-sun"></i> : <i className="bi bi-moon-stars"></i>}
           </button>
           <ProfileDropdown />
         </div>
@@ -105,6 +115,14 @@ export default function SupportInboxPlugin() {
           )}
         </div>
       </div>
+
+      {/* Analytics Dashboard Modal */}
+      {showAnalytics && (
+        <KBDashboard 
+          open={showAnalytics} 
+          onClose={() => setShowAnalytics(false)} 
+        />
+      )}
     </div>
   );
 }

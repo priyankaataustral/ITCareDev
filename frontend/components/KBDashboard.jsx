@@ -5,6 +5,8 @@ import dayjs from "dayjs";
 import { useAuth } from "../components/AuthContext"; // keep if Gate/children rely on context
 import Gate from "./Gate";
 import { apiGet, apiPost } from "../lib/apiClient"; // ← use the centralized client
+import { useDateRangeAnalytics } from "../hooks/useAnalytics";
+import { ComprehensiveAnalytics } from "./AnalyticsSection";
 
 /**
  * UI: Agent Knowledge Dashboard
@@ -15,6 +17,7 @@ import { apiGet, apiPost } from "../lib/apiClient"; // ← use the centralized c
  */
 export default function KBDashboard({ open, onClose }) {
   const [tab, setTab] = useState("review");
+  const [analyticsTab, setAnalyticsTab] = useState("overview");
 
   // --- State ---
   const [loading, setLoading] = useState(false);
@@ -24,6 +27,9 @@ export default function KBDashboard({ open, onClose }) {
   const [feedback, setFeedback] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [agentStats, setAgentStats] = useState([]);
+
+  // --- Analytics Hook ---
+  const analytics = useDateRangeAnalytics(30);
 
   const [q, setQ] = useState(""); // search
   const [statusFilter, setStatusFilter] = useState("all");
@@ -182,7 +188,7 @@ export default function KBDashboard({ open, onClose }) {
               { id: 'review', label: 'Review' },
               { id: 'articles', label: 'Articles' },
               { id: 'feedback', label: 'Feedback' },
-              { id: 'analytics', label: 'Analytics' },
+              { id: 'analytics', label: '📊 Analytics' },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-3 py-1 rounded-lg text-sm ${tab===t.id? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100':'text-gray-600 dark:text-gray-300'}`}>{t.label}</button>
@@ -440,49 +446,11 @@ export default function KBDashboard({ open, onClose }) {
           )}
 
           {tab === 'analytics' && (
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <KPI title="Solutions awaiting confirm" value={solutions.filter(s=>String(s.status).toLowerCase()==='sent_for_confirm').length} />
-              <KPI title="Draft KB articles" value={articles.filter(a=>String(a.status).toLowerCase()==='draft').length} />
-              <KPI title="Published KB articles" value={articles.filter(a=>String(a.status).toLowerCase()==='published').length} />
-              <KPI title="Open feedback" value={feedback.filter(f=>!f.resolved_at).length} />
-              <KPI title="Avg. rating (last 50)" value={avg(feedback.map(f=>Number(f.rating)).filter(Boolean)).toFixed(2)} />
-              <KPI title="Total confirmations" value={solutions.filter(s=>String(s.status).toLowerCase()==='confirmed_by_user').length} />
-              <KPI title="Confirm rate" value={confirmRate(solutions)} />
-              <KPI title="Avg time to confirm" value={avgHoursToConfirm(solutions)} />
-
-              {/* Agent analytics table */}
-              <div className="md:col-span-3 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 mt-4">
-                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Agent Activity</h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-gray-500">
-                      <tr>
-                        <th className="py-2 pr-3">Agent</th>
-                        <th className="py-2 pr-3">Solved</th>
-                        <th className="py-2 pr-3">Active</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {agentStats.length > 0 ? agentStats.map(a => (
-                        <tr key={a.agent_id} className="border-t border-gray-100 dark:border-gray-800 align-top">
-                          <td className="py-2 pr-3">{a.agent_id}</td>
-                          <td className="py-2 pr-3">{a.solved}</td>
-                          <td className="py-2 pr-3">{a.active}</td>
-                        </tr>
-                      )) : (
-                        <tr><td colSpan={3} className="py-6 text-center text-gray-500">No agent data.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Simple trend (client-side) */}
-              <div className="md:col-span-3 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">7-day activity (client-side)</h4>
-                <MiniSparkline series={build7DaySeries(solutions, articles, feedback)} />
-              </div>
-            </section>
+            <ComprehensiveAnalytics 
+              analytics={analytics}
+              analyticsTab={analyticsTab}
+              setAnalyticsTab={setAnalyticsTab}
+            />
           )}
         </div>
       </div>
