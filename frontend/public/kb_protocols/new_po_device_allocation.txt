@@ -1,0 +1,188 @@
+PROTOCOL: New Purchase Order - Device Allocation & Hardware Decommission
+Version: 1.2 | Last Updated: September 2025 | Category: Hardware Management
+
+═══════════════════════════════════════════════════════════════════════════════
+OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+This protocol outlines the complete process for handling new Purchase Orders (PO) 
+that involve allocating new devices to users and properly decommissioning existing 
+hardware, including receipt management and compliance requirements.
+
+═══════════════════════════════════════════════════════════════════════════════
+SCOPE & TRIGGERS
+═══════════════════════════════════════════════════════════════════════════════
+
+APPLIES TO:
+- New employee onboarding requiring equipment
+- Hardware upgrade requests
+- Equipment replacement due to failure/end-of-life
+- Department expansion requiring additional devices
+
+TICKET INDICATORS:
+- Keywords: "new PO", "purchase order", "new device", "equipment", "laptop", "desktop"
+- Mentions of: upgrade, replacement, allocation, procurement
+- References to: budget approval, manager approval, hardware request
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP-BY-STEP PROCEDURE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. INITIAL VERIFICATION (Required)
+   ├─ Verify manager/budget approval for new equipment
+   ├─ Confirm user's department and role requirements  
+   ├─ Check existing device assignment in asset management system
+   ├─ Validate PO number and procurement authorization
+   └─ Estimate delivery timeline (typically 3-5 business days)
+
+2. DEVICE SPECIFICATION ASSESSMENT
+   ├─ Standard Laptop (Most users):
+   │  • Dell Latitude 7420 or equivalent
+   │  • 16GB RAM, 512GB SSD, Windows 11 Pro
+   │  • Estimated cost: $1,200-1,500
+   │
+   ├─ High-Performance Workstation (Developers/Design):
+   │  • Dell Precision 7560 or equivalent  
+   │  • 32GB RAM, 1TB SSD, dedicated GPU
+   │  • Estimated cost: $2,500-3,200
+   │
+   ├─ Executive Configuration:
+   │  • Dell XPS 13 Plus or MacBook Pro
+   │  • Premium build, extended warranty
+   │  • Estimated cost: $1,800-2,400
+   │
+   └─ Accessories Required:
+      • Docking station, wireless mouse, keyboard
+      • Monitor (if not desk-mounted)
+      • Laptop bag, cable locks
+
+3. OLD DEVICE DECOMMISSION PROCESS
+   ├─ Schedule pickup/return appointment with user
+   ├─ Data backup verification (user responsibility)
+   ├─ Asset tag removal and inventory update
+   ├─ Secure data wipe using approved software (DBAN/NIST standards)
+   ├─ Hardware assessment for:
+   │  • Redeployment to other users
+   │  • Donation (if 3+ years old)
+   │  • Recycling through certified e-waste vendor
+   └─ Update asset management system with disposal method
+
+4. PROCUREMENT & RECEIPT MANAGEMENT
+   ├─ Submit PO request with detailed specifications
+   ├─ Attach manager approval email/form
+   ├─ Track order status and delivery confirmation
+   ├─ Upon delivery:
+   │  • Verify items match PO specifications
+   │  • Photograph packaging and contents
+   │  • Save all receipts and delivery confirmations
+   │  • Store receipts in shared drive: /Finance/Receipts/Hardware/YYYY-MM/
+   │
+   └─ Receipt Documentation Requirements:
+      • Original vendor invoice/receipt
+      • Delivery confirmation with signatures
+      • Asset tag assignment log
+      • Photos of delivered items
+
+5. NEW DEVICE SETUP & DEPLOYMENT
+   ├─ Unbox and perform initial quality inspection
+   ├─ Apply asset tags and record serial numbers
+   ├─ Install corporate image using deployment tools
+   ├─ Configure domain join and user profiles
+   ├─ Install required software packages per department
+   ├─ Perform security compliance scan
+   ├─ Schedule handover appointment with user
+   └─ Provide setup documentation and training materials
+
+6. FINANCIAL DOCUMENTATION
+   ├─ Cost breakdown for all components
+   ├─ Receipt filing with proper categorization
+   ├─ Budget code assignment and tracking
+   ├─ Depreciation schedule setup (typically 3-year)
+   ├─ Insurance notification for high-value items
+   └─ Month-end financial reconciliation
+
+═══════════════════════════════════════════════════════════════════════════════
+REQUIRED FORMS & DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════════════
+
+FORMS TO COMPLETE:
+□ Hardware Request Form (HR-001)
+□ Asset Assignment Form (AS-002)  
+□ Data Backup Verification (DS-003)
+□ Disposal Certificate (DS-004)
+□ Budget Authorization (FN-001)
+
+ATTACHMENTS REQUIRED:
+□ Manager approval email
+□ All vendor receipts and invoices
+□ Photos of delivered equipment
+□ Asset tag assignment log
+□ Disposal certificates (if applicable)
+
+═══════════════════════════════════════════════════════════════════════════════
+ESCALATION CRITERIA
+═══════════════════════════════════════════════════════════════════════════════
+
+ESCALATE TO L2 IF:
+- PO amount exceeds $3,000
+- Custom/non-standard hardware requirements
+- Executive-level equipment requests
+- Compliance or security concerns with specifications
+
+ESCALATE TO L3/MANAGER IF:
+- Budget approval issues or disputes
+- Vendor delivery delays exceeding 10 business days
+- Hardware compatibility issues with existing infrastructure
+- Bulk orders (5+ devices)
+
+═══════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON ISSUES:
+
+Issue: "Purchase order not approved"
+Solution: 
+- Contact user's direct manager for approval
+- Verify budget availability with Finance
+- Check if PO number is valid in procurement system
+
+Issue: "Requested specifications not available"
+Solution:
+- Suggest closest equivalent models
+- Provide cost comparison for alternatives
+- Get written approval for specification changes
+
+Issue: "Old device has critical data"
+Solution:
+- Delay decommission until data backup verified
+- Provide temporary device if urgently needed
+- Schedule after-hours data migration if required
+
+Issue: "Receipt missing or incomplete"
+Solution:
+- Contact vendor for duplicate invoice
+- Use delivery confirmation as backup documentation
+- Note discrepancy in asset management system
+
+═══════════════════════════════════════════════════════════════════════════════
+COMPLIANCE & SECURITY NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+IMPORTANT REMINDERS:
+• All disposed devices must undergo secure data wiping
+• Asset tags must be tracked through entire lifecycle
+• Receipts are required for financial audits
+• Insurance claims require photographic evidence
+• Executive equipment may have enhanced security requirements
+• International shipments require additional customs documentation
+
+TEMPLATE RESPONSES:
+"Your new device request has been approved. Expected delivery is [DATE]. 
+Please ensure your current device data is backed up. We'll schedule the 
+handover once your new equipment arrives."
+
+Contact Information:
+- Procurement Team: procurement@company.com
+- Asset Management: assets@company.com  
+- Finance/Receipts: finance@company.com

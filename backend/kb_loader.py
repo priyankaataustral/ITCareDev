@@ -28,7 +28,10 @@ class KBProtocolLoader:
         self.known_protocol_files = [
             "email_issues.txt",
             "network_troubleshooting.txt", 
-            "password_reset.txt"
+            "password_reset.txt",
+            "new_po_device_allocation.txt",
+            "printer_duplex_configuration.txt",
+            "access_request_reports_module.txt"
         ]
     
     def add_protocol_file(self, filename: str):

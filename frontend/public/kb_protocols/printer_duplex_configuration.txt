@@ -1,0 +1,219 @@
+PROTOCOL: Printer Alert - Duplex Unit Configuration for Office Printers
+Version: 1.1 | Last Updated: September 2025 | Category: Printer Support
+
+═══════════════════════════════════════════════════════════════════════════════
+OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+This protocol addresses duplex (double-sided printing) configuration issues on 
+office printers, including hardware detection, driver setup, and troubleshooting 
+common duplex printing problems across different printer models and operating systems.
+
+═══════════════════════════════════════════════════════════════════════════════
+SCOPE & TRIGGERS
+═══════════════════════════════════════════════════════════════════════════════
+
+APPLIES TO:
+- Office printers with duplex capability not working
+- New printer installations requiring duplex setup
+- Driver updates causing duplex functionality loss
+- User reports of single-sided printing only
+
+TICKET INDICATORS:
+- Keywords: "duplex", "double-sided", "two-sided printing", "flip pages"
+- Error messages: "duplex unit not found", "duplexer offline", "manual duplex only"
+- Mentions of: printing on one side only, paper waste, driver issues
+- Printer models: HP LaserJet, Canon imageRUNNER, Xerox WorkCentre, Brother MFC
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP-BY-STEP PROCEDURE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. INITIAL DIAGNOSTICS (Required)
+   ├─ Verify printer model and duplex capability
+   ├─ Check if duplex unit is physically installed
+   ├─ Test duplex function from printer's control panel
+   ├─ Confirm printer driver version and compatibility
+   └─ Determine affected users (single user vs. network-wide)
+
+2. HARDWARE VERIFICATION
+   ├─ Physical Inspection:
+   │  • Power off printer completely
+   │  • Open printer access panels
+   │  • Locate duplex unit (usually rear or side compartment)
+   │  • Check for loose connections or obstructions
+   │  • Verify duplex unit model matches printer
+   │
+   ├─ Duplex Unit Installation Check:
+   │  • HP Printers: Look for automatic duplex accessory
+   │  • Canon: Check for Duplex Module (DM) installation
+   │  • Xerox: Verify Automatic Document Feeder duplex option
+   │  • Brother: Confirm duplex unit is properly seated
+   │
+   └─ Control Panel Test:
+      • Navigate to printer settings menu
+      • Look for "Duplex", "2-Sided", or "Double-sided" options
+      • Run internal duplex test if available
+
+3. DRIVER CONFIGURATION (Most Common Solution)
+   ├─ Windows Systems:
+   │  • Open "Devices and Printers" (Control Panel)
+   │  • Right-click printer → "Printer properties"
+   │  • Navigate to "Device Settings" or "Features" tab
+   │  • Find "Duplex Unit" or "Double-Sided Printing Accessory"
+   │  • Change setting from "Not Installed" to "Installed"
+   │  • Apply settings and test print
+   │
+   ├─ macOS Systems:
+   │  • System Preferences → Printers & Scanners
+   │  • Select printer → "Options & Supplies"
+   │  • Click "Options" or "Driver" tab
+   │  • Enable "Duplex Printing Unit" or similar option
+   │  • Update driver if option is missing
+   │
+   └─ Network Printer Configuration:
+      • Access printer web interface (IP address in browser)
+      • Navigate to Configuration → Device Settings
+      • Enable duplex unit in hardware configuration
+      • Save settings and restart printer
+
+4. DRIVER UPDATE PROCESS
+   ├─ Identify exact printer model and current driver version
+   ├─ Download latest drivers from manufacturer website:
+   │  • HP: hp.com/support → Enter model number
+   │  • Canon: canon.com/support → Download drivers
+   │  • Xerox: xerox.com/support → Product support
+   │  • Brother: brother.com/support → Download section
+   │
+   ├─ Uninstall existing printer driver completely
+   ├─ Restart computer before installing new driver
+   ├─ Install new driver with administrative privileges
+   └─ Reconfigure duplex settings after installation
+
+5. NETWORK PRINTER TROUBLESHOOTING
+   ├─ Check printer's IP configuration and network connectivity
+   ├─ Verify print server settings (if applicable)
+   ├─ Update network printer drivers on affected workstations
+   ├─ Configure duplex settings via print server management
+   ├─ Test duplex printing from multiple workstations
+   └─ Document working configuration for future reference
+
+6. USER TRAINING & VERIFICATION
+   ├─ Demonstrate duplex printing from common applications:
+   │  • Microsoft Word: File → Print → Print on Both Sides
+   │  • Adobe PDF: Print → Two-Sided (Flip on long edge)
+   │  • Google Chrome: Print → More Settings → Two-sided
+   │
+   ├─ Explain duplex options:
+   │  • Long Edge (book-style binding)
+   │  • Short Edge (calendar-style binding)
+   │
+   └─ Provide test document for user verification
+
+═══════════════════════════════════════════════════════════════════════════════
+COMMON PRINTER-SPECIFIC SOLUTIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+HP LASERJET SERIES:
+• Install HP Smart app for automatic driver updates
+• Use HP Print and Scan Doctor for diagnostics
+• Enable duplex in "Printing Shortcuts" → "Print on both sides"
+• For older models: Check if manual duplex only (requires user intervention)
+
+CANON IMAGERUNNER SERIES:
+• Access Remote UI (web interface) for configuration
+• Enable duplex in Device Settings → Feeder/Stack Settings
+• Use Canon Generic Plus PCL6 driver for best compatibility
+• Check for finisher or stapler units that may conflict
+
+XEROX WORKCENTRE SERIES:
+• Use Xerox Print Experience app for configuration
+• Enable duplex in Print Features → 2-Sided Print
+• Verify PostScript vs PCL driver compatibility
+• Check for manual duplex mode in constraints
+
+BROTHER MFC SERIES:
+• Use Brother iPrint&Scan for mobile configuration
+• Enable duplex in printer properties → Advanced tab
+• For wireless models: Update firmware for duplex support
+• Check paper tray capacity for duplex jobs
+
+═══════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON ISSUES & SOLUTIONS:
+
+Issue: "Duplex option greyed out in print dialog"
+Solution:
+- Check driver settings: Device Settings → Duplex Unit → Installed
+- Update to manufacturer's latest driver
+- Verify duplex unit is physically present and connected
+
+Issue: "Pages print on same side despite duplex selection"
+Solution:
+- Test duplex from printer control panel first
+- Check paper weight (too heavy paper may disable duplex)
+- Verify correct duplex orientation (long vs short edge)
+
+Issue: "Paper jams during duplex printing"
+Solution:
+- Clean duplex unit paper path
+- Use recommended paper weight (20lb/75gsm typically)
+- Check for worn duplex unit rollers or guides
+- Reduce paper tray capacity to prevent overfeeding
+
+Issue: "Duplex works for some users but not others"
+Solution:
+- Compare working vs non-working driver configurations
+- Check Windows user permissions for printer settings
+- Ensure consistent driver version across all workstations
+
+Issue: "Manual duplex prompts even with automatic duplex unit"
+Solution:
+- Verify duplex unit is detected in printer properties
+- Check for driver conflicts (remove old printer instances)
+- Reset printer network settings and reconfigure
+
+═══════════════════════════════════════════════════════════════════════════════
+ESCALATION CRITERIA
+═══════════════════════════════════════════════════════════════════════════════
+
+ESCALATE TO L2 IF:
+- Hardware duplex unit appears faulty or damaged
+- Multiple network printers affected simultaneously
+- Driver updates cause system-wide printing issues
+- Executive/critical department printer problems
+
+ESCALATE TO L3/VENDOR IF:
+- Duplex unit requires physical replacement
+- Firmware update causes persistent duplex failure
+- Network infrastructure changes affect printer communication
+- Warranty/service contract issues with printer hardware
+
+═══════════════════════════════════════════════════════════════════════════════
+PREVENTION & MAINTENANCE
+═══════════════════════════════════════════════════════════════════════════════
+
+PROACTIVE MEASURES:
+• Monthly driver update checks for network printers
+• Quarterly duplex unit cleaning (compressed air)
+• Document known working driver versions
+• Train users on proper paper loading for duplex jobs
+• Monitor printer logs for duplex-related errors
+
+MAINTENANCE SCHEDULE:
+• Weekly: Check duplex test prints from main printers
+• Monthly: Update printer drivers and firmware
+• Quarterly: Physical cleaning of duplex mechanisms
+• Annually: Review printer duplex usage statistics
+
+TEMPLATE RESPONSES:
+"I'll help you configure duplex printing. First, let me verify your printer model 
+and check if the duplex unit is properly recognized by your system. This typically 
+involves updating the driver settings to detect the duplex accessory."
+
+Contact Information:
+- Printer Support: printers@company.com
+- Vendor Support: [Manufacturer specific contact]
+- Supplies/Maintenance: facilities@company.com

@@ -1,0 +1,282 @@
+PROTOCOL: Access Request - Grant Reports Module with Cost View Permission
+Version: 1.3 | Last Updated: September 2025 | Category: Access Management
+
+═══════════════════════════════════════════════════════════════════════════════
+OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+This protocol covers the process for granting user access to the Reports module
+with cost view permissions, including security verification, approval workflows,
+role-based access controls, and compliance requirements for financial data access.
+
+═══════════════════════════════════════════════════════════════════════════════
+SCOPE & TRIGGERS
+═══════════════════════════════════════════════════════════════════════════════
+
+APPLIES TO:
+- New user access requests for reporting functionality
+- Existing users requesting cost view privileges
+- Department managers requesting team access
+- Temporary access for projects or audits
+
+TICKET INDICATORS:
+- Keywords: "reports access", "cost view", "financial reports", "analytics permission"
+- Mentions of: dashboard, BI, business intelligence, cost analysis, budget reports
+- References to: role change, promotion, new responsibilities, project needs
+- Systems: Power BI, Tableau, SAP, Oracle, custom reporting platform
+
+═══════════════════════════════════════════════════════════════════════════════
+STEP-BY-STEP PROCEDURE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. REQUEST VALIDATION (Critical Security Step)
+   ├─ Verify requester identity and employment status
+   ├─ Confirm business justification for cost view access
+   ├─ Check if request is for user's own access or subordinate
+   ├─ Validate department and reporting hierarchy
+   └─ Review any existing access to financial systems
+
+2. SECURITY & COMPLIANCE ASSESSMENT
+   ├─ Background Check Requirements:
+   │  • Verify user has passed financial data background screening
+   │  • Check for any compliance violations in past 12 months
+   │  • Confirm completion of data privacy training (required)
+   │  • Validate digital signature/authentication setup
+   │
+   ├─ Access Classification:
+   │  • Level 1: Department cost view only (most common)
+   │  • Level 2: Cross-department cost analysis  
+   │  • Level 3: Company-wide financial reporting
+   │  • Level 4: Executive dashboard with P&L access
+   │
+   └─ Compliance Requirements:
+      • SOX compliance verification (if applicable)
+      • GDPR/data protection acknowledgment
+      • Non-disclosure agreement on file
+      • Audit trail documentation
+
+3. APPROVAL WORKFLOW PROCESS
+   ├─ Standard Approval Chain:
+   │  • Direct Manager approval (required for Level 1-2)
+   │  • Department Head approval (required for Level 3)
+   │  • CFO/Finance Director approval (required for Level 4)
+   │  • IT Security sign-off (required for all levels)
+   │
+   ├─ Approval Documentation:
+   │  • Email approval with specific access level mentioned
+   │  • Business justification form (Form ACC-001)
+   │  • Temporary access: Include end date and review schedule
+   │  • Emergency access: Expedited approval with 48-hour review
+   │
+   └─ Approval Tracking:
+      • Log all approvals in access management system
+      • Set automatic review dates (quarterly for sensitive access)
+      • Document any approval exceptions or special circumstances
+
+4. TECHNICAL IMPLEMENTATION
+   ├─ Active Directory/LDAP Configuration:
+   │  • Add user to appropriate security groups:
+   │    - ReportsModule_BasicUsers (Level 1)
+   │    - ReportsModule_CostView (Level 2)
+   │    - ReportsModule_Analytics (Level 3)
+   │    - ReportsModule_Executive (Level 4)
+   │  • Verify group membership propagation (may take up to 15 minutes)
+   │
+   ├─ Application-Specific Setup:
+   │  • Power BI: Add to appropriate workspace with cost view role
+   │  • Tableau: Grant server access with financial data permissions
+   │  • Custom Systems: Update user profile with new role assignments
+   │  • Database: Grant SELECT permissions on cost-related tables
+   │
+   ├─ Multi-Factor Authentication:
+   │  • Verify MFA is enabled for all financial data access
+   │  • Test authentication with user before granting access
+   │  • Document MFA method (app, SMS, hardware token)
+   │
+   └─ Access Testing:
+      • Login as user to verify access works correctly
+      • Test specific cost view functionality
+      • Confirm appropriate data filtering by department/role
+      • Verify no unauthorized data exposure
+
+5. USER ONBOARDING & TRAINING
+   ├─ Access Notification:
+   │  • Send welcome email with access details
+   │  • Include links to training materials and documentation
+   │  • Provide contact information for support
+   │  • Set expectations for responsible use
+   │
+   ├─ Mandatory Training Components:
+   │  • Reports module navigation and basic functionality
+   │  • Cost data interpretation and limitations
+   │  • Data confidentiality and sharing policies
+   │  • Proper export/download procedures
+   │  • Incident reporting for suspicious activity
+   │
+   └─ Documentation Handover:
+      • User guide for reports module
+      • Cost view feature documentation
+      • Data glossary and definitions
+      • Emergency contact procedures
+
+6. ACCESS MONITORING & COMPLIANCE
+   ├─ Initial Monitoring (First 30 days):
+   │  • Review user activity logs weekly
+   │  • Monitor for unusual access patterns
+   │  • Verify user follows data handling policies
+   │  • Check for any security policy violations
+   │
+   ├─ Ongoing Monitoring:
+   │  • Quarterly access reviews with user's manager
+   │  • Annual recertification of business need
+   │  • Automated alerts for suspicious activity
+   │  • Regular audit trail reviews
+   │
+   └─ Access Lifecycle Management:
+      • Set calendar reminders for access reviews
+      • Monitor for role changes or departures
+      • Automatic access suspension for inactive accounts
+      • Proper access removal procedures
+
+═══════════════════════════════════════════════════════════════════════════════
+ACCESS LEVEL DEFINITIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+LEVEL 1 - DEPARTMENT COST VIEW:
+• Own department budget vs actual reports
+• Team headcount and basic cost metrics
+• Project cost tracking for assigned projects
+• Standard operational dashboards
+
+LEVEL 2 - CROSS-DEPARTMENT ANALYTICS:
+• Multi-department cost comparisons
+• Resource allocation analysis
+• Vendor/supplier cost reports
+• Advanced filtering and drill-down capabilities
+
+LEVEL 3 - COMPANY-WIDE REPORTING:
+• Complete organizational cost structure
+• Executive summary dashboards
+• Trend analysis and forecasting
+• Custom report creation capabilities
+
+LEVEL 4 - EXECUTIVE FINANCIAL ACCESS:
+• Full P&L and financial statements
+• Board-level reporting and analytics
+• Merger/acquisition analysis tools
+• Regulatory and compliance reporting
+
+═══════════════════════════════════════════════════════════════════════════════
+REQUIRED FORMS & DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════════════
+
+MANDATORY FORMS:
+□ Access Request Form (ACC-001)
+□ Business Justification Form (ACC-002)
+□ Data Confidentiality Agreement (LEG-001)
+□ Manager Approval Form (HR-003)
+□ Security Clearance Verification (SEC-001)
+
+SUPPORTING DOCUMENTATION:
+□ Current organizational chart showing reporting structure
+□ Job description highlighting reporting responsibilities
+□ Training completion certificates
+□ Background check results (if applicable)
+□ Previous access reviews and approvals
+
+═══════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON ISSUES & SOLUTIONS:
+
+Issue: "User can access reports but not see cost data"
+Solution:
+- Verify user is in correct security group for cost view
+- Check database permissions on financial tables
+- Test with a known working account to isolate issue
+- Review application role assignments
+
+Issue: "Access granted but reports show 'No Data Available'"
+Solution:
+- Confirm user's department assignment in HR system
+- Verify data filtering rules are correctly applied
+- Check if user needs additional permissions for specific cost centers
+- Test with sample cost data to verify connectivity
+
+Issue: "Manager approval delay holding up urgent access"
+Solution:
+- Escalate to department head for approval
+- Document business urgency and impact
+- Consider temporary read-only access pending full approval
+- Set up automatic reminder for delayed approvals
+
+Issue: "User sees unauthorized financial data"
+Solution:
+- Immediately suspend access and investigate
+- Review security group memberships for over-permissioned roles
+- Check data filtering configuration
+- Document incident and report to security team
+
+Issue: "Reports module slow or timing out for user"
+Solution:
+- Check user's network connectivity and browser
+- Verify database query performance for large datasets
+- Consider limiting initial data range for new users
+- Review server resource utilization during peak times
+
+═══════════════════════════════════════════════════════════════════════════════
+ESCALATION CRITERIA
+═══════════════════════════════════════════════════════════════════════════════
+
+ESCALATE TO L2 IF:
+- Executive-level access requests (Level 4)
+- Cross-department access spanning multiple business units
+- Requests involving merger/acquisition data
+- Compliance or audit-related urgent access needs
+
+ESCALATE TO L3/SECURITY IF:
+- Suspicious access patterns detected
+- Potential data breach or unauthorized access
+- Requests from terminated or inactive employees
+- Access needed for external auditors or consultants
+
+ESCALATE TO LEGAL/COMPLIANCE IF:
+- Regulatory compliance questions
+- Access requests involving litigation holds
+- International data transfer requirements
+- Conflicts with data retention policies
+
+═══════════════════════════════════════════════════════════════════════════════
+SECURITY BEST PRACTICES
+═══════════════════════════════════════════════════════════════════════════════
+
+ACCESS PRINCIPLES:
+• Principle of least privilege - grant minimum required access
+• Regular access reviews and recertification
+• Time-limited access for project-based needs
+• Comprehensive audit logging for all financial data access
+
+SECURITY CONTROLS:
+• Multi-factor authentication mandatory for all financial access
+• IP address restrictions for sensitive reporting systems
+• Session timeouts for inactive users (15 minutes maximum)
+• Encryption of all cost data in transit and at rest
+
+MONITORING REQUIREMENTS:
+• Real-time alerts for access outside business hours
+• Quarterly reviews of high-privilege access
+• Annual penetration testing of reporting systems
+• Regular vulnerability assessments
+
+TEMPLATE RESPONSES:
+"Your request for Reports module access with cost view has been received. 
+I need to verify the approval from your manager and ensure you've completed 
+the required data confidentiality training. The process typically takes 2-3 
+business days once all approvals are in place."
+
+Contact Information:
+- Access Management: access@company.com
+- Security Team: security@company.com
+- Compliance: compliance@company.com
+- Reports Support: reports@company.com

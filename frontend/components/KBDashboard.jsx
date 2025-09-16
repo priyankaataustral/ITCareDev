@@ -34,6 +34,10 @@ export default function KBDashboard({ open, onClose }) {
   const [q, setQ] = useState(""); // search
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all"); // Filter by source type
+  // Upload state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   // --- Data fetchers (now use apiGet/apiPost which return parsed JSON) ---
   const refresh = useCallback(async () => {
@@ -56,6 +60,50 @@ export default function KBDashboard({ open, onClose }) {
       setLoading(false);
     }
   }, [open]);
+
+    // Upload function
+    const handleUploadProtocol = async (e) => {
+      e.preventDefault();
+      if (!uploadFile) {
+        setErr("Please select a file to upload");
+        return;
+      }
+  
+      setUploading(true);
+      setErr("");
+  
+      try {
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+  
+        const response = await fetch('/kb/protocols/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        });
+  
+        const result = await response.json();
+  
+        if (!response.ok) {
+          throw new Error(result.error || 'Upload failed');
+        }
+  
+        setShowUploadModal(false);
+        setUploadFile(null);
+        setErr("");
+        
+        // Show success message
+        alert(`Protocol "${result.filename}" uploaded successfully!`);
+        
+        // Refresh the protocols list if needed
+        await refresh();
+  
+      } catch (error) {
+        setErr(error.message);
+      } finally {
+        setUploading(false);
+      }
+    };
 
   // Fetch agent analytics when analytics tab is loaded
   useEffect(() => {
@@ -170,7 +218,7 @@ export default function KBDashboard({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal>
+    <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="bg-white dark:bg-gray-900 w-full max-w-6xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50">
@@ -181,7 +229,7 @@ export default function KBDashboard({ open, onClose }) {
           <button onClick={onClose} className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600">Close</button>
         </div>
 
-        {/* Controls */}
+        {/* Navigation Tabs */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
             {[
@@ -195,28 +243,155 @@ export default function KBDashboard({ open, onClose }) {
             ))}
           </div>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search…" className="flex-1 min-w-[120px] px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm" />
-          <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm">
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="sent_for_confirm">Sent for confirm</option>
-            <option value="confirmed_by_user">Confirmed</option>
-            <option value="published">Published</option>
-            <option value="open">Open (feedback)</option>
-            <option value="resolved">Resolved (feedback)</option>
-          </select>
-          {tab === 'articles' && (
-            <>
-              <select value={sourceFilter} onChange={(e)=>setSourceFilter(e.target.value)} className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm">
-                <option value="all">All Sources</option>
-                <option value="protocol">Protocol Docs</option>
-                <option value="ai">AI Generated</option>
-                <option value="human">Human Created</option>
-                <option value="mixed">Mixed</option>
-              </select>
-              <button onClick={loadProtocols} className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-700">
-                📄 Load Protocols
-              </button>
-              <div className="ml-4 flex items-center gap-2">
+        </div>
+
+        {/* Quick Access List */}
+        <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">📋 Quick Access</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <button 
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 dark:text-purple-400">📤</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Upload Protocol</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Add new procedure documents</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={loadProtocols}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 dark:text-green-400">📄</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Load Protocols</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Standard procedures & workflows</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setTab('articles')}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 dark:text-blue-400">✉️</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Email Issues</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Outlook, SMTP, delivery problems</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setTab('articles')}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 dark:text-purple-400">🌐</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Network Issues</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Connectivity, WiFi, VPN problems</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setTab('articles')}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600 dark:text-yellow-400">🔑</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Password Reset</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Account recovery & access issues</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setTab('articles')}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                <span className="text-red-600 dark:text-red-400">🖨️</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Setup</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Installation, drivers, troubleshooting</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setTab('articles')}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                <span className="text-indigo-600 dark:text-indigo-400">💻</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Hardware Issues</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Device setup, replacement, repairs</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={loadProtocols}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                <span className="text-emerald-600 dark:text-emerald-400">🛒</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">New PO Device</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Equipment allocation & decommission</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={loadProtocols}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                <span className="text-orange-600 dark:text-orange-400">📄</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Duplex</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Double-sided printing configuration</div>
+              </div>
+            </button>
+
+            <button 
+              onClick={loadProtocols}
+              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+            >
+              <div className="flex-shrink-0 w-8 h-8 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
+                <span className="text-cyan-600 dark:text-cyan-400">📊</span>
+              </div>
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Reports Access</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Cost view permissions & security</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area Header */}
+        <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {tab === 'review' && '📝 Review pending solutions and drafts'}
+              {tab === 'articles' && '📚 Knowledge base articles and protocols'}
+              {tab === 'feedback' && '💬 User feedback and ratings'}
+              {tab === 'analytics' && '📊 Performance metrics and insights'}
+            </span>
+            {tab === 'articles' && (
+              <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Quick Access:</span>
                 <a 
                   href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt" 
@@ -243,9 +418,9 @@ export default function KBDashboard({ open, onClose }) {
                   🔑 Password Reset
                 </a>
               </div>
-            </>
-          )}
+            )}
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">Refresh</button>
+          </div>
         </div>
 
         {err && <div className="px-5 py-2 text-sm text-red-600">{err}</div>}
@@ -512,6 +687,65 @@ export default function KBDashboard({ open, onClose }) {
           )}
         </div>
       </div>
+
+      {/* Upload Protocol Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-[1100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Upload Protocol Document</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select .txt file
+              </label>
+              <input
+                type="file"
+                accept=".txt"
+                onChange={(e) => setUploadFile(e.target.files[0])}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-gray-100"
+              />
+            </div>
+            
+            {uploadFile && (
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+                <div className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>File:</strong> {uploadFile.name}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <strong>Size:</strong> {(uploadFile.size / 1024).toFixed(1)} KB
+                </div>
+              </div>
+            )}
+            
+            {err && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 rounded-md">
+                <div className="text-sm text-red-600 dark:text-red-400">{err}</div>
+              </div>
+            )}
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadFile(null);
+                  setErr('');
+                }}
+                disabled={uploading}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUploadProtocol}
+                disabled={!uploadFile || uploading}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {uploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

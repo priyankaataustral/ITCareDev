@@ -3512,6 +3512,97 @@ def load_kb_protocols():
 #         current_app.logger.error(f"Protocol loading failed: {e}")
 #         return jsonify({'error': f'Failed to load protocols: {str(e)}'}), 500
 
+# Upload protocol document
+@urls.route('/kb/protocols/upload', methods=['POST'])
+@require_role("L2", "L3", "MANAGER")
+def upload_protocol():
+    """Upload a new protocol document"""
+    try:
+        # Check if file is present in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Validate file type (only .txt files)
+        if not file.filename.lower().endswith('.txt'):
+            return jsonify({'error': 'Only .txt files are allowed'}), 400
+        
+        # Sanitize filename
+        import re
+        filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
+        if not filename.endswith('.txt'):
+            filename += '.txt'
+        
+        # Read file content
+        content = file.read().decode('utf-8')
+        
+        # Validate content (basic checks)
+        if len(content.strip()) < 50:
+            return jsonify({'error': 'File content too short (minimum 50 characters)'}), 400
+        
+        # For development: save to frontend/public/kb_protocols
+        try:
+            protocols_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'public', 'kb_protocols')
+            os.makedirs(protocols_dir, exist_ok=True)
+            file_path = os.path.join(protocols_dir, filename)
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+                
+            current_app.logger.info(f"Protocol file uploaded: {filename}")
+            
+        except Exception as e:
+            # Fallback: store in database if file system not writable
+            current_app.logger.warning(f"Could not save to file system: {e}")
+            # In production, you might save to cloud storage or database here
+        
+        # Add to kb_loader's known files list
+        try:
+            from kb_loader import get_kb_loader
+            loader = get_kb_loader()
+            loader.add_protocol_file(filename)
+        except Exception as e:
+            current_app.logger.warning(f"Could not add to loader: {e}")
+        
+        return jsonify({
+            'message': 'Protocol uploaded successfully',
+            'filename': filename,
+            'size': len(content),
+            'location': 'kb_protocols/' + filename
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Protocol upload failed: {e}")
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+# List uploaded protocols
+@urls.route('/kb/protocols/list', methods=['GET'])
+@require_role("L1", "L2", "L3", "MANAGER")
+def list_protocols():
+    """List all available protocol files"""
+    try:
+        from kb_loader import get_kb_loader
+        loader = get_kb_loader()
+        
+        protocols = []
+        for filename in loader.known_protocol_files:
+            protocols.append({
+                'filename': filename,
+                'url': f"{loader.protocols_base_url}/{filename}",
+                'name': filename.replace('_', ' ').replace('.txt', '').title()
+            })
+        
+        return jsonify({'protocols': protocols}), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to list protocols: {e}")
+        return jsonify({'error': f'Failed to list protocols: {str(e)}'}), 500
+
+        
+
 # Search KB articles (for internal use by OpenAI)
 @urls.route('/kb/search', methods=['POST'])
 @require_role("L1", "L2", "L3", "MANAGER")
@@ -3917,28 +4008,71 @@ def get_kb_analytics():
         
         total_solutions = db.session.query(func.count(Solution.id)).scalar() or 0
         
-        # If no real data, return demo data
-        if draft_kb == 0 and published_kb == 0:
-            return jsonify({
-                'num_solutions': 15,
-                'num_articles': 8,
-                'num_feedback': 23,
-                'solutions_awaiting_confirm': 3,
-                'draft_kb_articles': 2,
-                'published_kb_articles': 6,
-                'open_feedback': 4,
-                'avg_rating_last_50': 4.2,
-                'total_confirmations': 18,
-                'confirm_rate': 0.78,
-                'avg_time_to_confirm_minutes': 45.5,
-                'activity_7d': {
-                    (datetime.now().date() - timedelta(days=i)).isoformat(): {
-                        "proposed": max(0, 3 - i),
-                        "confirmed": max(0, 2 - i//2), 
-                        "rejected": max(0, 1 - i//3)
-                    } for i in range(7)
-                }
-            })
+        # Calculate real metrics from database
+        solutions_awaiting = db.session.query(func.count(Solution.id)).filter(
+            Solution.status.in_(['sent_for_confirm', 'draft'])
+        ).scalar() or 0
+        
+        # Unified feedback count (KB + Tickets)
+        kb_feedback_count = db.session.query(func.count(KBFeedback.id)).filter(
+            KBFeedback.created_at >= since
+        ).scalar() or 0
+        
+        ticket_feedback_count = db.session.query(func.count(TicketFeedback.id)).scalar() or 0
+        total_feedback = kb_feedback_count + ticket_feedback_count
+        
+        # Recent confirmations
+        recent_confirmations = db.session.query(func.count(Solution.id)).filter(
+            Solution.confirmed_at >= since,
+            Solution.status == 'confirmed'
+        ).scalar() or 0
+        
+        # Confirmation rate
+        total_sent = db.session.query(func.count(Solution.id)).filter(
+            Solution.sent_for_confirmation_at >= since
+        ).scalar() or 0
+        confirm_rate = (recent_confirmations / total_sent) if total_sent > 0 else 0
+        
+        # Average rating from both sources
+        kb_avg = db.session.query(func.avg(KBFeedback.rating)).filter(
+            KBFeedback.rating.isnot(None)
+        ).scalar() or 0
+        
+        ticket_avg = db.session.query(func.avg(TicketFeedback.rating)).filter(
+            TicketFeedback.rating.isnot(None)
+        ).scalar() or 0
+        
+        # Weighted average based on count
+        avg_rating = (kb_avg + ticket_avg) / 2 if (kb_avg and ticket_avg) else (kb_avg or ticket_avg or 0)
+        
+        # Daily activity for last 7 days
+        activity_7d = {}
+        for i in range(7):
+            day_date = datetime.now().date() - timedelta(days=i)
+            day_start = datetime.combine(day_date, datetime.min.time())
+            day_end = day_start + timedelta(days=1)
+            
+            day_confirmations = db.session.query(func.count(Solution.id)).filter(
+                Solution.confirmed_at >= day_start,
+                Solution.confirmed_at < day_end
+            ).scalar() or 0
+            
+            day_proposed = db.session.query(func.count(Solution.id)).filter(
+                Solution.sent_for_confirmation_at >= day_start,
+                Solution.sent_for_confirmation_at < day_end
+            ).scalar() or 0
+            
+            day_rejected = db.session.query(func.count(Solution.id)).filter(
+                Solution.updated_at >= day_start,
+                Solution.updated_at < day_end,
+                Solution.status == 'rejected'
+            ).scalar() or 0
+            
+            activity_7d[day_date.isoformat()] = {
+                "proposed": day_proposed,
+                "confirmed": day_confirmations,
+                "rejected": day_rejected
+            }
         
         # Continue with real analytics if data exists...
         total_feedback = db.session.query(func.count(KBFeedback.id)).scalar() or 0
@@ -3949,21 +4083,15 @@ def get_kb_analytics():
             'num_solutions': total_solutions,
             'num_articles': draft_kb + published_kb,
             'num_feedback': total_feedback,
-            'solutions_awaiting_confirm': awaiting,
+            'solutions_awaiting_confirm': solutions_awaiting,
             'draft_kb_articles': draft_kb,
             'published_kb_articles': published_kb,
             'open_feedback': total_feedback,
-            'avg_rating_last_50': 4.1,
-            'total_confirmations': max(total_feedback // 2, 5),
-            'confirm_rate': 0.75,
-            'avg_time_to_confirm_minutes': 35.2,
-            'activity_7d': {
-                (datetime.now().date() - timedelta(days=i)).isoformat(): {
-                    "proposed": max(0, 2 - i//2),
-                    "confirmed": max(0, 1 - i//3),
-                    "rejected": max(0, i//4)
-                } for i in range(7)
-            }
+            'avg_rating_last_50': round(avg_rating, 1),
+            'total_confirmations': recent_confirmations,
+            'confirm_rate': round(confirm_rate, 2),
+            'avg_time_to_confirm_minutes': 0,  # Would need timestamp analysis
+            'activity_7d': activity_7d
         })
         
     except Exception as e:
@@ -4054,6 +4182,169 @@ def get_agents():
         } for agent in agents]
         return jsonify({"agents": result})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/agents/management", methods=["GET"])
+@require_role("L2", "L3", "MANAGER")
+def get_agents_management():
+    """Get detailed agent list for management page with statistics"""
+    try:
+        # Get all agents with department info
+        agents = db.session.query(Agent, Department.name.label('department_name')).outerjoin(
+            Department, Agent.department_id == Department.id
+        ).all()
+        
+        result = []
+        for agent, dept_name in agents:
+            # Get agent statistics
+            total_tickets = db.session.query(Ticket).filter(Ticket.assigned_to == agent.id).count()
+            resolved_tickets = db.session.query(Ticket).filter(
+                Ticket.resolved_by == agent.id
+            ).count()
+            
+            # Get recent activity (last 30 days)
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            recent_tickets = db.session.query(Ticket).filter(
+                Ticket.assigned_to == agent.id,
+                Ticket.updated_at >= thirty_days_ago
+            ).count()
+            
+            result.append({
+                "id": agent.id,
+                "name": agent.name,
+                "email": agent.email,
+                "role": agent.role,
+                "department_id": agent.department_id,
+                "department_name": dept_name or "Unassigned",
+                "stats": {
+                    "total_tickets": total_tickets,
+                    "resolved_tickets": resolved_tickets,
+                    "recent_activity": recent_tickets,
+                    "resolution_rate": round((resolved_tickets / total_tickets * 100) if total_tickets > 0 else 0, 1)
+                }
+            })
+        
+        return jsonify({"agents": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/agents", methods=["POST"])
+@require_role("L3", "MANAGER")
+def create_agent():
+    """Create a new agent"""
+    try:
+        data = request.json or {}
+        
+        # Validate required fields
+        required_fields = ["name", "email", "password", "role"]
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+        
+        # Check if email already exists
+        existing_agent = Agent.query.filter(Agent.email == data["email"]).first()
+        if existing_agent:
+            return jsonify({"error": "Email already exists"}), 400
+        
+        # Hash password (you should use proper password hashing in production)
+        from werkzeug.security import generate_password_hash
+        hashed_password = generate_password_hash(data["password"])
+        
+        # Create new agent
+        new_agent = Agent(
+            name=data["name"],
+            email=data["email"],
+            password=hashed_password,
+            role=data["role"],
+            department_id=data.get("department_id")
+        )
+        
+        db.session.add(new_agent)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Agent created successfully",
+            "agent": {
+                "id": new_agent.id,
+                "name": new_agent.name,
+                "email": new_agent.email,
+                "role": new_agent.role,
+                "department_id": new_agent.department_id
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/agents/<int:agent_id>", methods=["PUT"])
+@require_role("L3", "MANAGER")
+def update_agent(agent_id):
+    """Update an existing agent"""
+    try:
+        agent = db.session.get(Agent, agent_id)
+        if not agent:
+            return jsonify({"error": "Agent not found"}), 404
+        
+        data = request.json or {}
+        
+        # Update fields if provided
+        if "name" in data:
+            agent.name = data["name"]
+        if "email" in data:
+            # Check if email is unique (excluding current agent)
+            existing = Agent.query.filter(Agent.email == data["email"], Agent.id != agent_id).first()
+            if existing:
+                return jsonify({"error": "Email already exists"}), 400
+            agent.email = data["email"]
+        if "role" in data:
+            agent.role = data["role"]
+        if "department_id" in data:
+            agent.department_id = data["department_id"]
+        if "password" in data and data["password"]:
+            from werkzeug.security import generate_password_hash
+            agent.password = generate_password_hash(data["password"])
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Agent updated successfully",
+            "agent": {
+                "id": agent.id,
+                "name": agent.name,
+                "email": agent.email,
+                "role": agent.role,
+                "department_id": agent.department_id
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@urls.route("/agents/<int:agent_id>", methods=["DELETE"])
+@require_role("MANAGER")
+def delete_agent(agent_id):
+    """Delete an agent (only managers can do this)"""
+    try:
+        agent = db.session.get(Agent, agent_id)
+        if not agent:
+            return jsonify({"error": "Agent not found"}), 404
+        
+        # Check if agent has assigned tickets
+        assigned_tickets = db.session.query(Ticket).filter(Ticket.assigned_to == agent_id).count()
+        if assigned_tickets > 0:
+            return jsonify({
+                "error": f"Cannot delete agent with {assigned_tickets} assigned tickets. Please reassign tickets first."
+            }), 400
+        
+        db.session.delete(agent)
+        db.session.commit()
+        
+        return jsonify({"message": "Agent deleted successfully"})
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 

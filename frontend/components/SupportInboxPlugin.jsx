@@ -7,6 +7,7 @@ import LoadingBot from './LoadingBot';
 import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
 import KBDashboard from './KBDashboard';
+import AgentsPage from '../pages/agents';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
 import { apiGet } from '../lib/apiClient'; // only import what we use
@@ -20,6 +21,7 @@ export default function SupportInboxPlugin() {
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showAgents, setShowAgents] = useState(false);
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
   const { agent } = useAuth();
 
@@ -121,6 +123,18 @@ export default function SupportInboxPlugin() {
             <i className="bi bi-graph-up mr-2"></i>
             Analytics
           </button>
+          
+          {/* Agents Management - Only for L2, L3, MANAGER */}
+          {agent && ['L2', 'L3', 'MANAGER'].includes(agent.role) && (
+            <button
+              onClick={() => setShowAgents(true)}
+              className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+              aria-label="Manage Agents"
+            >
+              <i className="bi bi-people mr-2"></i>
+              Agents
+            </button>
+          )}
           <button
             onClick={() => setDark((d) => !d)}
             className="bg-white text-black dark:bg-black dark:text-white p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -151,6 +165,33 @@ export default function SupportInboxPlugin() {
           open={showAnalytics} 
           onClose={() => setShowAnalytics(false)} 
         />
+      )}
+
+      {/* Agents Management Modal */}
+      {showAgents && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-2xl w-full h-full max-w-none max-h-none m-0 overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <i className="bi bi-people text-purple-600"></i>
+                Agent Management
+              </h2>
+              <button
+                onClick={() => setShowAgents(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                aria-label="Close agents management"
+              >
+                <i className="bi bi-x-lg text-xl"></i>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-1 overflow-hidden">
+              <AgentsPage />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
