@@ -3,18 +3,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function GroupedTickets({ threads, selectedId, onSelect }) {
+export default function GroupedTickets({ threads = [], tickets = [], selectedId, onSelect }) {
+  // Support both 'threads' and 'tickets' props for backward compatibility
+  const actualThreads = threads.length > 0 ? threads : tickets;
   // For demo: treat all except selected as unread
   const getUnread = t => selectedId !== t.id;
   const [openTeam, setOpenTeam] = useState(null);
   const [openCat, setOpenCat]   = useState({});
 
   // Group threads by team → category
-  const grouped = threads.reduce((acc, t) => {
-    acc[t.assigned_team] = acc[t.assigned_team] || {};
-    acc[t.assigned_team][t.predicted_category] =
-      acc[t.assigned_team][t.predicted_category] || [];
-    acc[t.assigned_team][t.predicted_category].push(t);
+  const grouped = actualThreads.reduce((acc, t) => {
+    // Use available fields or fallback to defaults
+    const team = t.assigned_team || t.owner || 'Unassigned';
+    const category = t.predicted_category || t.category || 'General';
+    
+    acc[team] = acc[team] || {};
+    acc[team][category] = acc[team][category] || [];
+    acc[team][category].push(t);
     return acc;
   }, {});
 
@@ -102,7 +107,7 @@ export default function GroupedTickets({ threads, selectedId, onSelect }) {
                                 aria-current={selectedId === t.id ? 'true' : undefined}
                               >
                                 <span className="font-mono text-xs text-gray-500 dark:text-gray-400 mr-2">#{t.id}</span>
-                                <span>{t.text.slice(0, 32)}…</span>
+                                <span>{(t.text || t.subject || 'No subject').slice(0, 32)}…</span>
                               </button>
                             </li>
                           ))}

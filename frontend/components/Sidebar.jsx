@@ -128,7 +128,7 @@ export default function Sidebar({
             <GroupedTickets
               onSelect={onSelect}
               selectedId={selectedId}
-              tickets={threads}
+              threads={threads}
               departments={departments}
             />
           ) : (
