@@ -338,13 +338,25 @@ export default function ThreadList({
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   Last activity: {dayjs(updatedTs || t.lastActivity).fromNow()}
                 </span>
-                <div className="flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${
-                    t.status === 'open' ? 'bg-green-400' : 
-                    t.status === 'escalated' ? 'bg-red-400' : 
-                    'bg-gray-400'
-                  }`}></span>
-                  <span className="text-xs text-gray-500 capitalize">{t.status}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                    t.archived ? 'bg-gray-500 text-white' :
+                    t.status === 'open' ? 'bg-green-500 text-white' :
+                    t.status === 'escalated' ? 'bg-orange-500 text-white' :
+                    t.status === 'closed' ? 'bg-red-500 text-white' :
+                    t.status === 'resolved' ? 'bg-blue-500 text-white' :
+                    'bg-gray-400 text-white'
+                  }`}>
+                    <span>{
+                      t.archived ? '📦' :
+                      t.status === 'open' ? '🟢' :
+                      t.status === 'escalated' ? '🟠' :
+                      t.status === 'closed' ? '🔴' :
+                      t.status === 'resolved' ? '🔵' :
+                      '❓'
+                    }</span>
+                    <span>{t.archived ? 'Archived' : t.status}</span>
+                  </span>
                 </div>
               </div>
             </div>

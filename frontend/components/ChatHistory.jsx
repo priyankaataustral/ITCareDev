@@ -46,6 +46,11 @@ function renderListOrText(text, mentionRenderer) {
     return out;
   };
 
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [closeReason, setCloseReason] = useState('');
+  const [archiveReason, setArchiveReason] = useState('');
+
   // Ordered list
   const ordered = [...text.matchAll(
     /(?:^|\s)(\d+[\.)])\s+([\s\S]*?)(?=(?:\s+\d+[\.)]\s)|$)/g
@@ -650,7 +655,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   const ADJ_WORDS = '(?:short|brief|concise|detailed|formal|informal|friendly|professional|polite|casual|clear|simple|comprehensive|thorough|succinct)';
   const ADJ_BLOCK = `(?:${ADJ_WORDS}(?:\\s+${ADJ_WORDS})*)?`; // zero or more adjectives
-  // For “show editor empty”
+  // For "show editor empty"
   const DRAFT_EMAIL_OPEN_EMPTY_RE =
     /\b(?:open|show)\s+(?:the\s+)?(?:draft\s+)?email\s+editor\b|\bcompose\s+(?:a\s+)?new\s+email\s+(?:from\s+scratch|without\s+solution)\b/i;
 
@@ -745,7 +750,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
     }
   } catch (e) { console.warn('[getConfirmLinks] confirm-token error:', e); }
 
-  // 3) Dev fallback (lets you SEE links even if you’re logged out)
+  // 3) Dev fallback (lets you SEE links even if you're logged out)
   const origin = (typeof window !== 'undefined' && window.location?.origin);
   const links = {
     confirm: `${origin}/confirm?thread=${encodeURIComponent(tid)}&a=confirm&demo=1`,
@@ -771,12 +776,12 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   Support Team`;
     }
     const summary = ticket?.text
-      ? `I’m following up on your request: "${ticket.text}".`
-      : `I’m following up on your request.`;
+      ? `I'm following up on your request: "${ticket.text}".`
+      : `I'm following up on your request.`;
     return `${greeting}
 
   ${summary}
-  Here’s a quick update: I'm preparing the next steps and will share the final fix shortly.
+  Here's a quick update: I'm preparing the next steps and will share the final fix shortly.
 
   Best regards,
   Support Team`;
@@ -840,7 +845,7 @@ const draftFromBackendOrBuild = async (solutionLike) => {
     }
   } catch {}
 
-  // Backend didn’t give a draft — return a plain, link-free email
+  // Backend didn't give a draft — return a plain, link-free email
   return buildEmailFromAnyText(candidate);
 };
 
@@ -1675,6 +1680,8 @@ const openDraftEditor = (prefill) => {
     }
   };
 
+ 
+
   // Escalate / Close (with downloadable report) - Legacy function for non-popup escalations
   const handleAction = async action => {
     setActionLoading(true);
@@ -1688,39 +1695,41 @@ const openDraftEditor = (prefill) => {
       
       // Keep existing logic for close action
       if (action === 'close') {
-        const data = await apiPost(`/threads/${tid}/close`, { notify: notifyUser });
-        setTicket(t => ({ ...t, status: data.status }));
-        setMessages(prev => [
-          ...prev,
-          {
-            id: `temp-${Date.now()}-close`,
-            sender: 'bot',
-            content: `✅ Ticket closed.${notifyUser ? ' (notification sent)' : ' (no notification)'}`,
-            timestamp: new Date().toISOString()
-          }
-        ]);
-        
-        // Refresh timeline and mentions
-        setTimelineRefresh(x => x + 1);
-        window.dispatchEvent(new CustomEvent('refreshMentions'));
-      }
-
+        const data = await apiPost(`/threads/${tid}/close`, { 
+                notify: notifyUser,
+                reason: closeReason 
+              });
+              setTicket(t => ({ ...t, status: data.status }));
+              setMessages(prev => [
+                ...prev,
+                {
+                  id: `temp-${Date.now()}-close`,
+                  sender: 'bot',
+                  content: `✅ Ticket closed. Reason: ${data.reason || 'No reason provided'}${notifyUser ? ' (notification sent)' : ' (no notification)'}`,
+                  timestamp: new Date().toISOString()
+                }
+              ]);
+              
+              // Refresh timeline and mentions
+              setTimelineRefresh(x => x + 1);
+              window.dispatchEvent(new CustomEvent('refreshMentions'));
+            }
       // Archive action
       if (action === 'archive') {
-        const data = await apiPost(`/threads/${tid}/archive`, {});
-        setTicket(t => ({ ...t, archived: data.archived }));
-        setMessages(prev => [
+          const data = await apiPost(`/threads/${tid}/archive`, { reason: archiveReason });
+          setTicket(t => ({ ...t, archived: data.archived }));
+          setMessages(prev => [
           ...prev,
-          {
-            id: `temp-${Date.now()}-archive`,
-            sender: 'bot',
-            content: data.message?.content || '📦 Ticket archived.',
-            timestamp: data.message?.timestamp || new Date().toISOString()
-          }
-        ]);
-        
-        // Refresh timeline
-        setTimelineRefresh(x => x + 1);
+            {
+              id: `temp-${Date.now()}-archive`,
+              sender: 'bot',
+              content: `📦 Ticket archived. Reason: ${data.reason || 'No reason provided'}`,
+              timestamp: data.message?.timestamp || new Date().toISOString()
+            }
+          ]);
+              
+            // Refresh timeline
+            setTimelineRefresh(x => x + 1);
       }
 
       // Unarchive action
@@ -1744,6 +1753,36 @@ const openDraftEditor = (prefill) => {
       setActionError('Failed to update ticket.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleCloseConfirm = async () => {
+    if (!closeReason.trim()) {
+      alert('Please provide a reason for closing this ticket');
+      return;
+    }
+    
+    try {
+      await handleAction('close');
+      setShowCloseConfirm(false);
+      setCloseReason('');
+    } catch (error) {
+      console.error('Failed to close ticket:', error);
+    }
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveReason.trim()) {
+      alert('Please provide a reason for archiving this ticket');
+      return;
+    }
+    
+    try {
+      await handleAction('archive');
+      setShowArchiveConfirm(false);
+      setArchiveReason('');
+    } catch (error) {
+      console.error('Failed to archive ticket:', error);
     }
   };
 
@@ -1846,19 +1885,21 @@ const openDraftEditor = (prefill) => {
           </Gate>
 
           {/* Close: MANAGER */}
-          <Gate roles={["MANAGER"]}>
-            <button
-              onClick={() => handleAction('close')}
-              disabled={actionLoading}
-              className="flex items-center gap-1 px-3 py-1 bg-gray-700 text-white rounded-full hover:bg-gray-900 transition disabled:opacity-50 text-sm"
-            >🚫 Close</button>
+          <Gate roles={["L2", "L3", "MANAGER"]}>
+            {(ticket?.status === 'open' || ticket?.status === 'escalated') && (
+              <button
+                onClick={() => setShowCloseConfirm(true)}
+                disabled={actionLoading}
+                className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition disabled:opacity-50 text-sm"
+              >🚫 Close</button>
+            )}
           </Gate>
 
           {/* Archive/Unarchive: L2, L3, MANAGER only for closed tickets */}
           <Gate roles={["L2", "L3", "MANAGER"]}>
           {(ticket?.status === 'closed' || ticket?.status === 'resolved') && !ticket?.archived && (
               <button
-                onClick={() => handleAction('archive')}
+                onClick={() => setShowArchiveConfirm(true)}
                 disabled={actionLoading}
                 className="flex items-center gap-1 px-3 py-1 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-50 text-sm"
               >📦 Archive</button>
@@ -2167,6 +2208,114 @@ const openDraftEditor = (prefill) => {
         onEscalate={handleEscalateWithForm}
         ticketId={tid}
       />
+
+      {/* Close Confirmation Modal */}
+      {showCloseConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                <span className="text-red-600 dark:text-red-400 text-xl">🚫</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Close Ticket
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  This will mark the ticket as closed
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason for closing *
+              </label>
+              <textarea
+                value={closeReason}
+                onChange={(e) => setCloseReason(e.target.value)}
+                placeholder="e.g., Issue resolved, duplicate ticket, invalid request..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-700 dark:text-white"
+                rows={3}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowCloseConfirm(false);
+                  setCloseReason('');
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCloseConfirm}
+                disabled={actionLoading || !closeReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? 'Closing...' : 'Close Ticket'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Confirmation Modal */}
+      {showArchiveConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                <span className="text-purple-600 dark:text-purple-400 text-xl">📦</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Archive Ticket
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  This will move the ticket to archived status
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason for archiving *
+              </label>
+              <textarea
+                value={archiveReason}
+                onChange={(e) => setArchiveReason(e.target.value)}
+                placeholder="e.g., Case closed, no further action needed, historical reference..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                rows={3}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowArchiveConfirm(false);
+                  setArchiveReason('');
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleArchiveConfirm}
+                disabled={actionLoading || !archiveReason.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {actionLoading ? 'Archiving...' : 'Archive Ticket'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

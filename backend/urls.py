@@ -1456,16 +1456,40 @@ def close_ticket(thread_id):
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
         return jsonify(error="Ticket not found"), 404
+        # Get reason from request body
+    data = request.json or {}
+    reason = data.get('reason', 'No reason provided')
+    
+    # Validate that ticket can be closed
+    if ticket.status in ['closed', 'resolved']:
+        return jsonify(error="Ticket is already closed or resolved"), 400
+    
     now = datetime.now(timezone.utc).isoformat()
     ticket.status = 'closed'
     ticket.resolved_by = getattr(request, 'agent_ctx', {}).get('id')  # Track who closed the ticket
     ticket.updated_at = now
-    add_event(ticket.id, 'CLOSED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    
+    # Log event with reason
+    add_event(ticket.id, 'CLOSED', 
+              actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'),
+              reason=reason)
+    
     db.session.commit()
-    insert_message_with_mentions(thread_id, "assistant", "✅ Ticket has been closed.")
+    
+    # Add system message with reason
+    insert_message_with_mentions(thread_id, "assistant", f"✅ Ticket has been closed. Reason: {reason}")
     insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been closed.")
-    enqueue_status_email(thread_id, "closed", "Your ticket was closed.")
-    return jsonify(status="closed", message={"sender":"assistant","content":"✅ Ticket has been closed.","timestamp":now}), 200
+    enqueue_status_email(thread_id, "closed", f"Your ticket was closed. Reason: {reason}")
+    
+    return jsonify(
+        status="closed", 
+        reason=reason,
+        message={
+            "sender": "assistant",
+            "content": f"✅ Ticket has been closed. Reason: {reason}",
+            "timestamp": now
+        }
+    ), 200
 
 @urls.route("/threads/<thread_id>/archive", methods=["POST"])
 @require_role("L2","L3","MANAGER")
@@ -1481,21 +1505,35 @@ def archive_ticket(thread_id):
     if ticket.status not in ['closed', 'resolved']:
         return jsonify(error="Only closed or resolved tickets can be archived"), 400
         
+    # Get reason from request body
+    data = request.json or {}
+    reason = data.get('reason', 'No reason provided')
+    
+    if ticket.archived:
+        return jsonify(error="Ticket is already archived"), 400
+        
     now = datetime.now(timezone.utc).isoformat()
     ticket.archived = True
     ticket.updated_at = now
-    add_event(ticket.id, 'ARCHIVED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    
+    # Log event with reason
+    add_event(ticket.id, 'ARCHIVED', 
+              actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'),
+              reason=reason)
+    
     db.session.commit()
     
-    insert_message_with_mentions(thread_id, "assistant", "📦 Ticket has been archived.")
+    # Add system message with reason
+    insert_message_with_mentions(thread_id, "assistant", f"📦 Ticket has been archived. Reason: {reason}")
     insert_message_with_mentions(thread_id, "assistant", "[SYSTEM] Ticket has been archived.")
     
     return jsonify(
         status="archived", 
         archived=True,
+        reason=reason,
         message={
             "sender": "assistant",
-            "content": "📦 Ticket has been archived.",
+            "content": f"📦 Ticket has been archived. Reason: {reason}",
             "timestamp": now
         }
     ), 200
@@ -5020,6 +5058,73 @@ def not_fixed_feedback():
 
     log_event(t.id, "FEEDBACK", {"kind":"not_fixed_detail", "attempt_id": att.id, "reason": att.rejected_reason})
     return jsonify(ok=True)
+
+@urls.route("/threads/<thread_id>/close", methods=["POST"])
+@require_role("L2","L3","MANAGER")
+def close_ticket(thread_id):
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
+        return jsonify(error="Ticket not found"), 404
+    
+    # Get reason from request body
+    data = request.json or {}
+    reason = data.get('reason', 'No reason provided')
+    
+    # Validate that ticket can be closed
+    if ticket.status in ['closed', 'resolved']:
+        return jsonify(error="Ticket is already closed or resolved"), 400
+    
+    now = datetime.now(timezone.utc).isoformat()
+    ticket.status = 'closed'
+    ticket.resolved_by = getattr(request, 'agent_ctx', {}).get('id')
+    ticket.updated_at = now
+    
+    # Log event with reason
+    add_event(ticket.id, 'CLOSED', 
+              actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'),
+              reason=reason)
+    
+    db.session.commit()
+    
+    # Add system message with reason
+    insert_message_with_mentions(thread_id, "assistant", f"✅ Ticket closed. Reason: {reason}")
+    enqueue_status_email(thread_id, "closed", f"Your ticket was closed. Reason: {reason}")
+    
+    return jsonify(status="closed", reason=reason), 200
+
+@urls.route("/threads/<thread_id>/archive", methods=["POST"])
+@require_role("L2","L3","MANAGER")
+def archive_ticket(thread_id):
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
+        return jsonify(error="Ticket not found"), 404
+    
+    # Get reason from request body
+    data = request.json or {}
+    reason = data.get('reason', 'No reason provided')
+    
+    # Only allow archiving closed or resolved tickets
+    if ticket.status not in ['closed', 'resolved']:
+        return jsonify(error="Only closed or resolved tickets can be archived"), 400
+        
+    if ticket.archived:
+        return jsonify(error="Ticket is already archived"), 400
+        
+    now = datetime.now(timezone.utc).isoformat()
+    ticket.archived = True
+    ticket.updated_at = now
+    
+    # Log event with reason
+    add_event(ticket.id, 'ARCHIVED', 
+              actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'),
+              reason=reason)
+    
+    db.session.commit()
+    
+    # Add system message with reason
+    insert_message_with_mentions(thread_id, "assistant", f"📦 Ticket archived. Reason: {reason}")
+    
+    return jsonify(status="archived", archived=True, reason=reason), 200
 
 # # TEMPORARY - REMOVE IN FINAL DEPLOYMENT
 # @urls.route("/threads", methods=["GET"]) 
