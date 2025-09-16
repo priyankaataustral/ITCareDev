@@ -3440,11 +3440,25 @@ def load_kb_protocols():
         
         current_app.logger.info(f"Protocol loading completed: {results}")
         
+        # Also return the list of available protocols for the UI
+        protocols_list = []
+        for filename in loader.known_protocol_files:
+            protocols_list.append({
+                'id': len(protocols_list) + 1,
+                'title': filename.replace('_', ' ').replace('.txt', '').title(),
+                'source': 'Protocol',
+                'status': 'published',
+                'approved_by': 'system',
+                'filename': filename,
+                'url': f"{loader.protocols_base_url}/{filename}"
+            })
+        
         return jsonify({
             'message': 'Protocol loading completed successfully',
             'results': results,
             'source': 'http',
-            'base_url': loader.protocols_base_url
+            'base_url': loader.protocols_base_url,
+            'protocols': protocols_list
         }), 200
         
     except Exception as e:
