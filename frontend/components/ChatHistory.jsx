@@ -46,11 +46,6 @@ function renderListOrText(text, mentionRenderer) {
     return out;
   };
 
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
-  const [closeReason, setCloseReason] = useState('');
-  const [archiveReason, setArchiveReason] = useState('');
-
   // Ordered list
   const ordered = [...text.matchAll(
     /(?:^|\s)(\d+[\.)])\s+([\s\S]*?)(?=(?:\s+\d+[\.)]\s)|$)/g
@@ -642,6 +637,12 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   // CC state
   const [cc, setCc] = useState('');
+
+  
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [closeReason, setCloseReason] = useState('');
+  const [archiveReason, setArchiveReason] = useState('');
 
   // Draft Email Editor (new)
   const [showDraftEditor, setShowDraftEditor] = useState(false);
