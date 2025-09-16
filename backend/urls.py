@@ -1789,7 +1789,7 @@ def send_confirmation_email(solution_id):
     db.session.add(att); db.session.commit()
 
     # Token includes attempt_id - matching original design
-    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
     authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
     # Generate confirmation URLs for the new confirm.jsx page
@@ -2873,7 +2873,7 @@ def solutions_confirm():
     
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
         payload = ts.loads(authToken, max_age=7*24*3600)
         
         solution_id = payload.get("solution_id")
@@ -2941,7 +2941,7 @@ def debug_confirm():
     
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
         payload = ts.loads(authToken, max_age=7*24*3600)
         return jsonify(payload=payload, token_valid=True), 200
     except Exception as e:
@@ -2967,7 +2967,7 @@ def confirm_solution_original():
     # Verify token
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
         payload = ts.loads(token, max_age=7*24*3600)  # 7 days
         
         # Verify solution_id matches token
@@ -3046,7 +3046,7 @@ def confirm_solution():
     from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
     # SECRET_KEY is already imported at the top of this file from config.py
 
-    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
     try:
         payload = ts.loads(authToken, max_age=7*24*3600)
         logging.warning(f"[CONFIRM] Token payload: {payload}")
@@ -3601,7 +3601,7 @@ def list_protocols():
         current_app.logger.error(f"Failed to list protocols: {e}")
         return jsonify({'error': f'Failed to list protocols: {str(e)}'}), 500
 
-        
+
 
 # Search KB articles (for internal use by OpenAI)
 @urls.route('/kb/search', methods=['POST'])
