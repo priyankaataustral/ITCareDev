@@ -1789,7 +1789,7 @@ def send_confirmation_email(solution_id):
     db.session.add(att); db.session.commit()
 
     # Token includes attempt_id - matching original design
-    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
     # Generate confirmation URLs for the new confirm.jsx page
@@ -2210,12 +2210,13 @@ def send_email(thread_id):
 
     # --- Build signed links + final body ---
     try:
-        serializer = _serializer(SECRET)
+        from itsdangerous import URLSafeTimedSerializer
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
         token_payload = {"solution_id": int(s.id), "ticket_id": str(thread_id), "attempt_id": int(att.id)}
-        authToken = serializer.dumps(token_payload)
+        authToken = ts.dumps(token_payload)
 
-        confirm_url = f"{FRONTEND}/confirm_2?token={authToken}&solution_id={s.id}"
-        reject_url  = f"{FRONTEND}/confirm_2?token={authToken}&solution_id={s.id}&action=reject"
+        confirm_url = f"{FRONTEND}/confirm?token={authToken}&a=confirm"
+        reject_url  = f"{FRONTEND}/confirm?token={authToken}&a=not_confirm"
 
         final_body = (
             f"{email_body}\n\n"
@@ -2873,7 +2874,7 @@ def solutions_confirm():
     
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
         payload = ts.loads(authToken, max_age=7*24*3600)
         
         solution_id = payload.get("solution_id")
@@ -2941,7 +2942,7 @@ def debug_confirm():
     
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
         payload = ts.loads(authToken, max_age=7*24*3600)
         return jsonify(payload=payload, token_valid=True), 200
     except Exception as e:
@@ -2967,7 +2968,7 @@ def confirm_solution_original():
     # Verify token
     try:
         from itsdangerous import URLSafeTimedSerializer
-        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
         payload = ts.loads(token, max_age=7*24*3600)  # 7 days
         
         # Verify solution_id matches token
@@ -3046,7 +3047,7 @@ def confirm_solution():
     from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
     # SECRET_KEY is already imported at the top of this file from config.py
 
-    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-confirm-v1")
+    ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     try:
         payload = ts.loads(authToken, max_age=7*24*3600)
         logging.warning(f"[CONFIRM] Token payload: {payload}")
@@ -3601,7 +3602,7 @@ def list_protocols():
         current_app.logger.error(f"Failed to list protocols: {e}")
         return jsonify({'error': f'Failed to list protocols: {str(e)}'}), 500
 
-
+        
 
 # Search KB articles (for internal use by OpenAI)
 @urls.route('/kb/search', methods=['POST'])

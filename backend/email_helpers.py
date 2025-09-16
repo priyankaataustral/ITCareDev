@@ -96,7 +96,7 @@ def send_via_gmail(to_email: str, subject: str, body: str, cc_list: list[str] | 
         raise Exception(error_msg)
 
 
-def _serializer(secret_key: str, salt: str = "solution-confirm-v1"):
+def _serializer(secret_key: str, salt: str = "solution-links-v1"):
     return URLSafeTimedSerializer(secret_key, salt=salt)
 
 def _utcnow():
