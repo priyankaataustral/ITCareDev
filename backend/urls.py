@@ -205,7 +205,7 @@ def list_threads():
                 "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
                 "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
                 "department_id": ticket.department_id,
-                "department": department,
+            "department": department,
                 "level": ticket.level or 1,  # Critical for role filtering
                 "escalated": escalated,       # From TicketEvent query
                 "priority": ticket.priority,
@@ -219,13 +219,13 @@ def list_threads():
                 "lastActivity": ticket.updated_at.isoformat() if ticket.updated_at else None
             }
             threads_all.append(enriched_ticket)
-
+        
         # PRESERVE ORIGINAL ROLE-BASED FILTERING
         if role == "L2":
-            # L2 sees tickets with level >= 2 (escalated tickets)
+                # L2 sees tickets with level >= 2 (escalated tickets)
             threads_filtered = [t for t in threads_all if (t.get("level") or 1) >= 2]
         elif role == "L3":
-            # L3 sees only tickets with level == 3 (highest escalation)
+                # L3 sees only tickets with level == 3 (highest escalation)
             threads_filtered = [t for t in threads_all if (t.get("level") or 1) == 3]
         else:  # L1 and MANAGER see all
             threads_filtered = threads_all
@@ -250,12 +250,12 @@ def list_threads():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Return exact same format as original
+        # Return exact same format as original
     return jsonify(
-        total=total,
-        limit=limit,
-        offset=offset,
-        threads=threads
+            total=total,
+            limit=limit,
+            offset=offset,
+            threads=threads
     ), 200
         
 
@@ -1317,6 +1317,19 @@ def escalate_ticket(thread_id):
     # Get current agent role for escalation rules
     agent = getattr(request, 'agent_ctx', {}) or {}
     current_role = agent.get('role', 'L1')
+
+    current_role = agent.get('role', 'L1')
+
+    # 🔍 DEBUG: Add this debug block here
+    print(f"🔍 DEBUG ESCALATION:")
+    print(f"   agent_ctx = {getattr(request, 'agent_ctx', None)}")
+    print(f"   agent = {agent}")
+    print(f"   agent.get('id') = {agent.get('id')}")
+    print(f"   current_role = {current_role}")
+    print(f"   thread_id = {thread_id}")
+    print(f"   target_dept = {target_department_id}")
+    print(f"   target_agent = {target_agent_id}")
+    print(f"   reason = {escalation_reason}")
     
     old_level = ticket.level or 1
     
@@ -1349,7 +1362,28 @@ def escalate_ticket(thread_id):
         ticket.assigned_to = target_agent_id
     
     # Create escalation summary record (with fallback if table doesn't exist)
+    # try:
+    #     summary = EscalationSummary(
+    #         ticket_id=thread_id,
+    #         escalated_to_department_id=target_department_id,
+    #         escalated_to_agent_id=target_agent_id,
+    #         escalated_by_agent_id=agent.get('id'),
+    #         reason=escalation_reason,
+    #         from_level=old_level,
+    #         to_level=to_level
+    #     )
+    #     db.session.add(summary)
+    #     current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
+    # except Exception as e:
+    #     current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
+    
+    # Create escalation summary record (with enhanced debugging)
     try:
+        print(f"🔄 Creating EscalationSummary...")
+        print(f"   Parameters: ticket_id={thread_id}, dept_id={target_department_id}, agent_id={target_agent_id}")
+        print(f"   escalated_by_agent_id={agent.get('id')}, reason='{escalation_reason}'")
+        print(f"   from_level={old_level}, to_level={to_level}")
+        
         summary = EscalationSummary(
             ticket_id=thread_id,
             escalated_to_department_id=target_department_id,
@@ -1360,8 +1394,15 @@ def escalate_ticket(thread_id):
             to_level=to_level
         )
         db.session.add(summary)
+        db.session.commit()
+        print(f"✅ EscalationSummary created successfully!")
         current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
+        
     except Exception as e:
+        print(f"❌ EscalationSummary creation failed: {e}")
+        print(f"   Exception type: {type(e)}")
+        import traceback
+        traceback.print_exc()
         current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
     
     # Log event with additional details
