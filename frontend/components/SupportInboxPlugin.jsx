@@ -94,7 +94,7 @@ export default function SupportInboxPlugin() {
           selectedId={selectedId}
           threads={threads}
           departments={departments}
-          useNewList={true}
+          useNewList={false}
           ticketFilter={ticketFilter}
           onFilterChange={(filter) => {
             setTicketFilter(filter);
