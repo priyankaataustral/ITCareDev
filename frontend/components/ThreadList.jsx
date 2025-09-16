@@ -172,7 +172,7 @@ export default function ThreadList({
       
       // Update local state
       setThreads(prevThreads =>
-        prevThreads.map(thread =>
+        (prevThreads || []).map(thread =>
           thread.id === ticketId
             ? { ...thread, assigned_to: agentId }
             : thread
@@ -217,7 +217,7 @@ export default function ThreadList({
 
       // Update thread status locally
       setThreads(prevThreads =>
-        prevThreads.map(thread =>
+        (prevThreads || []).map(thread =>
           thread.id === threadId
             ? { ...thread, status: 'escalated', department_id: payload.department_id }
             : thread
@@ -236,7 +236,7 @@ export default function ThreadList({
   if (loading) return <div className="p-4 text-center text-gray-500">Loading tickets...</div>;
   if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
 
-  const filteredThreads = threads.filter(t => {
+  const filteredThreads = (threads || []).filter(t => {
     if (activeDeptId === 'all') return true;
     return t.department_id === parseInt(activeDeptId);
   });

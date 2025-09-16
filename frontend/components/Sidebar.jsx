@@ -58,7 +58,7 @@ export default function Sidebar({
               <span className="text-lg">{currentFilter.icon}</span>
               <div className="text-left">
                 <div className="font-semibold text-gray-900">{currentFilter.label}</div>
-                <div className="text-sm text-gray-500">{threads.length} tickets</div>
+                <div className="text-sm text-gray-500">{threads?.length || 0} tickets</div>
               </div>
             </div>
             <svg className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
