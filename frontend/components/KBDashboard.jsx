@@ -152,15 +152,36 @@ export default function KBDashboard({ open, onClose }) {
       
       // Add protocol files to the articles list
       if (result.protocols && Array.isArray(result.protocols)) {
+        console.log('Protocols received from backend:', result.protocols);
         setArticles(prevArticles => {
           // Remove existing protocol entries to avoid duplicates
           const nonProtocolArticles = prevArticles.filter(a => a.source !== 'Protocol');
           // Add new protocol entries
-          return [...nonProtocolArticles, ...result.protocols];
+          const newArticles = [...nonProtocolArticles, ...result.protocols];
+          console.log('Updated articles list:', newArticles);
+          return newArticles;
         });
+      } else {
+        console.log('No protocols received or invalid format:', result);
       }
       
-      refresh();
+      // Only refresh other data, not articles (to preserve protocol display)
+      setLoading(true);
+      try {
+        const [sol, fb, mx] = await Promise.all([
+          apiGet('/solutions?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50'),
+          apiGet('/kb/feedback?limit=50'),
+          apiGet('/kb/analytics').catch(() => null),
+        ]);
+        setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
+        setFeedback(Array.isArray(fb) ? fb : (fb.items || []));
+        setMetrics(mx);
+      } catch (e) {
+        console.error('Error refreshing data:', e);
+        setErr(e.message || 'Failed to refresh data');
+      } finally {
+        setLoading(false);
+      }
     } catch (e) { toast(`Error loading protocols: ${e.message || e}`, true); }
   };
 

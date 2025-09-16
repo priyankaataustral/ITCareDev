@@ -2866,38 +2866,55 @@ def deescalate_ticket(thread_id):
 @urls.route("/solutions/confirm", methods=["GET"])
 def solutions_confirm():
     """Handle solution confirmation from email links - returns JSON for frontend"""
-    authToken = request.args.get("token", "")
-    action = (request.args.get("a") or "confirm").lower()
-    
-    if not authToken:
-        return jsonify(ok=False, reason="missing_token"), 400
-    
     try:
+        current_app.logger.info(f"[DEBUG] solutions_confirm called with token: {request.args.get('token', '')[:20]}... and action: {request.args.get('a', '')}")
+        
+        authToken = request.args.get("token", "")
+        action = (request.args.get("a") or "confirm").lower()
+        
+        if not authToken:
+            current_app.logger.warning("[DEBUG] No token provided")
+            return jsonify(ok=False, reason="missing_token"), 400
         from itsdangerous import URLSafeTimedSerializer
         ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        current_app.logger.info(f"[DEBUG] Attempting to decode token with salt: solution-links-v1")
+        
         payload = ts.loads(authToken, max_age=7*24*3600)
+        current_app.logger.info(f"[DEBUG] Token decoded successfully: {payload}")
         
         solution_id = payload.get("solution_id")
         ticket_id = payload.get("ticket_id") 
         attempt_id = payload.get("attempt_id")
         
+        current_app.logger.info(f"[DEBUG] Extracted IDs - solution_id: {solution_id}, ticket_id: {ticket_id}, attempt_id: {attempt_id}")
+        
         if not all([solution_id, ticket_id, attempt_id]):
+            current_app.logger.warning(f"[DEBUG] Missing required IDs in token payload: {payload}")
             return jsonify(ok=False, reason="invalid_token_payload"), 400
             
         # Get the resolution attempt
+        current_app.logger.info(f"[DEBUG] Looking up ResolutionAttempt with ID: {attempt_id}")
         attempt = db.session.get(ResolutionAttempt, attempt_id)
         if not attempt:
+            current_app.logger.warning(f"[DEBUG] ResolutionAttempt not found for ID: {attempt_id}")
             return jsonify(ok=False, reason="attempt_not_found"), 404
+        current_app.logger.info(f"[DEBUG] Found ResolutionAttempt: {attempt}")
             
         # Get the solution and ticket for context
+        current_app.logger.info(f"[DEBUG] Looking up Solution with ID: {solution_id}")
         solution = db.session.get(Solution, solution_id)
+        current_app.logger.info(f"[DEBUG] Looking up Ticket with ID: {ticket_id}")
         ticket = db.session.get(Ticket, ticket_id)
         
         if not solution or not ticket:
+            current_app.logger.warning(f"[DEBUG] Missing records - solution: {solution}, ticket: {ticket}")
             return jsonify(ok=False, reason="solution_or_ticket_not_found"), 404
         
         # Update the attempt based on action
+        current_app.logger.info(f"[DEBUG] Processing action: {action}")
+        
         if action == "confirm":
+            current_app.logger.info(f"[DEBUG] Confirming solution #{solution_id}")
             attempt.outcome = "CONFIRMED"
             solution.confirmed_by_user = True
             solution.confirmed_at = datetime.now(timezone.utc)
@@ -2906,30 +2923,39 @@ def solutions_confirm():
             # Update ticket resolution tracking
             if ticket and attempt.agent_id:
                 ticket.resolved_by = attempt.agent_id
+                current_app.logger.info(f"[DEBUG] Updated ticket.resolved_by to {attempt.agent_id}")
                 
             # Log timeline event
+            current_app.logger.info(f"[DEBUG] Adding CONFIRMED event for ticket {ticket_id}")
             add_event(ticket_id, 'CONFIRMED', f"User confirmed solution #{solution_id}")
             
         elif action == "not_confirm":
+            current_app.logger.info(f"[DEBUG] Rejecting solution #{solution_id}")
             attempt.outcome = "NOT_CONFIRMED"
             solution.status = "rejected"
             
             # Log timeline event  
+            current_app.logger.info(f"[DEBUG] Adding NOT_FIXED event for ticket {ticket_id}")
             add_event(ticket_id, 'NOT_FIXED', f"User rejected solution #{solution_id}")
         
         # Save changes
+        current_app.logger.info(f"[DEBUG] Committing changes to database")
         db.session.commit()
+        current_app.logger.info(f"[DEBUG] Database commit successful")
         
         # Return success with data needed for frontend
-        return jsonify(
-            ok=True,
-            ticket_id=ticket_id,
-            attempt_id=attempt_id,
-            user_email=ticket.requester_email,
-            action=action
-        ), 200
+        response_data = {
+            "ok": True,
+            "ticket_id": ticket_id,
+            "attempt_id": attempt_id,
+            "user_email": ticket.requester_email,
+            "action": action
+        }
+        current_app.logger.info(f"[DEBUG] Returning success response: {response_data}")
+        return jsonify(response_data), 200
         
     except Exception as e:
+        current_app.logger.exception(f"[DEBUG] Exception in solutions_confirm: {str(e)}")
         db.session.rollback()
         return jsonify(ok=False, reason=f"processing_error: {str(e)}"), 500
 
@@ -3452,6 +3478,8 @@ def load_kb_protocols():
                 'filename': filename,
                 'url': f"{loader.protocols_base_url}/{filename}"
             })
+        
+        current_app.logger.info(f"Generated protocols list: {protocols_list}")
         
         return jsonify({
             'message': 'Protocol loading completed successfully',
