@@ -276,7 +276,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={() => setTab('articles')}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -289,7 +289,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={() => setTab('articles')}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -302,7 +302,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={() => setTab('articles')}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
@@ -315,7 +315,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={() => setTab('articles')}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_setup.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
@@ -328,7 +328,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={() => setTab('articles')}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/hardware_troubleshooting.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
@@ -341,7 +341,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={loadProtocols}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/new_po_device_allocation.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
@@ -354,7 +354,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={loadProtocols}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_duplex_configuration.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
@@ -367,7 +367,7 @@ export default function KBDashboard({ open, onClose }) {
             </button>
 
             <button 
-              onClick={loadProtocols}
+              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/access_request_reports_module.txt', '_blank')}
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
             >
               <div className="flex-shrink-0 w-8 h-8 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
@@ -390,35 +390,6 @@ export default function KBDashboard({ open, onClose }) {
               {tab === 'feedback' && '💬 User feedback and ratings'}
               {tab === 'analytics' && '📊 Performance metrics and insights'}
             </span>
-            {tab === 'articles' && (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Quick Access:</span>
-                <a 
-                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
-                >
-                  📧 Email Issues
-                </a>
-                <a 
-                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
-                >
-                  🌐 Network Issues
-                </a>
-                <a 
-                  href="https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
-                >
-                  🔑 Password Reset
-                </a>
-              </div>
-            )}
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">Refresh</button>
           </div>
         </div>
@@ -428,7 +399,7 @@ export default function KBDashboard({ open, onClose }) {
         {/* Content */}
         <div className="p-5 max-h-[70vh] overflow-y-auto">
           {tab === 'review' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 gap-5">
               {/* Solutions */}
               <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
                 <header className="flex items-center justify-between mb-3">
@@ -488,8 +459,11 @@ export default function KBDashboard({ open, onClose }) {
                   </table>
                 </div>
               </section>
+            </div>
+          )}
 
-              {/* Articles */}
+          {tab === 'articles' && (
+            <div>
               <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
                 <header className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100">KB Articles</h3>
@@ -568,6 +542,7 @@ export default function KBDashboard({ open, onClose }) {
               </section>
             </div>
           )}
+
 
           {tab === 'feedback' && (
             <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">

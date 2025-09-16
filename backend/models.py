@@ -57,7 +57,7 @@ class Agent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     email = db.Column(db.String(100), nullable=False, unique=True)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(10), default='L1')  # L1, L2, L3, MANAGER
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
 
