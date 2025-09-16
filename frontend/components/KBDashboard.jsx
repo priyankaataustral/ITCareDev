@@ -245,141 +245,6 @@ export default function KBDashboard({ open, onClose }) {
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search…" className="flex-1 min-w-[120px] px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm" />
         </div>
 
-        {/* Quick Access List */}
-        <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">📋 Quick Access</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <button 
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <span className="text-purple-600 dark:text-purple-400">📤</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Upload Protocol</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Add new procedure documents</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={loadProtocols}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 dark:text-green-400">📄</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Load Protocols</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Standard procedures & workflows</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <span className="text-blue-600 dark:text-blue-400">✉️</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Email Issues</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Outlook, SMTP, delivery problems</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <span className="text-purple-600 dark:text-purple-400">🌐</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Network Issues</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Connectivity, WiFi, VPN problems</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                <span className="text-yellow-600 dark:text-yellow-400">🔑</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Password Reset</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Account recovery & access issues</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_setup.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                <span className="text-red-600 dark:text-red-400">🖨️</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Setup</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Installation, drivers, troubleshooting</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/hardware_troubleshooting.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-                <span className="text-indigo-600 dark:text-indigo-400">💻</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Hardware Issues</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Device setup, replacement, repairs</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/new_po_device_allocation.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
-                <span className="text-emerald-600 dark:text-emerald-400">🛒</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">New PO Device</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Equipment allocation & decommission</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_duplex_configuration.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-                <span className="text-orange-600 dark:text-orange-400">📄</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Duplex</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Double-sided printing configuration</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/access_request_reports_module.txt', '_blank')}
-              className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
-            >
-              <div className="flex-shrink-0 w-8 h-8 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
-                <span className="text-cyan-600 dark:text-cyan-400">📊</span>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Reports Access</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Cost view permissions & security</div>
-              </div>
-            </button>
-          </div>
-        </div>
 
         {/* Content Area Header */}
         <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -464,6 +329,128 @@ export default function KBDashboard({ open, onClose }) {
 
           {tab === 'articles' && (
             <div>
+              {/* Quick Access List */}
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">📋 Quick Access</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <button 
+                    onClick={() => setShowUploadModal(true)}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                      <span className="text-purple-600 dark:text-purple-400">📤</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Upload Protocol</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Add new procedure documents</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={loadProtocols}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                      <span className="text-green-600 dark:text-green-400">📄</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Load Protocols</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Standard procedures & workflows</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                      <span className="text-blue-600 dark:text-blue-400">✉️</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Email Issues</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Outlook, SMTP, delivery problems</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                      <span className="text-purple-600 dark:text-purple-400">🌐</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Network Issues</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Connectivity, WiFi, VPN problems</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                      <span className="text-yellow-600 dark:text-yellow-400">🔑</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Password Reset</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Account recovery & access issues</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_setup.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                      <span className="text-red-600 dark:text-red-400">🖨️</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Setup</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Installation, drivers, troubleshooting</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/new_po_device_allocation.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                      <span className="text-emerald-600 dark:text-emerald-400">🛒</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">New PO Device</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Equipment allocation & decommission</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_duplex_configuration.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                      <span className="text-orange-600 dark:text-orange-400">📄</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Duplex</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Double-sided printing configuration</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/access_request_reports_module.txt', '_blank')}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 bg-cyan-100 dark:bg-cyan-900 rounded-lg flex items-center justify-center">
+                      <span className="text-cyan-600 dark:text-cyan-400">📊</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Reports Access</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Cost view permissions & security</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
               <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
                 <header className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 dark:text-gray-100">KB Articles</h3>
