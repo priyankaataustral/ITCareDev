@@ -90,7 +90,7 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center text-xs font-semibold text-blue-600">
-                      {agent.name.charAt(0)}
+                    {(agent?.name || '?').charAt(0)}
                     </span>
                     <div>
                       <div className="font-medium">{agent.name}</div>
@@ -273,13 +273,13 @@ export default function ThreadList({
                     t.status === 'escalated' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
                     'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                   }`}>
-                    {t.status.toUpperCase()}
+                    {String(t.status || 'open').toUpperCase()}
                   </span>
                 </div>
                 <h3 className={`font-semibold text-sm leading-tight ${
                   isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'
                 }`}>
-                  {t.subject}
+                  {t.subject || 'No subject'}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
