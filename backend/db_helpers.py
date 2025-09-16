@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from flask import abort
 from sqlalchemy import text as _sql_text, func
 from extensions import db
-from models import Ticket, Message, ResolutionAttempt, TicketEvent, Solution, KBAudit, KBArticle, Department, TicketCC, EmailQueue, StepSequence, SolutionGeneratedBy, SolutionStatus # Import all models
+from models import Ticket, Message, ResolutionAttempt, TicketEvent, Solution, KBArticle, Department, TicketCC, EmailQueue, StepSequence, SolutionGeneratedBy, SolutionStatus # Import all models
 from email_helpers import _fingerprint, _normalize
 from openai_helpers import categorize_department_with_gpt
 from utils import extract_mentions
@@ -280,15 +280,15 @@ def create_solution(ticket_id: str, text: str, proposed_by: str | None = None):
     return s
 
 
-def audit(event: str, entity_type: str, entity_id: int, actor_id=None, meta: dict | None=None):
-    rec = KBAudit(
-        event=event,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        actor_id=actor_id,
-        meta_json=json.dumps(meta or {})
-    )
-    db.session.add(rec)
+# def audit(event: str, entity_type: str, entity_id: int, actor_id=None, meta: dict | None=None):
+#     rec = KBAudit(
+#         event=event,
+#         entity_type=entity_type,
+#         entity_id=entity_id,
+#         actor_id=actor_id,
+#         meta_json=json.dumps(meta or {})
+#     )
+#     db.session.add(rec)
 
 # ─── DB helper functions ──────────────────────────────────────────────────────
 def save_message(ticket_id, sender, content, type='assistant', meta=None):
