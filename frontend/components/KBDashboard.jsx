@@ -391,7 +391,7 @@ export default function KBDashboard({ open, onClose }) {
                     </div>
                   </button>
 
-                  <button 
+                  {/* <button 
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/email_issues.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
@@ -467,9 +467,9 @@ export default function KBDashboard({ open, onClose }) {
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Duplex</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">Double-sided printing configuration</div>
                     </div>
-                  </button>
+                  </button> */}
 
-                  <button 
+                  {/* <button 
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/access_request_reports_module.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
@@ -480,7 +480,7 @@ export default function KBDashboard({ open, onClose }) {
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Reports Access</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">Cost view permissions & security</div>
                     </div>
-                  </button>
+                  </button> */}
                 </div>
               </div>
               <section className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">

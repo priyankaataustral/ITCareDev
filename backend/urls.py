@@ -2927,7 +2927,7 @@ def solutions_confirm():
                 
             # Log timeline event
             current_app.logger.info(f"[DEBUG] Adding CONFIRMED event for ticket {ticket_id}")
-            add_event(ticket_id, 'CONFIRMED', f"User confirmed solution #{solution_id}")
+            add_event(ticket_id, 'CONFIRMED', actor_agent_id=attempt.agent_id, message=f"User confirmed solution #{solution_id}")
             
         elif action == "not_confirm":
             current_app.logger.info(f"[DEBUG] Rejecting solution #{solution_id}")
@@ -2936,7 +2936,7 @@ def solutions_confirm():
             
             # Log timeline event  
             current_app.logger.info(f"[DEBUG] Adding NOT_FIXED event for ticket {ticket_id}")
-            add_event(ticket_id, 'NOT_FIXED', f"User rejected solution #{solution_id}")
+            add_event(ticket_id, 'NOT_FIXED', actor_agent_id=attempt.agent_id, message=f"User rejected solution #{solution_id}")
         
         # Save changes
         current_app.logger.info(f"[DEBUG] Committing changes to database")
