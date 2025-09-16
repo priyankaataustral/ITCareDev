@@ -342,7 +342,7 @@ def download_ticket_summary(thread_id):
 #         df = load_df()
 #         if df[df["id"] == thread_id].empty:
 #             abort(404, f"Ticket {thread_id} not found")
-#         ensure_ticket_record_from_csv(thread_id)
+#         #ensure_ticket_record_from_csv(thread_id)
 #         t = db.session.get(Ticket, thread_id)
     
 #     user = getattr(request, "agent_ctx", {}) or {}
@@ -496,7 +496,7 @@ def get_thread(thread_id):
 #         df = load_df()
 #         if df[df["id"] == thread_id].empty:
 #             return jsonify(error="not found"), 404
-#         ensure_ticket_record_from_csv(thread_id)
+#         #ensure_ticket_record_from_csv(thread_id)
 #         t = db.session.get(Ticket, thread_id)
 
 #     # 1) Role-based visibility
@@ -1298,7 +1298,7 @@ def solution_response(thread_id):
 @urls.route("/threads/<thread_id>/escalate", methods=["POST"])
 @require_role("L1","L2","L3","MANAGER")
 def escalate_ticket(thread_id):
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
 
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
@@ -1451,7 +1451,7 @@ def escalate_ticket(thread_id):
 @urls.route("/threads/<thread_id>/close", methods=["POST"])
 @require_role("L2","L3","MANAGER")
 def close_ticket(thread_id):
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
 
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
@@ -1471,7 +1471,7 @@ def close_ticket(thread_id):
 @require_role("L2","L3","MANAGER")
 def archive_ticket(thread_id):
     """Archive a ticket - removes it from main view but keeps in database"""
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
 
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
@@ -1504,7 +1504,7 @@ def archive_ticket(thread_id):
 @require_role("L2","L3","MANAGER")
 def unarchive_ticket(thread_id):
     """Unarchive a ticket - brings it back to main view"""
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
 
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
@@ -1617,7 +1617,7 @@ def claim_ticket(thread_id):
     if not agent_name:
         return jsonify(error="agent_name required"), 400
 
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
 
     # Find agent id by name (or switch to using agent_id in the request)
     agent = Agent.query.filter_by(name=agent_name).first()
@@ -1974,7 +1974,7 @@ INSTEAD USE:
 #         return jsonify(error="Missing email body"), 400
 
 #     # Ensure ticket + resolve primary recipient
-#     ensure_ticket_record_from_csv(thread_id)
+#     #ensure_ticket_record_from_csv(thread_id)
 #     t = db.session.get(Ticket, thread_id)
 #     recipient_email = (t.requester_email or '').strip().lower() if t else ''
 #     if not recipient_email:
@@ -2284,7 +2284,7 @@ def send_email(thread_id):
 #         return jsonify(error="Missing email body"), 400
 
 #     # --- Ensure ticket + recipient ---
-#     ensure_ticket_record_from_csv(thread_id)
+#     #ensure_ticket_record_from_csv(thread_id)
 #     t = db.session.get(Ticket, thread_id)
 #     recipient_email = (t.requester_email or '').strip().lower() if t else ''
 #     if not recipient_email:
@@ -2734,7 +2734,7 @@ def override_department(thread_id):
 @urls.route("/threads/<thread_id>/route", methods=["POST"])
 @require_role("L1","L2","L3","MANAGER")
 def auto_route(thread_id):
-    ensure_ticket_record_from_csv(thread_id)
+    #ensure_ticket_record_from_csv(thread_id)
     t = db.session.get(Ticket, thread_id)
 
     dep_id = t.department_id or route_department_from_category(t.category)
@@ -2834,7 +2834,7 @@ def count_unassigned_tickets():
 @urls.route("/threads/<thread_id>/deescalate", methods=["POST"])
 @require_role("L2","L3","MANAGER")
 def deescalate_ticket(thread_id):
-    ensure_ticket_record_from_csv(thread_id)
+    # #ensure_ticket_record_from_csv(thread_id)
     t = db.session.get(Ticket, thread_id)
     if not t:
         return jsonify(error="Ticket not found"), 404
