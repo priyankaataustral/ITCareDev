@@ -52,7 +52,7 @@ export default function KBDashboard({ open, onClose }) {
       ]);
       setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
       setArticles(Array.isArray(art) ? art : (art.items || []));
-      setFeedback(Array.isArray(fb) ? fb : (fb.items || []));
+      setFeedback(Array.isArray(fb) ? fb : (fb.items || fb.feedback || []));
       setMetrics(mx);
     } catch (e) {
       setErr(`Failed to load: ${e.message || e}`);
@@ -174,7 +174,7 @@ export default function KBDashboard({ open, onClose }) {
           apiGet('/kb/analytics').catch(() => null),
         ]);
         setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
-        setFeedback(Array.isArray(fb) ? fb : (fb.items || []));
+        setFeedback(Array.isArray(fb) ? fb : (fb.items || fb.feedback || []));
         setMetrics(mx);
       } catch (e) {
         console.error('Error refreshing data:', e);
