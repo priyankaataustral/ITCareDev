@@ -1792,9 +1792,9 @@ def send_confirmation_email(solution_id):
     ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
     authToken = ts.dumps({"solution_id": s.id, "ticket_id": s.ticket_id, "attempt_id": att.id})
 
-    # Use original working URL pattern: /confirm_2?token=...&solution_id=...
-    confirm_url = f"{FRONTEND_ORIGINS}/confirm_2?token={authToken}&solution_id={s.id}"
-    reject_url  = f"{FRONTEND_ORIGINS}/confirm_2?token={authToken}&solution_id={s.id}&action=reject"
+    # Generate confirmation URLs for the new confirm.jsx page
+    confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+    reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
 
     subject = f"Please review the solution for Ticket {s.ticket_id}"
     body = (
@@ -2861,6 +2861,76 @@ def deescalate_ticket(thread_id):
     enqueue_status_email(thread_id, "Updated", f"Ticket moved to L{to_level}.")
     return jsonify(status=t.status, level=to_level), 200
 
+
+@urls.route("/solutions/confirm", methods=["GET"])
+def solutions_confirm():
+    """Handle solution confirmation from email links - returns JSON for frontend"""
+    authToken = request.args.get("token", "")
+    action = (request.args.get("a") or "confirm").lower()
+    
+    if not authToken:
+        return jsonify(ok=False, reason="missing_token"), 400
+    
+    try:
+        from itsdangerous import URLSafeTimedSerializer
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        payload = ts.loads(authToken, max_age=7*24*3600)
+        
+        solution_id = payload.get("solution_id")
+        ticket_id = payload.get("ticket_id") 
+        attempt_id = payload.get("attempt_id")
+        
+        if not all([solution_id, ticket_id, attempt_id]):
+            return jsonify(ok=False, reason="invalid_token_payload"), 400
+            
+        # Get the resolution attempt
+        attempt = db.session.get(ResolutionAttempt, attempt_id)
+        if not attempt:
+            return jsonify(ok=False, reason="attempt_not_found"), 404
+            
+        # Get the solution and ticket for context
+        solution = db.session.get(Solution, solution_id)
+        ticket = db.session.get(Ticket, ticket_id)
+        
+        if not solution or not ticket:
+            return jsonify(ok=False, reason="solution_or_ticket_not_found"), 404
+        
+        # Update the attempt based on action
+        if action == "confirm":
+            attempt.outcome = "CONFIRMED"
+            solution.confirmed_by_user = True
+            solution.confirmed_at = datetime.now(timezone.utc)
+            solution.status = "confirmed"
+            
+            # Update ticket resolution tracking
+            if ticket and attempt.agent_id:
+                ticket.resolved_by = attempt.agent_id
+                
+            # Log timeline event
+            add_event(ticket_id, 'CONFIRMED', f"User confirmed solution #{solution_id}")
+            
+        elif action == "not_confirm":
+            attempt.outcome = "NOT_CONFIRMED"
+            solution.status = "rejected"
+            
+            # Log timeline event  
+            add_event(ticket_id, 'NOT_FIXED', f"User rejected solution #{solution_id}")
+        
+        # Save changes
+        db.session.commit()
+        
+        # Return success with data needed for frontend
+        return jsonify(
+            ok=True,
+            ticket_id=ticket_id,
+            attempt_id=attempt_id,
+            user_email=ticket.requester_email,
+            action=action
+        ), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(ok=False, reason=f"processing_error: {str(e)}"), 500
 
 @urls.route("/solutions/confirm/debug", methods=["GET"])
 def debug_confirm():
