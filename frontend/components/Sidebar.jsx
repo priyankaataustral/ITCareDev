@@ -47,46 +47,46 @@ export default function Sidebar({
 
   return (
     <div className="sidebar" style={{ width: 350, minWidth: 350, maxWidth: 350 }}>
-      {/* Ticket Filter Dropdown */}
-      {view === 'all' && (
-        <div className="p-4 border-b border-gray-200">
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <div className="flex items-center gap-2">
-                <span>{currentFilter.icon}</span>
-                <span className="font-medium text-gray-900">{currentFilter.label}</span>
-                <span className="text-sm text-gray-500">({threads.length})</span>
+      {/* Ticket Filter Dropdown - Always Visible */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm hover:from-blue-100 hover:to-indigo-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">{currentFilter.icon}</span>
+              <div className="text-left">
+                <div className="font-semibold text-gray-900">{currentFilter.label}</div>
+                <div className="text-sm text-gray-500">{threads.length} tickets</div>
               </div>
-              <svg className={`w-5 h-5 text-gray-400 transform transition-transform ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
-                {filterOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      onFilterChange(option.value);
-                      setShowDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 ${
-                      ticketFilter === option.value ? 'bg-blue-50 text-blue-600' : 'text-gray-900'
-                    } first:rounded-t-md last:rounded-b-md`}
-                  >
-                    <span>{option.icon}</span>
-                    <span>{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
+            <svg className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showDropdown && (
+            <div className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              {filterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    onFilterChange(option.value);
+                    setShowDropdown(false);
+                  }}
+                  className={`w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center gap-3 transition-colors ${
+                    ticketFilter === option.value ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500' : 'text-gray-900'
+                  }`}
+                >
+                  <span className="text-lg">{option.icon}</span>
+                  <span className="font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Navigation Tabs */}
       <div className="tabs">
@@ -107,10 +107,11 @@ export default function Sidebar({
                 fontSize: 12,
                 borderRadius: '999px',
                 padding: '2px 7px',
-                fontWeight: 'bold',
-                marginLeft: 6,
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-              }}>{mentions.length}</span>
+                minWidth: 18,
+                textAlign: 'center'
+              }}>
+                {mentions.length}
+              </span>
             )}
           </span>
         </button>
@@ -119,20 +120,38 @@ export default function Sidebar({
           onClick={() => setView('escalations')}
         >📋 Escalations</button>
       </div>
-      {view === 'all' ? (
-        useNewList
-          ? <ThreadList
+
+      {/* Content */}
+      <div className="tab-content">
+        {view === 'all' && (
+          useNewList ? (
+            <GroupedTickets
               onSelect={onSelect}
-              threads={threads}
               selectedId={selectedId}
+              tickets={threads}
               departments={departments}
             />
-          : <GroupedTickets threads={threads} onSelect={onSelect} selectedId={selectedId} />
-      ) : view === 'mentions' ? (
-        <MentionsPanel agentId={agentId} onSelect={onSelect} selectedId={selectedId} />
-      ) : view === 'escalations' ? (
-        <EscalationSummaries />
-      ) : null}
+          ) : (
+            <ThreadList
+              onSelect={onSelect}
+              selectedId={selectedId}
+              threads={threads}
+              departments={departments}
+            />
+          )
+        )}
+        {view === 'mentions' && (
+          <MentionsPanel 
+            agentId={agentId} 
+            onSelect={onSelect}
+            selectedId={selectedId}
+            refreshMentions={refreshMentions}
+          />
+        )}
+        {view === 'escalations' && (
+          <EscalationSummaries agentId={agentId} />
+        )}
+      </div>
     </div>
   );
 }
