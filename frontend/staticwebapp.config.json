@@ -2,5 +2,11 @@
   "navigationFallback": {
     "rewrite": "/index.html"
   },
-  "routes": []
+  "routes": [
+    {
+      "route": "/kb/protocols/upload",
+      "methods": ["POST", "OPTIONS"],
+      "rewrite": "itcaredev-hkeyh9cheucmbfbf.australiaeast-01.azurewebsites.net/kb/protocols/upload"
+    }
+  ]
 }
