@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
 import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
-import DepartmentOverridePill from './DepartmentOverridePill';
+import DepartmentOverridePill from '../components/DepartmentOverridePill';
 
 dayjs.extend(relativeTime);
 
