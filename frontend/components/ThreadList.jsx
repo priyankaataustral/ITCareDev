@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
 import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
-import DepartmentOverridePill from '../components/DepartmentOverridePill';
+import DepartmentOverridePanel from '../components/DepartmentOverridePanel';
 
 dayjs.extend(relativeTime);
 
@@ -348,7 +348,7 @@ export default function ThreadList({
 
               {/* Department Override Button - Add this */}
                 <div onClick={(e) => e.stopPropagation()}>
-                  <DepartmentOverridePill
+                  <DepartmentOverridePanel
                     ticket={t}
                     onDepartmentChange={handleDepartmentChange}
                   />
