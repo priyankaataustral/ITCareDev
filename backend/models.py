@@ -88,9 +88,17 @@ class Solution(db.Model):
     status = db.Column(db.String(17))
     created_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime)
-    # Removed unused AI fields: ai_contribution_pct, ai_confidence, normalized_text,
-    # fingerprint_sha256, confirmed_by_user, confirmed_at, confirmed_ip, 
-    # confirmed_via, dedup_score, published_article_id
+    confirmed_by_user = db.Column(db.Boolean, default=False)
+    confirmed_at = db.Column(db.DateTime)
+    confirmed_ip = db.Column(db.String(45))
+    confirmed_via = db.Column(db.String(5))    
+    published_article_id = db.Column(db.Integer, db.ForeignKey('kb_articles.id'), nullable=True)
+    dedup_score = db.Column(Float)  # Similarity score to existing solutions
+    fingerprint_sha256 = db.Column(db.String(64), index=True)
+    normalized_text = db.Column(db.Text)  # Text after normalization for deduplication
+    ai_confidence = db.Column(Float)  # AI confidence score (0-1)   
+    ai_contribution_pct = db.Column(Float)  # Percentage of AI contribution (0-100)
+    
 
 class KBArticle(db.Model):
     __tablename__ = 'kb_articles'
