@@ -1,11 +1,12 @@
-// frontend/src/components/TicketContext.jsx
 import React, { useState } from 'react';
 import ChatHistory from './ChatHistory';
 import QuickActions from './QuickActions';
 import MessageInput from './MessageInput';
+import TicketHistoryPanel from './TicketHistoryPanel';
 
 export default function TicketContext({ ticket, knowledgeContext, onSend }) {
   const [draftText, setDraftText] = useState('');
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const handleSend = () => {
     onSend(ticket.ticketId, draftText);
@@ -22,7 +23,26 @@ export default function TicketContext({ ticket, knowledgeContext, onSend }) {
           <span>Priority: {ticket.priority}</span>
           <span>Agent: {ticket.assignedAgent || 'Unassigned'}</span>
         </div>
+        
+        {/* History Toggle Button */}
+        <div className="ticket-actions">
+          <button 
+            onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+            className={`history-toggle-btn ${isHistoryOpen ? 'active' : ''}`}
+          >
+            📜 History {isHistoryOpen ? '▼' : '▶'}
+          </button>
+        </div>
       </header>
+
+      {/* Collapsible History Panel */}
+      {isHistoryOpen && (
+        <TicketHistoryPanel 
+          ticketId={ticket.ticketId} 
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+        />
+      )}
 
       <ChatHistory messages={ticket.messages} />
 

@@ -265,5 +265,21 @@ class TicketFeedback(db.Model):
     resolved_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
 
+class TicketHistory(db.Model):
+    __tablename__ = 'ticket_history'
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False)
+    event_type = db.Column(db.String(50), nullable=False)  # e.g., status_change, dept_change, assign, escalate, note
+    old_value = db.Column(db.String(100), nullable=True)
+    new_value = db.Column(db.String(100), nullable=True)
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
+    from_role = db.Column(db.String(10), nullable=True)
+    to_role = db.Column(db.String(10), nullable=True)
+    from_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    to_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    actor_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+
 # KBDraft model removed - unused drafting feature
     

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from flask import abort
 from sqlalchemy import text as _sql_text, func
 from extensions import db
-from models import Ticket, Message, ResolutionAttempt, TicketEvent, Solution, KBArticle, Department, TicketCC, EmailQueue, StepSequence, SolutionGeneratedBy, SolutionStatus # Import all models
+from models import Ticket, Message, ResolutionAttempt, TicketEvent, Solution, KBArticle, Department, TicketCC, EmailQueue, StepSequence, TicketHistory, SolutionGeneratedBy, SolutionStatus # Import all models
 from email_helpers import _fingerprint, _normalize
 from openai_helpers import categorize_department_with_gpt
 from utils import extract_mentions
@@ -279,6 +279,35 @@ def create_solution(ticket_id: str, text: str, proposed_by: str | None = None):
         raise
     return s
 
+
+def log_ticket_history(
+    ticket_id,
+    event_type,
+    actor_agent_id=None,
+    old_value=None,
+    new_value=None,
+    department_id=None,
+    from_role=None,
+    to_role=None,
+    from_agent_id=None,
+    to_agent_id=None,
+    note=None
+):
+    history = TicketHistory(
+        ticket_id=ticket_id,
+        event_type=event_type,
+        actor_agent_id=actor_agent_id,
+        old_value=old_value,
+        new_value=new_value,
+        department_id=department_id,
+        from_role=from_role,
+        to_role=to_role,
+        from_agent_id=from_agent_id,
+        to_agent_id=to_agent_id,
+        note=note
+    )
+    db.session.add(history)
+    db.session.commit()
 
 # def audit(event: str, entity_type: str, entity_id: int, actor_id=None, meta: dict | None=None):
 #     rec = KBAudit(

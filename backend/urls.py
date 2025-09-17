@@ -9,7 +9,7 @@ from sqlalchemy import func, text
 import re
 import os
 from extensions import db
-from db_helpers import get_next_attempt_no, has_pending_attempt, save_steps, insert_message_with_mentions, get_messages, ensure_ticket_record_from_csv, log_event, add_event, _derive_subject_from_text
+from db_helpers import get_next_attempt_no, has_pending_attempt, save_steps, insert_message_with_mentions, get_messages, ensure_ticket_record_from_csv, log_event, add_event, _derive_subject_from_text, log_ticket_history, save_message
 from email_helpers import _serializer, _utcnow, send_via_gmail, enqueue_status_email
 from openai_helpers import _inject_system_message, _start_step_sequence_basic, categorize_department_with_gpt, is_materially_different, next_action_for, categorize_with_gpt
 from utils import extract_mentions, route_department_from_category
@@ -1166,10 +1166,28 @@ def post_chat(thread_id):
             
             # Perform escalation
             old_level = t.level or 1
+            old_status = t.status
             t.level = target_level
             t.status = "escalated"
             from datetime import datetime, timezone
             t.updated_at = datetime.now(timezone.utc)
+            
+            # Log status change
+            actor = getattr(request, "agent_ctx", None)
+            actor_id = actor.get("id") if isinstance(actor, dict) else None
+            log_ticket_history(
+                t.id, "status_change", old_status, "escalated",
+                actor_id=actor_id,
+                notes=f"Ticket escalated from L{old_level} to L{target_level}"
+            )
+            
+            # Log level change
+            log_ticket_history(
+                t.id, "level_change", str(old_level), str(target_level),
+                actor_id=actor_id,
+                notes=f"Ticket escalated from L{old_level} to L{target_level}"
+            )
+            
             db.session.commit()
             
             # Log the escalation
@@ -1267,9 +1285,18 @@ def solution_response(thread_id):
 
     if solved:
         insert_message_with_mentions(thread_id, "assistant", "🎉 Glad we could help! Closing the ticket.")
+        old_status = t.status
         t.status = "closed"
         t.resolved_by = user.get("id")  # Track who resolved the ticket
         t.updated_at = now
+        
+        # Log status change
+        log_ticket_history(
+            t.id, "status_change", old_status, "closed",
+            actor_id=user.get("id"),
+            notes="Ticket closed - user confirmed problem was solved"
+        )
+        
         db.session.commit()
         log_event(thread_id, "RESOLVED", {"note": "User confirmed solved"})
         # Emails are handled by /close; this endpoint just updates state.
@@ -1278,9 +1305,25 @@ def solution_response(thread_id):
     # Not solved → escalate (1→2, else →3) and log
     old = t.level or 1
     to_level = 2 if old == 1 else 3
+    old_status = t.status
     t.level = to_level
     t.status = "escalated"
     t.updated_at = now
+    
+    # Log status change
+    log_ticket_history(
+        t.id, "status_change", old_status, "escalated",
+        actor_id=user.get("id"),
+        notes=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
+    )
+    
+    # Log level change
+    log_ticket_history(
+        t.id, "level_change", str(old), str(to_level),
+        actor_id=user.get("id"),
+        notes=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
+    )
+    
     db.session.commit()
 
     log_event(
@@ -1294,12 +1337,9 @@ def solution_response(thread_id):
     return jsonify(status=t.status, level=to_level, message="Ticket escalated"), 200
 
 
-
 @urls.route("/threads/<thread_id>/escalate", methods=["POST"])
 @require_role("L1","L2","L3","MANAGER")
 def escalate_ticket(thread_id):
-    #ensure_ticket_record_from_csv(thread_id)
-
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
         return jsonify(error="Ticket not found"), 404
@@ -1314,95 +1354,94 @@ def escalate_ticket(thread_id):
     if not escalation_reason:
         return jsonify(error="Escalation reason is required"), 400
     
-    # Get current agent role for escalation rules
-    agent = getattr(request, 'agent_ctx', {}) or {}
-    current_role = agent.get('role', 'L1')
-
-    current_role = agent.get('role', 'L1')
-
-    # 🔍 DEBUG: Add this debug block here
-    print(f"🔍 DEBUG ESCALATION:")
-    print(f"   agent_ctx = {getattr(request, 'agent_ctx', None)}")
-    print(f"   agent = {agent}")
-    print(f"   agent.get('id') = {agent.get('id')}")
-    print(f"   current_role = {current_role}")
-    print(f"   thread_id = {thread_id}")
-    print(f"   target_dept = {target_department_id}")
-    print(f"   target_agent = {target_agent_id}")
-    print(f"   reason = {escalation_reason}")
+    # Get current agent info from token
+    current_agent_id = request.agent_ctx.get('id')
+    current_agent_role = request.agent_ctx.get('role', '').upper()
+    current_agent_dept = request.agent_ctx.get('department_id')
     
+    # ROUTING PERMISSION CHECKS for escalation
+    if target_agent_id:
+        target_agent = Agent.query.get(target_agent_id)
+        if target_agent:
+            if current_agent_dept != 7:  # Not Helpdesk
+                if current_agent_role == "MANAGER":
+                    if target_agent.department_id != current_agent_dept and target_agent.department_id != 7:
+                        return jsonify({"error": "Department managers can only escalate within their department or to Helpdesk"}), 403
+                elif current_agent_role in ["L2", "L3"]:
+                    if target_agent.department_id != current_agent_dept:
+                        return jsonify({"error": "L2/L3 agents can only escalate within their department"}), 403
+
     old_level = ticket.level or 1
     
     # Escalation rules: L1→L2, L2→L3, L3→Manager, Manager can escalate anywhere
-    if current_role == "L1":
+    if current_agent_role == "L1":
         to_level = 2  # L1 can only escalate to L2
-    elif current_role == "L2":
+    elif current_agent_role == "L2":
         to_level = 3  # L2 can only escalate to L3
-    elif current_role == "L3":
+    elif current_agent_role == "L3":
         to_level = 4  # L3 escalates to Manager level
-    elif current_role == "MANAGER":
+    elif current_agent_role == "MANAGER":
         # Manager can escalate to any level, default increment
         to_level = min(old_level + 1, 4)
     else:
         return jsonify(error="Insufficient permissions to escalate"), 403
     
     # Prevent invalid escalations
-    if old_level >= to_level and current_role != "MANAGER":
+    if old_level >= to_level and current_agent_role != "MANAGER":
         return jsonify(error=f"Ticket already at level {old_level} or higher"), 400
     
     # Update ticket
+    old_status = ticket.status
     ticket.level = to_level
     ticket.status = 'escalated'
     ticket.updated_at = datetime.now(timezone.utc)
+    
+    # Log status change
+    log_ticket_history(
+        ticket.id, "status_change", old_status, "escalated",
+        actor_id=current_agent_id,
+        notes=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
+    )
+    
+    # Log level change
+    log_ticket_history(
+        ticket.id, "level_change", str(old_level), str(to_level),
+        actor_id=current_agent_id,
+        notes=f"Manual escalation from L{old_level} to L{to_level} by {current_agent_role}"
+    )
     
     # Update department and assignment if specified
     if target_department_id:
         ticket.department_id = target_department_id
     if target_agent_id:
+        old_assigned_id = ticket.assigned_to
         ticket.assigned_to = target_agent_id
-    
-    # Create escalation summary record (with fallback if table doesn't exist)
-    # try:
-    #     summary = EscalationSummary(
-    #         ticket_id=thread_id,
-    #         escalated_to_department_id=target_department_id,
-    #         escalated_to_agent_id=target_agent_id,
-    #         escalated_by_agent_id=agent.get('id'),
-    #         reason=escalation_reason,
-    #         from_level=old_level,
-    #         to_level=to_level
-    #     )
-    #     db.session.add(summary)
-    #     current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
-    # except Exception as e:
-    #     current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
-    
-    # Create escalation summary record (with enhanced debugging)
+        # Log assignment change during escalation
+        log_ticket_history(
+            ticket_id=ticket.id,
+            event_type="assign",
+            actor_agent_id=current_agent_id,
+            from_agent_id=old_assigned_id,
+            to_agent_id=target_agent_id,
+            note=f"Assigned during escalation to level {to_level}"
+        )
+
+    # Create escalation summary record
     try:
-        print(f"🔄 Creating EscalationSummary...")
-        print(f"   Parameters: ticket_id={thread_id}, dept_id={target_department_id}, agent_id={target_agent_id}")
-        print(f"   escalated_by_agent_id={agent.get('id')}, reason='{escalation_reason}'")
-        print(f"   from_level={old_level}, to_level={to_level}")
-        
         summary = EscalationSummary(
             ticket_id=thread_id,
             escalated_to_department_id=target_department_id,
             escalated_to_agent_id=target_agent_id,
-            escalated_by_agent_id=agent.get('id'),
+            escalated_by_agent_id=current_agent_id,
             reason=escalation_reason,
             from_level=old_level,
             to_level=to_level
         )
         db.session.add(summary)
         db.session.commit()
-        print(f"✅ EscalationSummary created successfully!")
         current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
         
     except Exception as e:
-        print(f"❌ EscalationSummary creation failed: {e}")
-        print(f"   Exception type: {type(e)}")
-        import traceback
-        traceback.print_exc()
         current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
     
     # Log event with additional details
@@ -1420,7 +1459,7 @@ def escalate_ticket(thread_id):
         if target_agent:
             event_details['target_agent'] = target_agent.name
     
-    add_event(ticket.id, 'ESCALATED', actor_agent_id=agent.get('id'), **event_details)
+    add_event(ticket.id, 'ESCALATED', actor_agent_id=current_agent_id, **event_details)
     db.session.commit()
     
     level_name = "Manager" if to_level == 4 else f"L{to_level}"
@@ -1448,6 +1487,187 @@ def escalate_ticket(thread_id):
         }
     ), 200
 
+# @urls.route("/threads/<thread_id>/escalate", methods=["POST"])
+# @require_role("L1","L2","L3","MANAGER")
+# def escalate_ticket(thread_id):
+#     #ensure_ticket_record_from_csv(thread_id)
+
+#     ticket = db.session.get(Ticket, thread_id)
+#     if not ticket:
+#         return jsonify(error="Ticket not found"), 404
+    
+#     # Get request data for new escalation form
+#     data = request.json or {}
+#     escalation_reason = data.get('reason', '').strip()
+#     target_department_id = data.get('department_id')
+#     target_agent_id = data.get('agent_id')
+    
+#     # Require reason for escalation
+#     if not escalation_reason:
+#         return jsonify(error="Escalation reason is required"), 400
+    
+#     # Get current agent role for escalation rules
+#     agent = getattr(request, 'agent_ctx', {}) or {}
+#     current_role = agent.get('role', 'L1')
+
+#     current_role = agent.get('role', 'L1')
+
+#     # 🔍 DEBUG: Add this debug block here
+#     print(f"🔍 DEBUG ESCALATION:")
+#     print(f"   agent_ctx = {getattr(request, 'agent_ctx', None)}")
+#     print(f"   agent = {agent}")
+#     print(f"   agent.get('id') = {agent.get('id')}")
+#     print(f"   current_role = {current_role}")
+#     print(f"   thread_id = {thread_id}")
+#     print(f"   target_dept = {target_department_id}")
+#     print(f"   target_agent = {target_agent_id}")
+#     print(f"   reason = {escalation_reason}")
+    
+#     old_level = ticket.level or 1
+    
+#     # Escalation rules: L1→L2, L2→L3, L3→Manager, Manager can escalate anywhere
+#     if current_role == "L1":
+#         to_level = 2  # L1 can only escalate to L2
+#     elif current_role == "L2":
+#         to_level = 3  # L2 can only escalate to L3
+#     elif current_role == "L3":
+#         to_level = 4  # L3 escalates to Manager level
+#     elif current_role == "MANAGER":
+#         # Manager can escalate to any level, default increment
+#         to_level = min(old_level + 1, 4)
+#     else:
+#         return jsonify(error="Insufficient permissions to escalate"), 403
+    
+#     # Prevent invalid escalations
+#     if old_level >= to_level and current_role != "MANAGER":
+#         return jsonify(error=f"Ticket already at level {old_level} or higher"), 400
+    
+#     # Update ticket
+#     old_status = ticket.status
+#     ticket.level = to_level
+#     ticket.status = 'escalated'
+#     ticket.updated_at = datetime.now(timezone.utc)
+    
+#     # Log status change
+#     actor = getattr(request, "agent_ctx", None)
+#     actor_id = actor.get("id") if isinstance(actor, dict) else None
+#     log_ticket_history(
+#         ticket.id, "status_change", old_status, "escalated",
+#         actor_id=actor_id,
+#         notes=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
+#     )
+    
+#     # Log level change
+#     log_ticket_history(
+#         ticket.id, "level_change", str(old_level), str(to_level),
+#         actor_id=actor_id,
+#         notes=f"Manual escalation from L{old_level} to L{to_level} by {current_role}"
+#     )
+    
+#     # Update department and assignment if specified
+#     if target_department_id:
+#         ticket.department_id = target_department_id
+#     if target_agent_id:
+#         old_assigned_id = ticket.assigned_to
+#         ticket.assigned_to = target_agent_id
+#         # Log assignment change during escalation
+#         from db_helpers import log_ticket_history
+#         log_ticket_history(
+#             ticket_id=ticket.id,
+#             event_type="assign",
+#             actor_agent_id=agent.get('id'),
+#             from_agent_id=old_assigned_id,
+#             to_agent_id=target_agent_id,
+#             note=f"Assigned during escalation to level {to_level}"
+#         )
+
+#     # Create escalation summary record (with fallback if table doesn't exist)
+#     # try:
+#     #     summary = EscalationSummary(
+#     #         ticket_id=thread_id,
+#     #         escalated_to_department_id=target_department_id,
+#     #         escalated_to_agent_id=target_agent_id,
+#     #         escalated_by_agent_id=agent.get('id'),
+#     #         reason=escalation_reason,
+#     #         from_level=old_level,
+#     #         to_level=to_level
+#     #     )
+#     #     db.session.add(summary)
+#     #     current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
+#     # except Exception as e:
+#     #     current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
+    
+#     # Create escalation summary record (with enhanced debugging)
+#     try:
+#         print(f"🔄 Creating EscalationSummary...")
+#         print(f"   Parameters: ticket_id={thread_id}, dept_id={target_department_id}, agent_id={target_agent_id}")
+#         print(f"   escalated_by_agent_id={agent.get('id')}, reason='{escalation_reason}'")
+#         print(f"   from_level={old_level}, to_level={to_level}")
+        
+#         summary = EscalationSummary(
+#             ticket_id=thread_id,
+#             escalated_to_department_id=target_department_id,
+#             escalated_to_agent_id=target_agent_id,
+#             escalated_by_agent_id=agent.get('id'),
+#             reason=escalation_reason,
+#             from_level=old_level,
+#             to_level=to_level
+#         )
+#         db.session.add(summary)
+#         db.session.commit()
+#         print(f"✅ EscalationSummary created successfully!")
+#         current_app.logger.info(f"Created escalation summary for ticket {thread_id}")
+        
+#     except Exception as e:
+#         print(f"❌ EscalationSummary creation failed: {e}")
+#         print(f"   Exception type: {type(e)}")
+#         import traceback
+#         traceback.print_exc()
+#         current_app.logger.warning(f"Could not create escalation summary: {e}. Continuing with escalation...")
+    
+#     # Log event with additional details
+#     event_details = {
+#         'from_level': old_level, 
+#         'to_level': to_level,
+#         'reason': escalation_reason
+#     }
+#     if target_department_id:
+#         dept = db.session.get(Department, target_department_id)
+#         if dept:
+#             event_details['target_department'] = dept.name
+#     if target_agent_id:
+#         target_agent = db.session.get(Agent, target_agent_id)
+#         if target_agent:
+#             event_details['target_agent'] = target_agent.name
+    
+#     add_event(ticket.id, 'ESCALATED', actor_agent_id=agent.get('id'), **event_details)
+#     db.session.commit()
+    
+#     level_name = "Manager" if to_level == 4 else f"L{to_level}"
+#     escalation_msg = f"🚀 Ticket escalated to {level_name} support."
+#     if target_department_id:
+#         dept = db.session.get(Department, target_department_id)
+#         if dept:
+#             escalation_msg += f" Department: {dept.name}."
+#     if target_agent_id:
+#         target_agent = db.session.get(Agent, target_agent_id)
+#         if target_agent:
+#             escalation_msg += f" Assigned to: {target_agent.name}."
+#     escalation_msg += f" Reason: {escalation_reason}"
+    
+#     insert_message_with_mentions(thread_id, "assistant", escalation_msg)
+#     insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been escalated to {level_name} support.")
+#     enqueue_status_email(thread_id, "escalated", f"We've escalated this to {level_name}.")
+#     return jsonify(
+#         status="escalated", 
+#         level=to_level, 
+#         message={
+#             "sender": "assistant",
+#             "content": escalation_msg,
+#             "timestamp": datetime.now(timezone.utc).isoformat()
+#         }
+#     ), 200
+
 @urls.route("/threads/<thread_id>/close", methods=["POST"])
 @require_role("L2","L3","MANAGER")
 def close_ticket(thread_id):
@@ -1465,9 +1685,19 @@ def close_ticket(thread_id):
         return jsonify(error="Ticket is already closed or resolved"), 400
     
     now = datetime.now(timezone.utc).isoformat()
+    old_status = ticket.status
     ticket.status = 'closed'
     ticket.resolved_by = getattr(request, 'agent_ctx', {}).get('id')  # Track who closed the ticket
     ticket.updated_at = now
+    
+    # Log status change
+    actor = getattr(request, 'agent_ctx', None)
+    actor_id = actor.get('id') if isinstance(actor, dict) else None
+    log_ticket_history(
+        ticket.id, "status_change", old_status, "closed",
+        actor_id=actor_id,
+        notes=f"Ticket closed with reason: {reason or 'No reason provided'}"
+    )
     
     # Log event with reason
     add_event(ticket.id, 'CLOSED', 
@@ -1513,8 +1743,18 @@ def archive_ticket(thread_id):
         return jsonify(error="Ticket is already archived"), 400
         
     now = datetime.now(timezone.utc).isoformat()
+    old_archived = ticket.archived
     ticket.archived = True
     ticket.updated_at = now
+    
+    # Log archive state change
+    actor = getattr(request, 'agent_ctx', None)
+    actor_id = actor.get('id') if isinstance(actor, dict) else None
+    log_ticket_history(
+        ticket.id, "archive_change", str(old_archived), "True",
+        actor_id=actor_id,
+        notes=f"Ticket archived - reason: {reason}"
+    )
     
     # Log event with reason
     add_event(ticket.id, 'ARCHIVED', 
@@ -1647,6 +1887,7 @@ def get_current_agent():
     return jsonify(getattr(request, "agent_ctx", {})), 200
     
 # ─── Ticket Claim Endpoint ───────────────────────────────────────────────────
+
 @urls.route("/threads/<thread_id>/claim", methods=["POST"])
 @require_role("L1","L2","L3","MANAGER")
 def claim_ticket(thread_id):
@@ -1655,7 +1896,10 @@ def claim_ticket(thread_id):
     if not agent_name:
         return jsonify(error="agent_name required"), 400
 
-    #ensure_ticket_record_from_csv(thread_id)
+    # Get current agent info from token
+    current_agent_id = request.agent_ctx.get('id')
+    current_agent_role = request.agent_ctx.get('role', '').upper()
+    current_agent_dept = request.agent_ctx.get('department_id')
 
     # Find agent id by name (or switch to using agent_id in the request)
     agent = Agent.query.filter_by(name=agent_name).first()
@@ -1667,6 +1911,26 @@ def claim_ticket(thread_id):
     if not ticket:
         ticket = Ticket(id=thread_id, status="open")
         db.session.add(ticket)
+        
+        # Log initial ticket creation with status
+        log_ticket_history(
+            thread_id, "status_change", None, "open",
+            actor_id=current_agent_id,  # Use current_agent_id instead of agent.id
+            notes="Ticket created with initial status 'open'"
+        )
+        
+        # Log initial level assignment (default is 1)
+        log_ticket_history(
+            thread_id, "level_change", None, "1",
+            actor_id=current_agent_id,  # Use current_agent_id instead of agent.id
+            notes="Ticket created with initial level L1"
+        )
+
+    # ROUTING PERMISSION CHECK - now using current_agent variables
+    if ticket.department_id and ticket.department_id != current_agent_dept:
+        # Only Helpdesk (dept 7) can claim tickets from other departments
+        if current_agent_dept != 7:  # 7 is Helpdesk department
+            return jsonify({"error": "Cannot claim tickets outside your department. Only Helpdesk can assign cross-department."}), 403
 
     # 2) close any open assignment for this ticket
     db.session.execute(_sql_text("""
@@ -1682,14 +1946,24 @@ def claim_ticket(thread_id):
     ))
 
     # 4) set owner field (legacy UI) AND sync assigned_to
+    old_assigned_id = ticket.assigned_to
     ticket.owner = agent_name
     ticket.assigned_to = agent.id  # Sync with TicketAssignment
     ticket.updated_at = datetime.utcnow()
     db.session.commit()
 
+    # Log assignment history - now using current_agent_id
+    log_ticket_history(
+        ticket_id=ticket.id,
+        event_type="assign",
+        actor_agent_id=current_agent_id,  # Use current_agent_id instead of agent.id
+        from_agent_id=old_assigned_id,
+        to_agent_id=agent.id,
+        note=f"Ticket claimed by {agent_name} (claimed by {current_agent_role})"
+    )
+
     # 5) log event + system message
-    log_event(thread_id, "ASSIGNED", {"agent_id": agent.id, "agent_name": agent_name})
-    from db_helpers import save_message
+    log_event(thread_id, "ASSIGNED", {"agent_id": agent.id, "agent_name": agent_name, "claimed_by": current_agent_id})
     save_message(
         ticket_id=thread_id,
         sender="system",
@@ -1698,6 +1972,101 @@ def claim_ticket(thread_id):
         meta={"event": "assigned", "agent": agent_name, "timestamp": datetime.utcnow().isoformat()}
     )
     return jsonify(status="assigned", ticket_id=thread_id, owner=agent_name), 200
+
+# @urls.route("/threads/<thread_id>/claim", methods=["POST"])
+# @require_role("L1","L2","L3","MANAGER")
+# def claim_ticket(thread_id):
+#     data = request.json or {}
+#     agent_name = data.get("agent_name")
+#     if not agent_name:
+#         return jsonify(error="agent_name required"), 400
+
+#     # Get current agent info from token
+#     current_agent_id = request.agent_ctx.get('id')
+#     current_agent_role = request.agent_ctx.get('role', '').upper()
+#     current_agent_dept = request.agent_ctx.get('department_id')
+
+#     # Find agent id by name (or switch to using agent_id in the request)
+#     agent = Agent.query.filter_by(name=agent_name).first()
+#     if not agent:
+#         return jsonify(error=f"agent '{agent_name}' not found"), 404
+
+#     # 1) ensure ticket exists
+#     ticket = db.session.get(Ticket, thread_id)
+#     if not ticket:
+#         ticket = Ticket(id=thread_id, status="open")
+#         db.session.add(ticket)
+        
+#         # Log initial ticket creation with status
+#         log_ticket_history(
+#             thread_id, "status_change", None, "open",
+#             actor_id=agent.id,
+#             notes="Ticket created with initial status 'open'"
+#         )
+        
+#         # Log initial level assignment (default is 1)
+#         log_ticket_history(
+#             thread_id, "level_change", None, "1",
+#             actor_id=agent.id,
+#             notes="Ticket created with initial level L1"
+#         )
+
+#     # ROUTING PERMISSION CHECK
+#     if ticket.department_id and ticket.department_id != current_agent_dept:
+#         # Only Helpdesk (dept 7) can claim tickets from other departments
+#         if current_agent_dept != 7:  # 7 is Helpdesk department
+#             return jsonify({"error": "Cannot claim tickets outside your department. Only Helpdesk can assign cross-department."}), 403
+
+#     # 2) close any open assignment for this ticket
+#     db.session.execute(_sql_text("""
+#         UPDATE ticket_assignments SET unassigned_at = :now
+#         WHERE ticket_id = :tid AND (unassigned_at IS NULL OR unassigned_at = '')
+#     """), {"tid": thread_id, "now": datetime.utcnow().isoformat()})
+
+#     # 3) create new assignment
+#     db.session.add(TicketAssignment(
+#         ticket_id=thread_id,
+#         agent_id=agent.id,
+#         assigned_at=datetime.utcnow().isoformat()
+#     ))
+
+#     # 4) set owner field (legacy UI) AND sync assigned_to
+#     old_assigned_id = ticket.assigned_to
+#     ticket.owner = agent_name
+#     ticket.assigned_to = agent.id  # Sync with TicketAssignment
+#     ticket.updated_at = datetime.utcnow()
+#     db.session.commit()
+
+#     # Log assignment history
+#     from db_helpers import log_ticket_history
+#     log_ticket_history(
+#         ticket_id=ticket.id,
+#         event_type="assign",
+#         actor_agent_id=agent.id,
+#         from_agent_id=old_assigned_id,
+#         to_agent_id=agent.id,
+#         note=f"Ticket claimed by {agent_name}"
+#     )
+
+#     log_ticket_history(
+#     ticket_id=ticket.id,
+#     event_type="assign",
+#     actor_agent_id=agent.id,  # or use the current session agent if different
+#     from_agent_id=None,       # If you track previous assignee, set their id here
+#     to_agent_id=agent.id,
+#     note=f"Ticket assigned to {agent_name}"
+#     )
+
+#     # 5) log event + system message
+#     log_event(thread_id, "ASSIGNED", {"agent_id": agent.id, "agent_name": agent_name})
+#     save_message(
+#         ticket_id=thread_id,
+#         sender="system",
+#         content=f"🔔 Ticket #{thread_id} assigned to {agent_name}",
+#         type="system",
+#         meta={"event": "assigned", "agent": agent_name, "timestamp": datetime.utcnow().isoformat()}
+#     )
+#     return jsonify(status="assigned", ticket_id=thread_id, owner=agent_name), 200
 
 
 # Inbox: Get all tickets where an agent was @mentioned
@@ -2732,7 +3101,6 @@ def emails_retry(qid):
     db.session.commit()
     return jsonify(ok=True)
 
-
 @urls.route("/threads/<thread_id>/department", methods=["PATCH"])
 @require_role("L2","L3","MANAGER")
 def override_department(thread_id):
@@ -2741,6 +3109,28 @@ def override_department(thread_id):
     dep = data.get("department_id", data.get("department"))
     if dep is None or dep == "":
         return jsonify(error="department or department_id required"), 400
+
+    # Get current agent info from token
+    current_agent_role = request.agent_ctx.get('role', '').upper()
+    current_agent_dept = request.agent_ctx.get('department_id')
+    
+    # ROUTING PERMISSION CHECKS
+    # Only Helpdesk and Managers can change departments
+    if current_agent_dept != 7 and current_agent_role != "MANAGER":
+        return jsonify({"error": "Only Helpdesk agents and Managers can change ticket departments"}), 403
+    
+    # If it's a department manager, they can only send tickets back to Helpdesk
+    if current_agent_role == "MANAGER" and current_agent_dept != 7:
+        new_department_id = None
+        try:
+            new_department_id = int(dep)
+        except:
+            d = Department.query.filter_by(name=str(dep)).first()
+            if d:
+                new_department_id = d.id
+        
+        if new_department_id != 7:  # Must send back to Helpdesk
+            return jsonify({"error": "Department managers can only send misrouted tickets back to Helpdesk"}), 403
 
     # normalize: allow "3" as id, or "Network" as name
     d = None
@@ -2755,19 +3145,78 @@ def override_department(thread_id):
         return jsonify(error="unknown department"), 404
 
     t = db.session.get(Ticket, thread_id) or abort(404)
-    old = t.department_id
+    old_department_id = t.department_id
     t.department_id = d.id
     t.updated_at = datetime.utcnow()
     db.session.commit()
 
-    actor = getattr(getattr(request, "agent_ctx", {}), "get", lambda _:"")( "email")
+    # Log department change history
+    log_ticket_history(
+        ticket_id=t.id,
+        event_type="dept_change",
+        actor_agent_id=request.agent_ctx.get("id"),
+        old_value=str(old_department_id) if old_department_id else None,
+        new_value=str(d.id),
+        department_id=d.id,
+        note=f"Department manually changed to {d.name}. Reason: {data.get('reason', 'No reason provided')}"
+    )
+
+    actor = request.agent_ctx.get("email", "")
     log_event(thread_id, "ROUTE_OVERRIDE", {
-        "old_department_id": old,
+        "old_department_id": old_department_id,
         "new_department_id": d.id,
         "reason": data.get("reason") or "",
         "by": actor
     })
     return jsonify(ok=True, department_id=d.id, department=d.name, updated_at=t.updated_at), 200
+
+# @urls.route("/threads/<thread_id>/department", methods=["PATCH"])
+# @require_role("L2","L3","MANAGER")
+# def override_department(thread_id):
+#     data = request.json or {}
+#     # Accept department_id (number) or department (name or id)
+#     dep = data.get("department_id", data.get("department"))
+#     if dep is None or dep == "":
+#         return jsonify(error="department or department_id required"), 400
+
+#     # normalize: allow "3" as id, or "Network" as name
+#     d = None
+#     try:
+#         d = Department.query.get(int(dep))
+#     except Exception:
+#         pass
+#     if not d:
+#         d = Department.query.filter_by(name=str(dep)).first()
+
+#     if not d:
+#         return jsonify(error="unknown department"), 404
+
+#     t = db.session.get(Ticket, thread_id) or abort(404)
+#     old_department_id = t.department_id
+#     t.department_id = d.id
+#     t.updated_at = datetime.utcnow()
+#     db.session.commit()
+
+#     # Log department change history
+#     from db_helpers import log_ticket_history
+#     log_ticket_history(
+#         ticket_id=t.id,
+#         event_type="dept_change",
+#         actor_agent_id=getattr(request, "agent_ctx", {}).get("id"),
+#         old_value=str(old_department_id) if old_department_id else None,
+#         new_value=str(d.id),
+#         department_id=d.id,
+#         note=f"Department manually changed to {d.name}. Reason: {data.get('reason', 'No reason provided')}"
+#     )
+
+#     actor = getattr(getattr(request, "agent_ctx", {}), "get", lambda _:"")( "email")
+#     log_event(thread_id, "ROUTE_OVERRIDE", {
+#         "old_department_id": old_department_id,
+#         "new_department_id": d.id,
+#         "reason": data.get("reason") or "",
+#         "by": actor
+#     })
+#     return jsonify(ok=True, department_id=d.id, department=d.name, updated_at=t.updated_at), 200
 
 
 @urls.route("/threads/<thread_id>/route", methods=["POST"])
@@ -2784,9 +3233,23 @@ def auto_route(thread_id):
     if not dep_id:
         return jsonify(routed=False, reason="no mapping"), 200
 
+    old_department_id = t.department_id
     t.department_id = dep_id
     t.updated_at = datetime.utcnow()
     db.session.commit()
+    
+    # Log department change history
+    from db_helpers import log_ticket_history
+    log_ticket_history(
+        ticket_id=t.id,
+        event_type="dept_change",
+        actor_agent_id=getattr(request, "agent_ctx", {}).get("id"),
+        old_value=str(old_department_id) if old_department_id else None,
+        new_value=str(dep_id),
+        department_id=dep_id,
+        note="Department auto-routed based on category"
+    )
+    
     log_event(thread_id, "ROUTED", {"department_id": dep_id, "mode": "auto"})
     return jsonify(routed=True, department_id=dep_id)
 
@@ -2849,12 +3312,36 @@ def auto_assign_departments():
             except Exception as e:
                 current_app.logger.warning(f"[AUTO-ASSIGN] Ticket {t.id}: FAISS fallback failed: {e}")
         if dep:
+            old_department_id = t.department_id
             t.department_id = dep.id
             count += 1
+            # Log department change history
+            from db_helpers import log_ticket_history
+            log_ticket_history(
+                ticket_id=t.id,
+                event_type="dept_change",
+                actor_agent_id=None,  # System operation
+                old_value=str(old_department_id) if old_department_id else None,
+                new_value=str(dep.id),
+                department_id=dep.id,
+                note=f"Department auto-assigned to {dep.name} by GPT/FAISS"
+            )
         else:
             # Assign to default department if no match
+            old_department_id = t.department_id
             t.department_id = default_dep.id
             count += 1
+            # Log department change history
+            from db_helpers import log_ticket_history
+            log_ticket_history(
+                ticket_id=t.id,
+                event_type="dept_change",
+                actor_agent_id=None,  # System operation
+                old_value=str(old_department_id) if old_department_id else None,
+                new_value=str(default_dep.id),
+                department_id=default_dep.id,
+                note=f"Department auto-assigned to default ({default_dep.name}) - no match found"
+            )
             current_app.logger.warning(f"[AUTO-ASSIGN] Ticket {t.id}: Could not match department, assigned to General Support.")
     db.session.commit()
     # Log any tickets still unassigned (should be none)
@@ -2885,9 +3372,27 @@ def deescalate_ticket(thread_id):
 
     to_level = old - 1
     now = datetime.now(timezone.utc).isoformat()
+    old_status = t.status
     t.level = to_level
     t.status = "de-escalated"
     t.updated_at = now
+    
+    # Log status change
+    actor = getattr(request, "agent_ctx", None)
+    actor_id = actor.get("id") if isinstance(actor, dict) else None
+    log_ticket_history(
+        t.id, "status_change", old_status, "de-escalated",
+        actor_id=actor_id,
+        notes=f"Ticket de-escalated from L{old} to L{to_level}"
+    )
+    
+    # Log level change
+    log_ticket_history(
+        t.id, "level_change", str(old), str(to_level),
+        actor_id=actor_id,
+        notes=f"Manual de-escalation from L{old} to L{to_level}"
+    )
+    
     actor = getattr(request, "agent_ctx", None)
     actor_id = actor.get("id") if isinstance(actor, dict) else None
     add_event(t.id, "DE-ESCALATED",
@@ -3216,12 +3721,29 @@ def confirm_solution():
                 _inject_system_message(s.ticket_id, "Not fixed. Draft a materially different fix or escalate.")
             elif nxt["action"] == "escalate":
                 old = t.level or 1
-                t.level = max(old, nxt.get("to_level", old+1))
+                new_level = max(old, nxt.get("to_level", old+1))
+                old_status = t.status
+                t.level = new_level
                 t.status = "escalated"
                 t.updated_at = datetime.utcnow()
+                
+                # Log status change
+                log_ticket_history(
+                    t.id, "status_change", old_status, "escalated",
+                    actor_id=None,  # System action
+                    notes=f"Auto-escalated from L{old} to L{new_level} after solution marked 'not fixed'"
+                )
+                
+                # Log level change
+                log_ticket_history(
+                    t.id, "level_change", str(old), str(new_level),
+                    actor_id=None,  # System action
+                    notes=f"Auto-escalated from L{old} to L{new_level} due to 'not fixed' policy"
+                )
+                
                 db.session.commit()
                 log_event(s.ticket_id, "ESCALATED", {"auto": True, "policy": "after_not_fixed", "from_level": old, "to_level": t.level})
-                _inject_system_message(s.ticket_id, f"Auto-escalated to L{t.level} after Not fixed.")
+                _inject_system_message(s.ticket_id, f"Auto-escalated to L{new_level} after Not fixed.")
             elif nxt["action"] == "live_assist":
                 _inject_system_message(s.ticket_id, "Recommend scheduling a live assist/remote session.")
         except Exception as e:
@@ -3868,8 +4390,16 @@ def submit_feedback(thread_id):
     if type_ == "REJECT":
         t = db.session.get(Ticket, thread_id)
         if t:
+            old_status = t.status
             t.status = "open"
             t.updated_at = datetime.utcnow()
+            
+            # Log status change
+            log_ticket_history(
+                t.id, "status_change", old_status, "open",
+                actor_id=None,  # System action
+                notes="Ticket re-opened due to solution rejection"
+            )
 
     db.session.commit()
     return jsonify(ok=True), 200
@@ -4444,6 +4974,11 @@ def assign_ticket(thread_id):
     data = request.json or {}
     agent_id = data.get("agent_id")
     
+    # Get current agent info from token
+    current_agent_id = request.agent_ctx.get('id')
+    current_agent_role = request.agent_ctx.get('role', '').upper()
+    current_agent_dept = request.agent_ctx.get('department_id')
+   
     # Get ticket
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
@@ -4454,6 +4989,17 @@ def assign_ticket(thread_id):
         agent = db.session.get(Agent, agent_id)
         if not agent:
             return jsonify(error="Agent not found"), 404
+        
+        # ROUTING PERMISSION CHECKS
+        if current_agent_dept != 7:  # Not Helpdesk
+            # Department managers can only assign within their dept or return to Helpdesk Manager
+            if current_agent_role == "MANAGER":
+                if agent.department_id != current_agent_dept and agent.department_id != 7:
+                    return jsonify({"error": "Department managers can only assign within their department or return to Helpdesk"}), 403
+            # L2/L3 can only assign within their department
+            elif current_agent_role in ["L2", "L3"]:
+                if agent.department_id != current_agent_dept:
+                    return jsonify({"error": "L2/L3 agents can only assign within their department"}), 403
         
         # Close any open assignments
         db.session.execute(_sql_text("""
@@ -4469,9 +5015,20 @@ def assign_ticket(thread_id):
         ))
         
         # Sync tickets table
+        old_assigned_id = ticket.assigned_to
         ticket.assigned_to = agent.id
         ticket.owner = agent.name
         message = f"Assigned to {agent.name}"
+        
+        # Log assignment history
+        log_ticket_history(
+            ticket_id=ticket.id,
+            event_type="assign",
+            actor_agent_id=current_agent_id,
+            from_agent_id=old_assigned_id,
+            to_agent_id=agent.id,
+            note=f"Manually assigned to {agent.name}"
+        )
     else:
         # Unassign ticket
         db.session.execute(_sql_text("""
@@ -4479,14 +5036,25 @@ def assign_ticket(thread_id):
             WHERE ticket_id = :tid AND (unassigned_at IS NULL OR unassigned_at = '')
         """), {"tid": thread_id, "now": datetime.utcnow().isoformat()})
         
+        old_assigned_id = ticket.assigned_to
         ticket.assigned_to = None
         ticket.owner = None
         message = "Unassigned"
+        
+        # Log unassignment history
+        log_ticket_history(
+            ticket_id=ticket.id,
+            event_type="assign",
+            actor_agent_id=current_agent_id,
+            from_agent_id=old_assigned_id,
+            to_agent_id=None,
+            note=f"Ticket unassigned by {current_agent_role}"
+        )
     
     ticket.updated_at = datetime.utcnow()
     
     # Log event
-    add_event(thread_id, 'ASSIGNMENT_CHANGED', actor_agent_id=getattr(request, 'agent_ctx', {}).get('id'))
+    add_event(thread_id, 'ASSIGNMENT_CHANGED', actor_agent_id=current_agent_id)
     
     db.session.commit()
     
@@ -5067,7 +5635,164 @@ def not_fixed_feedback():
     log_event(t.id, "FEEDBACK", {"kind":"not_fixed_detail", "attempt_id": att.id, "reason": att.rejected_reason})
     return jsonify(ok=True)
 
+@urls.route("/tickets/<ticket_id>/history", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def get_ticket_history(ticket_id):
+    """Get comprehensive ticket history for frontend display"""
+    try:
+        # Verify ticket exists
+        ticket = db.session.get(Ticket, ticket_id)
+        if not ticket:
+            return jsonify({"error": "Ticket not found"}), 404
+        
+        # Check role-based access
+        user = getattr(request, "agent_ctx", {}) or {}
+        if not _can_view(user.get("role"), ticket.level or 1):
+            return jsonify({"error": "Access denied"}), 403
+        
+        # Get ticket history entries
+        history_entries = (TicketHistory.query
+                          .filter_by(ticket_id=ticket_id)
+                          .order_by(TicketHistory.created_at.asc())
+                          .all())
+        
+        # Build agent lookup map for efficient name resolution
+        agent_ids = set()
+        for entry in history_entries:
+            if entry.actor_agent_id:
+                agent_ids.add(entry.actor_agent_id)
+            if entry.from_agent_id:
+                agent_ids.add(entry.from_agent_id)
+            if entry.to_agent_id:
+                agent_ids.add(entry.to_agent_id)
+        
+        agents_map = {}
+        if agent_ids:
+            agents = Agent.query.filter(Agent.id.in_(agent_ids)).all()
+            agents_map = {agent.id: {"name": agent.name, "role": agent.role} for agent in agents}
+        
+        # Build department lookup map
+        dept_ids = {entry.department_id for entry in history_entries if entry.department_id}
+        departments_map = {}
+        if dept_ids:
+            departments = Department.query.filter(Department.id.in_(dept_ids)).all()
+            departments_map = {dept.id: dept.name for dept in departments}
+        
+        # Format history entries for frontend
+        formatted_history = []
+        for entry in history_entries:
+            # Get agent information
+            actor_info = agents_map.get(entry.actor_agent_id) if entry.actor_agent_id else None
+            from_agent_info = agents_map.get(entry.from_agent_id) if entry.from_agent_id else None
+            to_agent_info = agents_map.get(entry.to_agent_id) if entry.to_agent_id else None
+            
+            # Format the entry
+            formatted_entry = {
+                "id": entry.id,
+                "timestamp": entry.created_at.isoformat() if entry.created_at else None,
+                "event_type": entry.event_type,
+                "actor": {
+                    "id": entry.actor_agent_id,
+                    "name": actor_info["name"] if actor_info else "System",
+                    "role": actor_info["role"] if actor_info else None
+                } if entry.actor_agent_id or actor_info else {"name": "System"},
+                "details": {
+                    "old_value": entry.old_value,
+                    "new_value": entry.new_value,
+                    "from_agent": {
+                        "id": entry.from_agent_id,
+                        "name": from_agent_info["name"] if from_agent_info else None,
+                        "role": from_agent_info["role"] if from_agent_info else None
+                    } if from_agent_info else None,
+                    "to_agent": {
+                        "id": entry.to_agent_id,
+                        "name": to_agent_info["name"] if to_agent_info else None,
+                        "role": to_agent_info["role"] if to_agent_info else None
+                    } if to_agent_info else None,
+                    "department": {
+                        "id": entry.department_id,
+                        "name": departments_map.get(entry.department_id)
+                    } if entry.department_id else None,
+                    "from_role": entry.from_role,
+                    "to_role": entry.to_role
+                },
+                "note": entry.note,
+                "summary": _format_history_summary(entry, actor_info, from_agent_info, to_agent_info, departments_map)
+            }
+            
+            formatted_history.append(formatted_entry)
+        
+        # Get current ticket state for context
+        current_state = {
+            "id": ticket.id,
+            "status": ticket.status,
+            "level": ticket.level,
+            "assigned_to": ticket.assigned_to,
+            "department_id": ticket.department_id,
+            "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+            "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None
+        }
+        
+        return jsonify({
+            "ticket": current_state,
+            "history": formatted_history,
+            "total_entries": len(formatted_history)
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error fetching ticket history for {ticket_id}: {e}")
+        return jsonify({"error": "Failed to fetch ticket history"}), 500
 
+def _format_history_summary(entry, actor_info, from_agent_info, to_agent_info, departments_map):
+    """Generate human-readable summary for history entry"""
+    actor_name = actor_info["name"] if actor_info else "System"
+    
+    if entry.event_type == "assign":
+        if entry.to_agent_id and entry.from_agent_id:
+            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
+            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
+            return f"{actor_name} reassigned ticket from {from_name} to {to_name}"
+        elif entry.to_agent_id:
+            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
+            return f"{actor_name} assigned ticket to {to_name}"
+        elif entry.from_agent_id:
+            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
+            return f"{actor_name} unassigned ticket from {from_name}"
+        else:
+            return f"{actor_name} updated ticket assignment"
+    
+    elif entry.event_type == "status_change":
+        old_status = entry.old_value or "unknown"
+        new_status = entry.new_value or "unknown"
+        return f"{actor_name} changed status from '{old_status}' to '{new_status}'"
+    
+    elif entry.event_type == "level_change":
+        old_level = f"L{entry.old_value}" if entry.old_value else "unknown"
+        new_level = f"L{entry.new_value}" if entry.new_value else "unknown"
+        return f"{actor_name} escalated ticket from {old_level} to {new_level}"
+    
+    elif entry.event_type == "dept_change":
+        old_dept = departments_map.get(int(entry.old_value)) if entry.old_value and entry.old_value.isdigit() else entry.old_value or "unassigned"
+        new_dept = departments_map.get(entry.department_id) if entry.department_id else entry.new_value or "unknown"
+        return f"{actor_name} moved ticket from {old_dept} to {new_dept} department"
+    
+    elif entry.event_type == "role_change":
+        old_role = entry.from_role or "unknown"
+        new_role = entry.to_role or "unknown"
+        return f"{actor_name} changed role from {old_role} to {new_role}"
+    
+    elif entry.event_type == "note":
+        return f"{actor_name} added a note"
+    
+    elif entry.event_type == "archive_change":
+        if entry.new_value == "True":
+            return f"{actor_name} archived the ticket"
+        else:
+            return f"{actor_name} unarchived the ticket"
+    
+    else:
+        # Generic fallback
+        return f"{actor_name} performed {entry.event_type.replace('_', ' ')}"
 
 # # TEMPORARY - REMOVE IN FINAL DEPLOYMENT
 # @urls.route("/threads", methods=["GET"]) 
