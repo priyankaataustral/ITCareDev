@@ -2234,9 +2234,13 @@ def send_confirmation_email(solution_id):
     confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
     reject_url  = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
 
+    # Get ticket and requester info for personalization
+    ticket = db.session.get(Ticket, s.ticket_id)
+    requester_name = ticket.requester_name if ticket and ticket.requester_name else "there"
+    
     subject = f"Please review the solution for Ticket {s.ticket_id}"
     body = (
-        f"Hello,\n\n"
+        f"Hello {requester_name},\n\n"
         f"Please confirm if the proposed solution resolved your issue:\n\n"
         f"Confirm: {confirm_url}\n"
         f"Not fixed: {reject_url}\n\n"
@@ -2656,8 +2660,31 @@ def send_email(thread_id):
         confirm_url = f"{FRONTEND}/confirm?token={authToken}&a=confirm"
         reject_url  = f"{FRONTEND}/confirm?token={authToken}&a=not_confirm"
 
+        # Personalize email body with requester name and agent signature
+        agent_ctx = getattr(request, "agent_ctx", None) or {}
+        agent_name = agent_ctx.get("name", "Support Team")
+        requester_name = t.requester_name or "there"
+        
+        # Replace generic greetings with personalized greeting
+        personalized_body = email_body
+        if personalized_body.startswith("Hi there"):
+            personalized_body = personalized_body.replace("Hi there", f"Hi {requester_name}", 1)
+        elif personalized_body.startswith("Hello there"):
+            personalized_body = personalized_body.replace("Hello there", f"Hello {requester_name}", 1)
+        elif personalized_body.startswith("Dear User"):
+            personalized_body = personalized_body.replace("Dear User", f"Dear {requester_name}", 1)
+        elif not any(personalized_body.startswith(greeting) for greeting in ["Hi ", "Hello ", "Dear "]):
+            # If no greeting, add one
+            personalized_body = f"Hi {requester_name},\n\n{personalized_body}"
+        
+        # Add agent signature if not already present
+        if not any(signature in personalized_body.lower() for signature in ["best regards", "thanks", "sincerely"]):
+            personalized_body = f"{personalized_body}\n\nBest regards,\n{agent_name}"
+        elif "Support Team" in personalized_body:
+            personalized_body = personalized_body.replace("Support Team", agent_name)
+        
         final_body = (
-            f"{email_body}\n\n"
+            f"{personalized_body}\n\n"
             f"---\n"
             f"Please let us know if this solved your issue:\n"
             f"Confirm: {confirm_url}\n"
@@ -3097,9 +3124,10 @@ def emails_preview():
     if not t:
         return jsonify(error="ticket not found"), 404
 
+    requester_name = t.requester_name if t.requester_name else "there"
     subj = f"[Ticket {t.id}] {kind} — {(t.subject or '').strip()}"
     body = (
-        f"Hello,\n\n"
+        f"Hello {requester_name},\n\n"
         f"Update on your ticket {t.id}: {kind}.\n\n"
         f"Regards,\nSupport Team"
     )

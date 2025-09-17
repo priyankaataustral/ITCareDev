@@ -28,7 +28,8 @@ def enqueue_status_email(ticket_id: str, label: str, extra: str = ""):
         return
 
     subject = f"[Ticket {ticket_id}] {label} — {(t.subject or '').strip()}"
-    body = f"Hello,\n\nUpdate on your ticket {ticket_id}: {label}.\n\n{extra}\n\nThanks,\nSupport Team"
+    requester_name = t.requester_name if t and t.requester_name else "there"
+    body = f"Hello {requester_name},\n\nUpdate on your ticket {ticket_id}: {label}.\n\n{extra}\n\nThanks,\nSupport Team"
 
     # Prevent duplicate emails: only queue if not already pending for this ticket/subject/body
     existing = EmailQueue.query.filter_by(ticket_id=ticket_id, to_email=to_email, subject=subject, body=body, status='PENDING').first()

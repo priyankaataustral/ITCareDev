@@ -40,6 +40,18 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
     const isManager = currentUser?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
     
+    // Debug logging
+    console.log('Assignment Debug:', {
+      currentUser,
+      ticket,
+      isHelpdesk,
+      isManager,
+      isL2OrL3,
+      userDept: currentUser?.department_id,
+      ticketDept: ticket.department_id,
+      userRole: currentUser?.role
+    });
+    
     // Helpdesk can assign to anyone within the ticket's department
     if (isHelpdesk) return true;
     
@@ -87,8 +99,10 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
     setIsOpen(false);
   };
   
-  // Don't show assignment pill if user has no permission
-  if (!canAssignTickets()) {
+  // Show assignment pill with appropriate permissions
+  const hasAssignPermission = canAssignTickets();
+  
+  if (!hasAssignPermission) {
     return (
       <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm">
         <span>👤</span>
@@ -97,6 +111,7 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
         ) : (
           <span>Unassigned</span>
         )}
+        <span className="text-xs text-gray-400">(Read-only)</span>
       </div>
     );
   }
@@ -181,8 +196,19 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
     const isManager = agent?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(agent?.role);
     
-    // Only Helpdesk (any level) and Managers can change departments
-    return isHelpdesk || (isManager && isL2OrL3);
+    // Debug logging
+    console.log('DepartmentOverride Debug:', {
+      agent,
+      isHelpdesk,
+      isManager,
+      isL2OrL3,
+      department_id: agent?.department_id,
+      role: agent?.role
+    });
+    
+    // Only Helpdesk (any level) and Managers (any level) can change departments
+    // OR L2/L3 in any department can change departments
+    return isHelpdesk || isManager || isL2OrL3;
   };
   
   const getAvailableDepartments = () => {
@@ -361,10 +387,13 @@ export default function ThreadList({
 
   // Handle assignment change
   const handleAssignmentChange = async (ticketId, agentId) => {
+    console.log('Assignment attempt:', { ticketId, agentId, currentUser: agent });
     try {
       const response = await apiPost(`/threads/${ticketId}/assign`, {
         agent_id: agentId
       });
+      
+      console.log('Assignment successful:', response);
       
       // Update local state
       setThreads(prevThreads =>
@@ -375,9 +404,11 @@ export default function ThreadList({
         )
       );
       
+      alert('Assignment updated successfully');
+      
     } catch (error) {
       console.error('Failed to assign ticket:', error);
-      alert('Failed to update assignment');
+      alert(`Failed to update assignment: ${error.message}`);
     }
   };
 
