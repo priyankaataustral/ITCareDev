@@ -41,7 +41,8 @@ export default function KBDashboard({ open, onClose }) {
 
   // --- Data fetchers (now use apiGet/apiPost which return parsed JSON) ---
   const refresh = useCallback(async () => {
-    if (!open) return;
+    // Allow loading even if 'open' prop is undefined (for standalone usage)
+    console.log('🔄 KB Dashboard refresh called, open:', open);
     setLoading(true); setErr("");
     try {
       const [sol, art, fb, mx] = await Promise.all([
@@ -60,6 +61,21 @@ export default function KBDashboard({ open, onClose }) {
       setLoading(false);
     }
   }, [open]);
+
+  // Auto-load data when component opens or mounts
+  useEffect(() => {
+    // Load data when component opens (modal) or mounts for the first time
+    if (open) {
+      console.log('📈 KB Dashboard opening - loading data automatically');
+      refresh();
+    }
+  }, [open, refresh]);
+  
+  // Also load data on component mount (fallback if open prop isn't used)
+  useEffect(() => {
+    console.log('📈 KB Dashboard mounted - ensuring data is loaded');
+    refresh();
+  }, [refresh]);
 
     // Upload function
     const handleUploadProtocol = async (e) => {

@@ -16,6 +16,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      
+      // Small delay to ensure state is fully hydrated before redirect
+      // This prevents race conditions with biometric auto-fill
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       router.push("/SupportInboxPlugin");
     } catch (err) {
       setError(err.message || "Network error");

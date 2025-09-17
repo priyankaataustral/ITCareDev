@@ -52,8 +52,15 @@ export function AuthProvider({ children }) {
     const data = await apiPost('/login', { email, password });
     const { token: newToken, agent: agentData } = data || {};
     if (!newToken || !agentData) throw new Error('Malformed response from server');
+    
+    // Immediately persist to localStorage to prevent race conditions
+    localStorage.setItem(TOKEN_KEY, newToken);
+    localStorage.setItem(AGENT_KEY, JSON.stringify(agentData));
+    
+    // Then update state
     setToken(newToken);
     setAgent(agentData);
+    
     return { token: newToken, agent: agentData };
   }
 
