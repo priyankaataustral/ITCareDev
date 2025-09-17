@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
 import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
-import DepartmentOverridePanel from '../components/DepartmentOverridePanel';
+// DepartmentOverridePill component will be defined inline below
 
 dayjs.extend(relativeTime);
 
@@ -24,6 +24,7 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentAgent, setCurrentAgent] = useState(null);
+  const { agent: currentUser } = useAuth();
   
   useEffect(() => {
     // Find current assigned agent name
@@ -33,11 +34,45 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
     }
   }, [ticket.assigned_to, agents]);
   
+  // Check if user can assign tickets based on department routing rules
+  const canAssignTickets = () => {
+    const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
+    const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
+    
+    // Helpdesk can assign to anyone within the ticket's department
+    if (isHelpdesk) return true;
+    
+    // Department managers and L2/L3 can only assign within their own department
+    if ((isManager || isL2OrL3) && currentUser?.department_id === ticket.department_id) {
+      return true;
+    }
+    
+    return false;
+  };
+  
+  const getTargetDepartmentForAgents = () => {
+    const isHelpdesk = currentUser?.department_id === 7;
+    
+    if (isHelpdesk) {
+      // Helpdesk can assign to agents in the ticket's current department
+      return ticket.department_id;
+    } else {
+      // Department staff can only assign within their own department
+      return currentUser?.department_id;
+    }
+  };
+  
   const handleDropdownOpen = async () => {
-    if (!isOpen && ticket.department_id) {
+    if (!canAssignTickets()) {
+      return; // Don't open if user doesn't have permission
+    }
+    
+    if (!isOpen) {
       setLoading(true);
       try {
-        const response = await apiGet(`/agents?department_id=${ticket.department_id}`);
+        const targetDepartmentId = getTargetDepartmentForAgents();
+        const response = await apiGet(`/agents?department_id=${targetDepartmentId}`);
         setAgents(response.agents || []);
       } catch (error) {
         console.error('Failed to fetch agents:', error);
@@ -52,6 +87,20 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
     setIsOpen(false);
   };
   
+  // Don't show assignment pill if user has no permission
+  if (!canAssignTickets()) {
+    return (
+      <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm">
+        <span>👤</span>
+        {currentAgent ? (
+          <span>Assigned: {currentAgent.name}</span>
+        ) : (
+          <span>Unassigned</span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="relative inline-block">
       <button
@@ -79,7 +128,7 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
             </button>
             {loading ? (
               <div className="px-4 py-2 text-sm text-gray-500">Loading agents...</div>
-            ) : (
+            ) : agents.length > 0 ? (
               agents.map(agent => (
                 <button
                   key={agent.id}
@@ -100,6 +149,13 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
                   {ticket.assigned_to === agent.id && <span className="text-blue-500">✓</span>}
                 </button>
               ))
+            ) : (
+              <div className="px-4 py-2 text-sm text-gray-500">
+                {currentUser?.department_id === 7 
+                  ? 'No agents in this department' 
+                  : 'No agents available in your department'
+                }
+              </div>
             )}
           </div>
         </div>
@@ -109,7 +165,142 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
 };
 
 // Department Override Pill Component
-// Add this DepartmentOverridePill component after the AssignmentPill component (around line 95)
+const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [reason, setReason] = useState('');
+  const { agent } = useAuth();
+  
+  // Get current department info
+  const currentDept = departments.find(d => d.id === ticket.department_id);
+  
+  // Check if user can change departments based on your routing rules
+  const canChangeDepartment = () => {
+    const isHelpdesk = agent?.department_id === 7;
+    const isManager = agent?.role === 'MANAGER';
+    const isL2OrL3 = ['L2', 'L3'].includes(agent?.role);
+    
+    // Only Helpdesk (any level) and Managers can change departments
+    return isHelpdesk || (isManager && isL2OrL3);
+  };
+  
+  const getAvailableDepartments = () => {
+    if (!departments.length) return [];
+    
+    const isHelpdesk = agent?.department_id === 7;
+    const isManager = agent?.role === 'MANAGER';
+    
+    if (isHelpdesk) {
+      // Helpdesk can route to any department
+      return departments.filter(dept => dept.id !== ticket.department_id);
+    } else if (isManager && agent?.department_id !== 7) {
+      // Department managers can only send back to Helpdesk (id: 7)
+      return departments.filter(dept => dept.id === 7);
+    }
+    
+    return [];
+  };
+  
+  const handleDropdownOpen = async () => {
+    if (!isOpen) {
+      setLoading(true);
+      try {
+        const response = await apiGet('/departments');
+        setDepartments(response.departments || response || []);
+      } catch (error) {
+        console.error('Failed to fetch departments:', error);
+      }
+      setLoading(false);
+    }
+    setIsOpen(!isOpen);
+  };
+  
+  const handleChange = async (departmentId) => {
+    if (!reason.trim()) {
+      alert('Please provide a reason for department change');
+      return;
+    }
+    try {
+      await onDepartmentChange(ticket.id, departmentId, reason);
+      setIsOpen(false);
+      setReason('');
+    } catch (error) {
+      // Error handled in parent
+    }
+  };
+  
+  // Don't show if user doesn't have permission
+  if (!canChangeDepartment()) {
+    return null;
+  }
+  
+  const availableDepts = getAvailableDepartments();
+  
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={handleDropdownOpen}
+        className="px-3 py-1.5 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 text-purple-700 text-xs font-medium rounded-lg hover:from-purple-100 hover:to-pink-100 transition-all duration-200 flex items-center gap-1.5 shadow-sm"
+      >
+        <span>🏢</span>
+        <span>{currentDept?.name || 'Dept'}</span>
+        <span className="text-[10px]">▼</span>
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 min-w-[220px] overflow-hidden">
+          <div className="p-3">
+            <div className="mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Reason for change:
+              </label>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why change department?"
+                className="w-full text-xs px-2 py-1 border border-gray-300 rounded"
+              />
+            </div>
+            
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {loading ? (
+                <div className="text-xs text-gray-500 p-2">Loading departments...</div>
+              ) : availableDepts.length > 0 ? (
+                availableDepts.map(dept => (
+                  <button
+                    key={dept.id}
+                    onClick={() => handleChange(dept.id)}
+                    disabled={!reason.trim()}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                  >
+                    <span>🏢</span>
+                    <span>{dept.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="text-xs text-gray-500 p-2">
+                  {agent?.department_id === 7 ? 'No other departments available' : 'Can only route to Helpdesk'}
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setReason('');
+              }}
+              className="mt-2 w-full text-xs text-gray-500 hover:text-gray-700 py-1 border-t pt-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 
@@ -346,9 +537,9 @@ export default function ThreadList({
                   onAssignmentChange={handleAssignmentChange}
                 />
 
-              {/* Department Override Button - Add this */}
+              {/* Department Override Button */}
                 <div onClick={(e) => e.stopPropagation()}>
-                  <DepartmentOverridePanel
+                  <DepartmentOverridePill
                     ticket={t}
                     onDepartmentChange={handleDepartmentChange}
                   />
