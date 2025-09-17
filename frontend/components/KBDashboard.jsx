@@ -215,7 +215,7 @@ export default function KBDashboard({ open, onClose }) {
     const term = q.toLowerCase();
     return solutions.filter(s => {
       const isConfirmed = String(s.status || '').toLowerCase() === 'confirmed';
-      const notPromoted = !s.published_article_id;
+      const notPromoted = s.published_article_id == null;
       const hit = !term ||
         String(s.text || '').toLowerCase().includes(term) ||
         String(s.ticket_id || '').toLowerCase().includes(term) ||

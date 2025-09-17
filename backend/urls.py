@@ -3364,7 +3364,7 @@ def get_solutions():
             'id': s.id,
             'ticket_id': s.ticket_id,
             'agent': s.proposed_by,
-            'status': s.status.value if s.status else None,
+            'status': s.status if s.status else None,
             'text': s.text,
             'created_at': s.created_at.isoformat() if s.created_at else None,
             'updated_at': s.updated_at.isoformat() if s.updated_at else None,
