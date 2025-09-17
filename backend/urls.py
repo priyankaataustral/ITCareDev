@@ -3358,6 +3358,14 @@ def get_solutions():
     if status:
         status_list = [s.strip() for s in status.split(',')]
         q = q.filter(Solution.status.in_(status_list))
+    else:
+        # Fallback: allow filtering by confirmation state if no status param
+        is_confirmed = request.args.get('is_confirmed')
+        if is_confirmed is not None:
+            if is_confirmed.lower() in ('1', 'true', 'yes'):
+                q = q.filter(Solution.confirmed_at.isnot(None))
+            elif is_confirmed.lower() in ('0', 'false', 'no'):
+                q = q.filter(Solution.confirmed_at.is_(None))
     q = q.order_by(Solution.created_at.desc()).limit(limit)
     results = [
         {
