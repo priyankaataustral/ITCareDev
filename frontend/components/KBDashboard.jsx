@@ -45,7 +45,7 @@ export default function KBDashboard({ open, onClose }) {
     setLoading(true); setErr("");
     try {
       const [sol, art, fb, mx] = await Promise.all([
-        apiGet('/solutions?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50'),
+        apiGet('/solutions?status=draft,sent,confirmed,published&limit=50'),
         apiGet('/kb/articles?status=draft,published,archived&limit=100'), // Increased limit to show more articles
         apiGet('/kb/feedback?limit=50'),
         apiGet('/kb/analytics').catch(() => null),
@@ -169,7 +169,7 @@ export default function KBDashboard({ open, onClose }) {
       setLoading(true);
       try {
         const [sol, fb, mx] = await Promise.all([
-          apiGet('/solutions?status=draft,sent_for_confirm,confirmed_by_user,published&limit=50'),
+          apiGet('/solutions?status=draft,sent,confirmed,published&limit=50'),
           apiGet('/kb/feedback?limit=50'),
           apiGet('/kb/analytics').catch(() => null),
         ]);
