@@ -210,17 +210,19 @@ export default function KBDashboard({ open, onClose }) {
   };
 
   // --- Derived filtered lists ---
+  // Only show solutions that are confirmed by user and not yet promoted to KB
   const filteredSolutions = useMemo(() => {
     const term = q.toLowerCase();
     return solutions.filter(s => {
+      const isConfirmed = String(s.status || '').toLowerCase() === 'confirmed';
+      const notPromoted = !s.published_article_id;
       const hit = !term ||
         String(s.text || '').toLowerCase().includes(term) ||
         String(s.ticket_id || '').toLowerCase().includes(term) ||
         String(s.status || '').toLowerCase().includes(term);
-      const statusOk = statusFilter === 'all' || String(s.status || '').toLowerCase() === statusFilter;
-      return hit && statusOk;
+      return isConfirmed && notPromoted && hit;
     });
-  }, [solutions, q, statusFilter]);
+  }, [solutions, q]);
 
   const filteredArticles = useMemo(() => {
     const term = q.toLowerCase();
@@ -337,12 +339,7 @@ export default function KBDashboard({ open, onClose }) {
                           <td className="py-2 pr-3">
                             <div className="flex flex-wrap gap-2">
                               <Gate roles={["L2","L3","MANAGER"]}>
-                                {['draft','sent_for_confirm'].includes(String(s.status).toLowerCase()) && (
-                                  <button className="btn-subtle" onClick={()=>sendConfirmEmail(s)}>✉️ Send confirm</button>
-                                )}
-                                {(s.confirm_url || s.confirm_token) && (
-                                  <button className="btn-subtle" onClick={()=>copyConfirmLink(s)}>🔗 Copy link</button>
-                                )}
+                                {/* Only show Promote button for confirmed & not yet promoted solutions */}
                                 <button className="btn-subtle" onClick={()=>promoteToKB(s)}>⬆️ Promote</button>
                               </Gate>
                             </div>
