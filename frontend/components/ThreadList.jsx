@@ -348,7 +348,7 @@ export default function ThreadList({
   const [saving, setSaving] = useState({});                 // { [id]: boolean }
 
   const [summaries, setSummaries] = useState({});
-  const [activeDeptId, setActiveDeptId] = useState('all');
+  // Department filtering is now handled by backend based on user's department
 
   // Load threads if parent didn't supply them
   useEffect(() => {
@@ -489,10 +489,8 @@ export default function ThreadList({
   if (loading) return <div className="p-4 text-center text-gray-500">Loading tickets...</div>;
   if (error) return <div className="p-4 text-center text-red-500">{error}</div>;
 
-  const filteredThreads = (threads || []).filter(t => {
-    if (activeDeptId === 'all') return true;
-    return t.department_id === parseInt(activeDeptId);
-  });
+  // No frontend filtering needed - backend handles department visibility
+  const filteredThreads = threads || [];
 
   const departmentsList = departments.length > 0 ? departments : FALLBACK_DEPTS;
 

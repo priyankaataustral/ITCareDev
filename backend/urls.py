@@ -163,17 +163,36 @@ def list_threads():
         show_archived = request.args.get("archived", "false").lower() == "true"
         status_filter = request.args.get("status", "all")  # all, open, closed, archived
 
-        # Get user role from JWT
+        # Get user role and department from JWT
         user = getattr(request, "agent_ctx", None)
         role = user.get("role") if user else None
+        user_department_id = user.get("department_id") if user else None
 
-        # Query tickets based on archive filter
+        # Query tickets based on archive filter and department restrictions
+        query = Ticket.query
+        
+        # Apply archive filter
         if show_archived:
-            # Show only archived tickets
-            tickets = Ticket.query.filter_by(archived=True).all()
+            query = query.filter_by(archived=True)
         else:
-            # Show non-archived tickets (default behavior)
-            tickets = Ticket.query.filter_by(archived=False).all()
+            query = query.filter_by(archived=False)
+        
+        # Apply department-based visibility rules
+        # Helpdesk (department_id = 7) can see all tickets
+        # Other departments can only see their own tickets
+        if user_department_id != 7:  # Not Helpdesk
+            if user_department_id:
+                query = query.filter_by(department_id=user_department_id)
+                current_app.logger.info(f"Department filtering: User dept {user_department_id} can only see tickets from their department")
+            else:
+                # If user has no department, they see no tickets
+                query = query.filter_by(department_id=None)
+                current_app.logger.info(f"Department filtering: User has no department, showing no tickets")
+        else:
+            current_app.logger.info(f"Department filtering: Helpdesk user can see all tickets")
+        
+        tickets = query.all()
+        current_app.logger.info(f"Department filtering result: {len(tickets)} tickets returned for user dept {user_department_id}")
         dept_map = {d.id: d.name for d in Department.query.all()}
         
         # Build all threads with full enrichment (like original)
