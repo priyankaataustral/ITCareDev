@@ -284,26 +284,58 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
     
     const isHelpdesk = currentUser?.department_id === 7;
     const isManager = currentUser?.role === 'MANAGER';
+    const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
+    
+    console.log('Department Override Available Departments Debug:', {
+      isHelpdesk,
+      isManager,
+      isL2OrL3,
+      userDept: currentUser?.department_id,
+      ticketDept: ticket.department_id,
+      totalDepartments: departments.length
+    });
     
     if (isHelpdesk) {
       // Helpdesk can route to any department
-      return departments.filter(dept => dept.id !== ticket.department_id);
+      const availableDepts = departments.filter(dept => dept.id !== ticket.department_id);
+      console.log('Helpdesk available departments:', availableDepts.length);
+      return availableDepts;
     } else if (isManager && currentUser?.department_id !== 7) {
       // Department managers can only send back to Helpdesk (id: 7)
-      return departments.filter(dept => dept.id === 7);
+      const availableDepts = departments.filter(dept => dept.id === 7);
+      console.log('Manager available departments:', availableDepts.length);
+      return availableDepts;
+    } else if (isL2OrL3 && currentUser?.department_id !== 7) {
+      // L2/L3 from other departments can only send back to Helpdesk (id: 7)
+      const availableDepts = departments.filter(dept => dept.id === 7);
+      console.log('L2/L3 available departments:', availableDepts.length);
+      return availableDepts;
     }
     
+    console.log('No departments available for this user type');
     return [];
   };
   
   const handleDropdownOpen = async () => {
+    // Check if user has permission before opening
+    if (!canChangeDepartment()) {
+      console.log('Department dropdown blocked: User does not have permission');
+      return;
+    }
+    
     if (!isOpen) {
       setLoading(true);
       try {
         const response = await apiGet('/departments');
-        setDepartments(response.departments || response || []);
+        const fetchedDepartments = response.departments || response || [];
+        setDepartments(fetchedDepartments);
+        
+        // Log departments fetched for debugging
+        console.log('Fetched departments:', fetchedDepartments.length);
       } catch (error) {
         console.error('Failed to fetch departments:', error);
+        setLoading(false);
+        return; // Don't open dropdown on error
       }
       setLoading(false);
     }
@@ -390,7 +422,7 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
                 ))
               ) : (
                 <div className="text-xs text-gray-500 p-2">
-                  {agent?.department_id === 7 ? 'No other departments available' : 'Can only route to Helpdesk'}
+                  {currentUser?.department_id === 7 ? 'No other departments available' : 'Can only route to Helpdesk'}
                 </div>
               )}
             </div>
