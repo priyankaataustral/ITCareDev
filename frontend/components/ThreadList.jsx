@@ -35,10 +35,12 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
   }, [ticket.assigned_to, agents]);
   
   // Check if user can assign tickets based on department routing rules
+  // Backend requires L2, L3, or MANAGER role
   const canAssignTickets = () => {
     const isHelpdesk = currentUser?.department_id === 7;
     const isManager = currentUser?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
+    const isL1 = currentUser?.role === 'L1';
     
     // Debug logging
     console.log('Assignment Debug:', {
@@ -47,16 +49,24 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
       isHelpdesk,
       isManager,
       isL2OrL3,
+      isL1,
       userDept: currentUser?.department_id,
       ticketDept: ticket.department_id,
-      userRole: currentUser?.role
+      userRole: currentUser?.role,
+      backendRequirement: 'L2, L3, or MANAGER only'
     });
     
-    // Helpdesk can assign to anyone within the ticket's department
+    // Backend endpoint requires L2, L3, or MANAGER role
+    if (!isManager && !isL2OrL3) {
+      console.log('Assignment blocked: User role not L2/L3/MANAGER');
+      return false;
+    }
+    
+    // Helpdesk (L2/L3/Manager) can assign to anyone within the ticket's department
     if (isHelpdesk) return true;
     
-    // Department managers and L2/L3 can only assign within their own department
-    if ((isManager || isL2OrL3) && currentUser?.department_id === ticket.department_id) {
+    // Department L2/L3/Managers can only assign within their own department
+    if (currentUser?.department_id === ticket.department_id) {
       return true;
     }
     
@@ -103,6 +113,10 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
   const hasAssignPermission = canAssignTickets();
   
   if (!hasAssignPermission) {
+    const userRole = currentUser?.role;
+    const isL1 = userRole === 'L1';
+    const isInValidDepartment = currentUser?.department_id === 7; // Helpdesk
+    
     return (
       <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm">
         <span>👤</span>
@@ -111,7 +125,12 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
         ) : (
           <span>Unassigned</span>
         )}
-        <span className="text-xs text-gray-400">(Read-only)</span>
+        <span className="text-xs text-gray-400">
+          {isL1 && !isInValidDepartment 
+            ? '(L1 only in Helpdesk)' 
+            : '(Need L2/L3/Manager)'
+          }
+        </span>
       </div>
     );
   }
@@ -191,10 +210,12 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   const currentDept = departments.find(d => d.id === ticket.department_id);
   
   // Check if user can change departments based on your routing rules
+  // Backend requires L2, L3, or MANAGER role
   const canChangeDepartment = () => {
     const isHelpdesk = agent?.department_id === 7;
     const isManager = agent?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(agent?.role);
+    const isL1 = agent?.role === 'L1';
     
     // Debug logging
     console.log('DepartmentOverride Debug:', {
@@ -202,12 +223,19 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
       isHelpdesk,
       isManager,
       isL2OrL3,
+      isL1,
       department_id: agent?.department_id,
-      role: agent?.role
+      role: agent?.role,
+      backendRequirement: 'L2, L3, or MANAGER only'
     });
     
-    // Only Helpdesk (any level) and Managers (any level) can change departments
-    // OR L2/L3 in any department can change departments
+    // Backend endpoint requires L2, L3, or MANAGER role
+    if (!isManager && !isL2OrL3) {
+      console.log('Department override blocked: User role not L2/L3/MANAGER');
+      return false;
+    }
+    
+    // Only Helpdesk L2/L3/Managers and other department L2/L3/Managers can change departments
     return isHelpdesk || isManager || isL2OrL3;
   };
   
@@ -256,9 +284,24 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
     }
   };
   
-  // Don't show if user doesn't have permission
+  // Show a disabled state instead of hiding completely when user doesn't have permission
   if (!canChangeDepartment()) {
-    return null;
+    const userRole = agent?.role;
+    const isL1 = userRole === 'L1';
+    const isInValidDepartment = agent?.department_id === 7; // Helpdesk
+    
+    return (
+      <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm cursor-not-allowed" title={isL1 && !isInValidDepartment ? 'L1 role only allowed in Helpdesk department' : 'Requires L2, L3, or Manager role'}>
+        <span>🏢</span>
+        <span>{currentDept?.name || 'Dept'}</span>
+        <span className="text-xs text-gray-400">
+          {isL1 && !isInValidDepartment 
+            ? '(L1 → Helpdesk only)' 
+            : '(Need L2/L3/Manager)'
+          }
+        </span>
+      </div>
+    );
   }
   
   const availableDepts = getAvailableDepartments();
@@ -525,8 +568,8 @@ export default function ThreadList({
                     'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                   }`}>
                     {String(t.status || 'open').toUpperCase()}
-                  </span>
-                </div>
+                </span>
+              </div>
                 <h3 className={`font-semibold text-sm leading-tight ${
                   isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'
                 }`}>
@@ -536,7 +579,7 @@ export default function ThreadList({
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded-md">
                   Level {t.level}
-                </span>
+                  </span>
               </div>
             </div>
 
@@ -578,7 +621,7 @@ export default function ThreadList({
               {/* Archive Button for Closed Tickets */}
               <div className="flex items-center gap-2">
                 {(t.status === 'closed' || t.status === 'resolved') && !t.archived && (
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       // Handle archive action
@@ -588,15 +631,15 @@ export default function ThreadList({
                     📦 Archive
                   </button>
                 )}
+                </div>
               </div>
-            </div>
 
             {/* Footer */}
             <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   Last activity: {dayjs(updatedTs || t.lastActivity).fromNow()}
-                </span>
+              </span>
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                     t.archived ? 'bg-gray-500 text-white' :
@@ -615,8 +658,8 @@ export default function ThreadList({
                       '❓'
                     }</span>
                     <span>{t.archived ? 'Archived' : t.status}</span>
-                  </span>
-                </div>
+              </span>
+            </div>
               </div>
             </div>
           </div>

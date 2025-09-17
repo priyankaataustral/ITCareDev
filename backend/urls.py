@@ -78,6 +78,7 @@ def login():
 		"name": agent.name,
 		"email": agent.email,
 		"role": getattr(agent, "role", "L1"),
+		"department_id": getattr(agent, "department_id", None),
 	}
 	authToken = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 	resp = make_response(jsonify({"token": authToken, "agent": payload}))
@@ -180,16 +181,17 @@ def list_threads():
         # Apply department-based visibility rules
         # Helpdesk (department_id = 7) can see all tickets
         # Other departments can only see their own tickets
-        if user_department_id != 7:  # Not Helpdesk
-            if user_department_id:
-                query = query.filter_by(department_id=user_department_id)
-                current_app.logger.info(f"Department filtering: User dept {user_department_id} can only see tickets from their department")
-            else:
-                # If user has no department, they see no tickets
-                query = query.filter_by(department_id=None)
-                current_app.logger.info(f"Department filtering: User has no department, showing no tickets")
-        else:
+        # Users without departments can see all tickets (fallback for admins/unassigned users)
+        if user_department_id == 7:  # Helpdesk
             current_app.logger.info(f"Department filtering: Helpdesk user can see all tickets")
+            # No filtering - see all tickets
+        elif user_department_id:  # Specific department
+            query = query.filter_by(department_id=user_department_id)
+            current_app.logger.info(f"Department filtering: User dept {user_department_id} can only see tickets from their department")
+        else:
+            # If user has no department, show all tickets (for admin/system users)
+            current_app.logger.info(f"Department filtering: User has no department, showing all tickets (admin fallback)")
+            # No filtering - see all tickets
         
         tickets = query.all()
         current_app.logger.info(f"Department filtering result: {len(tickets)} tickets returned for user dept {user_department_id}")
@@ -4958,6 +4960,13 @@ def create_agent():
         if existing_agent:
             return jsonify({"error": "Email already exists"}), 400
         
+        # Validate L1 role restriction: L1 can only exist in Helpdesk (department_id = 7)
+        role = data["role"].upper()
+        department_id = data.get("department_id")
+        
+        if role == "L1" and department_id != 7:
+            return jsonify({"error": "L1 role is only allowed in Helpdesk department (ID: 7)"}), 400
+        
         # Hash password (you should use proper password hashing in production)
         from werkzeug.security import generate_password_hash
         hashed_password = generate_password_hash(data["password"])
@@ -5013,6 +5022,10 @@ def update_agent(agent_id):
             agent.role = data["role"]
         if "department_id" in data:
             agent.department_id = data["department_id"]
+        
+        # Validate L1 role restriction after updates
+        if agent.role and agent.role.upper() == "L1" and agent.department_id != 7:
+            return jsonify({"error": "L1 role is only allowed in Helpdesk department (ID: 7)"}), 400
         if "password" in data and data["password"]:
             from werkzeug.security import generate_password_hash
             agent.password = generate_password_hash(data["password"])

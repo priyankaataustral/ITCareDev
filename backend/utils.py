@@ -77,9 +77,16 @@ def require_role(*allowed):
                 return jsonify(error="invalid token"), 401
             # Case-insensitive role check
             user_role = (user.get("role") or "").upper()
+            user_dept = user.get("department_id")
             allowed_upper = [r.upper() for r in allowed]
+            
             if allowed and user_role not in allowed_upper:
                 return jsonify(error="forbidden"), 403
+            
+            # CRITICAL: L1 role can only exist in Helpdesk (department_id = 7)
+            if user_role == "L1" and user_dept != 7:
+                return jsonify(error="L1 role is only allowed in Helpdesk department"), 403
+                
             request.agent_ctx = user
             return fn(*args, **kwargs)
         return wrapper
