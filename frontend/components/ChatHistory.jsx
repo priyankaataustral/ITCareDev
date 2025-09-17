@@ -2320,6 +2320,7 @@ function TicketHistoryCollapsible({
         onClose={() => setShowEscalationPopup(false)}
         onEscalate={handleEscalateWithForm}
         ticketId={tid}
+        ticket={ticket}
       />
 
       {/* Close Confirmation Modal */}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet } from '../lib/apiClient';
+import { useAuth } from './AuthContext';
 
-export default function EscalationPopup({ isOpen, onClose, onEscalate, ticketId }) {
+export default function EscalationPopup({ isOpen, onClose, onEscalate, ticketId, ticket }) {
   const [departments, setDepartments] = useState([]);
   const [agents, setAgents] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -9,6 +10,56 @@ export default function EscalationPopup({ isOpen, onClose, onEscalate, ticketId 
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const { agent: currentUser } = useAuth();
+
+  // Department-specific routing logic matching assignment and department override patterns
+  const getAvailableDepartments = (allDepartments) => {
+    if (!allDepartments.length) return [];
+    
+    const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
+    
+    console.log('Escalation Department Filtering:', {
+      currentUser,
+      isHelpdesk,
+      isManager,
+      userDept: currentUser?.department_id,
+      ticketDept: ticket?.department_id
+    });
+    
+    if (isHelpdesk) {
+      // Helpdesk can escalate to any department
+      return allDepartments;
+    } else if (isManager) {
+      // Department managers can escalate within their dept OR to Helpdesk
+      return allDepartments.filter(dept => 
+        dept.id === currentUser?.department_id || dept.id === 7
+      );
+    } else {
+      // L2/L3 can only escalate within their own department
+      return allDepartments.filter(dept => dept.id === currentUser?.department_id);
+    }
+  };
+  
+  const getAvailableAgents = (allAgents) => {
+    if (!allAgents.length) return [];
+    
+    const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
+    
+    if (isHelpdesk) {
+      // Helpdesk can escalate to agents in any department
+      return allAgents;
+    } else if (isManager) {
+      // Department managers can escalate to agents in their dept OR Helpdesk
+      return allAgents.filter(agent => 
+        agent.department_id === currentUser?.department_id || agent.department_id === 7
+      );
+    } else {
+      // L2/L3 can only escalate to agents within their own department
+      return allAgents.filter(agent => agent.department_id === currentUser?.department_id);
+    }
+  };
 
   // Load departments and agents when popup opens
   useEffect(() => {
@@ -19,17 +70,29 @@ export default function EscalationPopup({ isOpen, onClose, onEscalate, ticketId 
         apiGet('/agents').catch(() => ({ agents: [] }))
       ])
         .then(([deptData, agentData]) => {
-          setDepartments(Array.isArray(deptData) ? deptData : (deptData.departments || []));
-          setAgents(Array.isArray(agentData) ? agentData : (agentData.agents || []));
+          const allDepartments = Array.isArray(deptData) ? deptData : (deptData.departments || []);
+          const allAgents = Array.isArray(agentData) ? agentData : (agentData.agents || []);
+          
+          // Apply department-specific filtering
+          setDepartments(getAvailableDepartments(allDepartments));
+          setAgents(getAvailableAgents(allAgents));
         })
         .finally(() => setLoadingData(false));
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser, ticket]);
 
-  // Filter agents by selected department
+  // Filter agents by selected department (from already permission-filtered agents)
   const filteredAgents = selectedDepartment 
     ? agents.filter(agent => agent.department_id === parseInt(selectedDepartment))
     : agents;
+    
+  // Debug logging for agent filtering
+  console.log('Escalation Agent Filtering:', {
+    selectedDepartment,
+    totalAgents: agents.length,
+    filteredAgents: filteredAgents.length,
+    agentDepts: agents.map(a => ({ id: a.id, name: a.name, dept: a.department_id }))
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,7 +220,7 @@ export default function EscalationPopup({ isOpen, onClose, onEscalate, ticketId 
               <button
                 type="submit"
                 disabled={loading || !reason.trim()}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
               >
                 {loading ? (
                   <>

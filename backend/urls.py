@@ -1392,17 +1392,46 @@ def escalate_ticket(thread_id):
     current_agent_role = request.agent_ctx.get('role', '').upper()
     current_agent_dept = request.agent_ctx.get('department_id')
     
-    # ROUTING PERMISSION CHECKS for escalation
+    # ENHANCED ROUTING PERMISSION CHECKS for escalation (matching assignment/department patterns)
+    # Validate department routing permissions
+    if target_department_id:
+        target_dept = db.session.get(Department, target_department_id)
+        if target_dept:
+            if current_agent_dept == 7:  # Helpdesk
+                # Helpdesk can escalate to any department
+                pass
+            elif current_agent_role == "MANAGER":
+                # Department managers can escalate within their dept OR to Helpdesk
+                if target_department_id != current_agent_dept and target_department_id != 7:
+                    return jsonify({"error": "Department managers can only escalate within their department or to Helpdesk"}), 403
+            elif current_agent_role in ["L2", "L3"]:
+                # L2/L3 can only escalate within their own department
+                if target_department_id != current_agent_dept:
+                    return jsonify({"error": "L2/L3 agents can only escalate within their own department"}), 403
+            elif current_agent_role == "L1":
+                # L1 agents can only escalate within their department (should be Helpdesk only)
+                if target_department_id != current_agent_dept:
+                    return jsonify({"error": "L1 agents can only escalate within their own department"}), 403
+    
+    # Validate agent routing permissions  
     if target_agent_id:
         target_agent = Agent.query.get(target_agent_id)
         if target_agent:
-            if current_agent_dept != 7:  # Not Helpdesk
-                if current_agent_role == "MANAGER":
-                    if target_agent.department_id != current_agent_dept and target_agent.department_id != 7:
-                        return jsonify({"error": "Department managers can only escalate within their department or to Helpdesk"}), 403
-                elif current_agent_role in ["L2", "L3"]:
-                    if target_agent.department_id != current_agent_dept:
-                        return jsonify({"error": "L2/L3 agents can only escalate within their department"}), 403
+            if current_agent_dept == 7:  # Helpdesk
+                # Helpdesk can escalate to agents in any department
+                pass
+            elif current_agent_role == "MANAGER":
+                # Department managers can escalate to agents in their dept OR Helpdesk
+                if target_agent.department_id != current_agent_dept and target_agent.department_id != 7:
+                    return jsonify({"error": "Department managers can only escalate to agents within their department or to Helpdesk"}), 403
+            elif current_agent_role in ["L2", "L3"]:
+                # L2/L3 can only escalate to agents within their own department
+                if target_agent.department_id != current_agent_dept:
+                    return jsonify({"error": "L2/L3 agents can only escalate to agents within their own department"}), 403
+            elif current_agent_role == "L1":
+                # L1 agents can only escalate within their department (should be Helpdesk only)
+                if target_agent.department_id != current_agent_dept:
+                    return jsonify({"error": "L1 agents can only escalate within their own department"}), 403
 
     old_level = ticket.level or 1
     

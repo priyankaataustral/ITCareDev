@@ -244,7 +244,7 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState('');
-  const { agent } = useAuth();
+  const { agent: currentUser } = useAuth();
   
   // Get current department info
   const currentDept = departments.find(d => d.id === ticket.department_id);
@@ -252,20 +252,20 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   // Check if user can change departments based on your routing rules
   // Backend requires L2, L3, or MANAGER role
   const canChangeDepartment = () => {
-    const isHelpdesk = agent?.department_id === 7;
-    const isManager = agent?.role === 'MANAGER';
-    const isL2OrL3 = ['L2', 'L3'].includes(agent?.role);
-    const isL1 = agent?.role === 'L1';
+    const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
+    const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
+    const isL1 = currentUser?.role === 'L1';
     
     // Debug logging
     console.log('DepartmentOverride Debug:', {
-      agent,
+      currentUser,
       isHelpdesk,
       isManager,
       isL2OrL3,
       isL1,
-      department_id: agent?.department_id,
-      role: agent?.role,
+      department_id: currentUser?.department_id,
+      role: currentUser?.role,
       backendRequirement: 'L2, L3, or MANAGER only'
     });
     
@@ -282,13 +282,13 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   const getAvailableDepartments = () => {
     if (!departments.length) return [];
     
-    const isHelpdesk = agent?.department_id === 7;
-    const isManager = agent?.role === 'MANAGER';
+    const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
     
     if (isHelpdesk) {
       // Helpdesk can route to any department
       return departments.filter(dept => dept.id !== ticket.department_id);
-    } else if (isManager && agent?.department_id !== 7) {
+    } else if (isManager && currentUser?.department_id !== 7) {
       // Department managers can only send back to Helpdesk (id: 7)
       return departments.filter(dept => dept.id === 7);
     }
@@ -326,9 +326,9 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   
   // Show a disabled state instead of hiding completely when user doesn't have permission
   if (!canChangeDepartment()) {
-    const userRole = agent?.role;
+    const userRole = currentUser?.role;
     const isL1 = userRole === 'L1';
-    const isInValidDepartment = agent?.department_id === 7; // Helpdesk
+    const isInValidDepartment = currentUser?.department_id === 7; // Helpdesk
     
     return (
       <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm cursor-not-allowed" title={isL1 && !isInValidDepartment ? 'L1 role only allowed in Helpdesk department' : 'Requires L2, L3, or Manager role'}>
