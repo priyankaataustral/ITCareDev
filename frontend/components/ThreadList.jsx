@@ -1,12 +1,12 @@
 // frontend/components/ThreadList.jsx
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import Gate from './Gate';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
 import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
+import DepartmentOverridePill from './DepartmentOverridePill';
 
 dayjs.extend(relativeTime);
 
@@ -108,6 +108,158 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
   );
 };
 
+// Department Override Pill Component
+// Add this DepartmentOverridePill component after the AssignmentPill component (around line 95)
+
+// Department Override Pill Component
+const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [reason, setReason] = useState('');
+  const { agent } = useAuth();
+  
+  // Check if user can override department
+  const canOverrideDepartment = () => {
+    const userRole = agent?.role?.toUpperCase();
+    const userDept = agent?.department_id;
+    
+    // Only Helpdesk agents and Managers can change departments
+    return userDept === 7 || userRole === 'MANAGER';
+  };
+
+  const getAvailableDepartments = () => {
+    if (!departments.length) return [];
+
+    // If user is from Helpdesk (dept 7), they can assign to any department
+    if (agent?.department_id === 7) {
+      return departments.filter(dept => dept.id !== ticket.department_id);
+    }
+    
+    // If user is a Manager from other departments, they can only send back to Helpdesk
+    if (agent?.role?.toUpperCase() === 'MANAGER' && agent?.department_id !== 7) {
+      return departments.filter(dept => dept.id === 7); // Only Helpdesk
+    }
+
+    return [];
+  };
+
+  const handleDropdownOpen = async () => {
+    if (!isOpen) {
+      setLoading(true);
+      try {
+        const response = await apiGet('/departments');
+        setDepartments(response.departments || response || []);
+      } catch (error) {
+        console.error('Failed to fetch departments:', error);
+      }
+      setLoading(false);
+    }
+    setIsOpen(!isOpen);
+  };
+
+  const handleDepartmentChange = async (departmentId) => {
+    if (!reason.trim()) {
+      alert('Please provide a reason for the department change');
+      return;
+    }
+
+    try {
+      await onDepartmentChange(ticket.id, departmentId, reason.trim());
+      setIsOpen(false);
+      setReason('');
+    } catch (error) {
+      console.error('Department change failed:', error);
+    }
+  };
+
+  if (!canOverrideDepartment()) {
+    return null;
+  }
+
+  const availableDepartments = getAvailableDepartments();
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={handleDropdownOpen}
+        className="px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 text-green-700 text-xs font-medium rounded-lg hover:from-green-100 hover:to-emerald-100 transition-all duration-200 flex items-center gap-1.5 shadow-sm"
+      >
+        <span>🏢</span>
+        <span>Override Dept</span>
+        <span className="text-[10px]">▼</span>
+      </button>
+      
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 min-w-[250px] overflow-hidden">
+          <div className="p-3">
+            <div className="mb-3">
+              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Current: {FALLBACK_DEPTS.find(d => d.id === ticket.department_id)?.name || 'Unknown'}
+              </div>
+              {agent?.department_id === 7 ? (
+                <div className="text-xs text-green-600">You can route to any department</div>
+              ) : (
+                <div className="text-xs text-orange-600">You can only send back to Helpdesk</div>
+              )}
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Reason:
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why change department?"
+                className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:text-white"
+                rows={2}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-xs text-gray-500 text-center py-2">Loading departments...</div>
+            ) : (
+              <div className="space-y-1">
+                {availableDepartments.length === 0 ? (
+                  <div className="text-xs text-gray-500 text-center py-2">
+                    No department change options available
+                  </div>
+                ) : (
+                  availableDepartments.map(dept => (
+                    <button
+                      key={dept.id}
+                      onClick={() => handleDepartmentChange(dept.id)}
+                      disabled={!reason.trim()}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 dark:hover:bg-green-900/50 transition-colors flex items-center justify-between rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full flex items-center justify-center text-xs font-semibold text-green-600">
+                          {dept.name.charAt(0)}
+                        </span>
+                        <span className="font-medium">{dept.name}</span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-full text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function ThreadList({
   onSelect,
   threads: threadsProp = [],
@@ -182,6 +334,32 @@ export default function ThreadList({
     } catch (error) {
       console.error('Failed to assign ticket:', error);
       alert('Failed to update assignment');
+    }
+  };
+
+  // Handle department change
+  const handleDepartmentChange = async (ticketId, departmentId, reason) => {
+    try {
+      const response = await apiPatch(`/threads/${ticketId}/department`, {
+        department_id: departmentId,
+        reason: reason
+      });
+      
+      // Update local state
+      setThreads(prevThreads =>
+        (prevThreads || []).map(thread =>
+          thread.id === ticketId
+            ? { ...thread, department_id: departmentId }
+            : thread
+        )
+      );
+      
+      alert('Department changed successfully');
+      
+    } catch (error) {
+      console.error('Failed to change department:', error);
+      alert(`Failed to change department: ${error.message}`);
+      throw error;
     }
   };
 
@@ -314,6 +492,14 @@ export default function ThreadList({
                   ticket={t} 
                   onAssignmentChange={handleAssignmentChange}
                 />
+
+              {/* Department Override Button - Add this */}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <DepartmentOverridePill
+                    ticket={t}
+                    onDepartmentChange={handleDepartmentChange}
+                  />
+                </div>
               </div>
               
               {/* Archive Button for Closed Tickets */}

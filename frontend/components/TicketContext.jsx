@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import ChatHistory from './ChatHistory';
 import QuickActions from './QuickActions';
 import MessageInput from './MessageInput';
-import TicketHistoryPanel from './TicketHistoryPanel';
 import DepartmentOverridePanel from './DepartmentOverridePanel';
 
 export default function TicketContext({ ticket, knowledgeContext, onSend }) {
   const [draftText, setDraftText] = useState('');
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOverrideOpen, setIsOverrideOpen] = useState(false);
   const [overrideLoading, setOverrideLoading] = useState(false);
 
@@ -77,12 +75,6 @@ export default function TicketContext({ ticket, knowledgeContext, onSend }) {
         
         {/* Action Buttons */}
         <div className="ticket-actions">
-          <button 
-            onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-            className={`history-toggle-btn ${isHistoryOpen ? 'active' : ''}`}
-          >
-            📜 History {isHistoryOpen ? '▼' : '▶'}
-          </button>
 
           {/* Department Override Button - Only show if user has permission */}
           {canOverrideDepartment() && (
@@ -97,14 +89,6 @@ export default function TicketContext({ ticket, knowledgeContext, onSend }) {
         </div>
       </header>
 
-      {/* Collapsible History Panel */}
-      {isHistoryOpen && (
-        <TicketHistoryPanel 
-          ticketId={ticket.ticketId} 
-          isOpen={isHistoryOpen}
-          onClose={() => setIsHistoryOpen(false)}
-        />
-      )}
 
       {/* Department Override Panel */}
       {isOverrideOpen && canOverrideDepartment() && (

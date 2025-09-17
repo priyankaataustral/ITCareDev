@@ -6,6 +6,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { apiGet, apiPost, apiPatch, API_BASE } from '../lib/apiClient';
+import TicketHistoryPanel from './TicketHistoryPanel';
 // import { apiFetch } from '/apiFetch';
 dayjs.extend(relativeTime);
 
@@ -585,7 +586,7 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
 
   // Sidebar (collapsible)
-  const [openSections, setOpenSections] = useState({ suggested: true, related: false, activity: false });
+  const [openSections, setOpenSections] = useState({ suggested: true, related: false, activity: false, history: false });
   const toggleSection = (section) => setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
 
   // Thread nav
@@ -637,6 +638,12 @@ function ChatHistory({ threadId, onBack, className = '' }) {
 
   // CC state
   const [cc, setCc] = useState('');
+
+  // History panel
+  const [showTicketHistory, setShowTicketHistory] = useState(false);
+  const [ticketHistory, setTicketHistory] = useState([]);
+  const [ticketHistoryLoading, setTicketHistoryLoading] = useState(false);
+  const [ticketHistoryError, setTicketHistoryError] = useState(null);
 
   
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -1156,6 +1163,21 @@ const openDraftEditor = (prefill) => {
     }
   }, [messages, loading]);
 
+  // Fetch ticket history
+  useEffect(() => {
+    if (!showTicketHistory || !activeThreadId) return;
+    
+    setTicketHistoryLoading(true);
+    setTicketHistoryError(null);
+    
+    apiGet(`/tickets/${activeThreadId}/history`)
+      .then(data => {
+        setTicketHistory(data.history || []);
+      })
+      .catch(() => setTicketHistoryError('Failed to load ticket history'))
+      .finally(() => setTicketHistoryLoading(false));
+  }, [showTicketHistory, activeThreadId]);
+
   // Refresh timeline on window focus
   useEffect(() => {
     const onFocus = () => setTimelineRefresh(x => x + 1);
@@ -1206,6 +1228,87 @@ const openDraftEditor = (prefill) => {
     });
     setTimeout(() => setHighlightedMsgId(null), 3500);
   }
+
+  // Add this function inside ChatHistory component, near your other component functions
+
+function TicketHistoryCollapsible({ 
+  history, 
+  loading, 
+  error, 
+  openSections, 
+  toggleSection 
+}) {
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+    const date = new Date(timestamp);
+    return dayjs(date).format('MMM D, h:mm A');
+  };
+
+  const getEventIcon = (eventType) => {
+    const icons = {
+      'assign': '👤',
+      'status_change': '📋',
+      'level_change': '🚀',
+      'dept_change': '🏢',
+      'role_change': '🔄',
+      'note': '📝',
+      'archive_change': '📦'
+    };
+    return icons[eventType] || '📌';
+  };
+
+  return (
+    <CollapsibleSection
+      title={<span>📜 History</span>}
+      isOpen={openSections.history}
+      onToggle={() => toggleSection('history')}
+    >
+      <div className="max-h-48 overflow-y-auto">
+        {loading && <div className="text-sm text-gray-500">Loading history…</div>}
+        {error && !loading && <div className="text-sm text-red-600">{error}</div>}
+        {!loading && !error && (
+          history.length === 0 ? (
+            <div className="text-sm text-gray-400">No history entries found.</div>
+          ) : (
+            <div className="space-y-2">
+              {history.map((entry, index) => (
+                <div 
+                  key={entry.id || index} 
+                  className="flex items-start gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border"
+                >
+                  <span className="text-lg flex-shrink-0 mt-0.5">
+                    {getEventIcon(entry.event_type)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                      {entry.summary}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {formatTimestamp(entry.timestamp)}
+                      {entry.actor && entry.actor.name && (
+                        <span className="ml-2">
+                          by {entry.actor.name}
+                          {entry.actor.role && (
+                            <span className="text-gray-400"> ({entry.actor.role})</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {entry.note && (
+                      <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 italic">
+                        "{entry.note}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+    </CollapsibleSection>
+  );
+}
 
   // Suggested prompts
   const [suggestedPrompts, setSuggestedPrompts] = useState([]);
@@ -2196,6 +2299,15 @@ const openDraftEditor = (prefill) => {
                 openSections={openSections}
                 toggleSection={toggleSection}
               />
+
+              <TicketHistoryCollapsible
+                history={ticketHistory}
+                loading={ticketHistoryLoading}
+                error={ticketHistoryError}
+                openSections={openSections}
+                toggleSection={toggleSection}
+              />
+              
               <StepProgressBar stepInfo={stepInfo} />
             </div>
           </div>
