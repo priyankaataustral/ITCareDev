@@ -1175,19 +1175,22 @@ def post_chat(thread_id):
             # Log status change
             actor = getattr(request, "agent_ctx", None)
             actor_id = actor.get("id") if isinstance(actor, dict) else None
-            log_ticket_history(
-                t.id, "status_change", old_status, "escalated",
-                actor_id=actor_id,
-                notes=f"Ticket escalated from L{old_level} to L{target_level}"
-            )
+            # log_ticket_history(
+            #     t.id, "status_change", old_status, "escalated",
+            #     actor_agent_id=actor_id,
+            #     note=f"Ticket escalated from L{old_level} to L{target_level}"
+            # )
             
             # Log level change
             log_ticket_history(
-                t.id, "level_change", str(old_level), str(target_level),
-                actor_id=actor_id,
-                notes=f"Ticket escalated from L{old_level} to L{target_level}"
+                ticket_id=t.id,
+                event_type="level_change",
+                old_value=str(old_level),
+                new_value=str(target_level),
+                actor_agent_id=actor_id,
+                note=f"Ticket escalated from L{old_level} to L{target_level}"
             )
-            
+                        
             db.session.commit()
             
             # Log the escalation
@@ -1292,9 +1295,12 @@ def solution_response(thread_id):
         
         # Log status change
         log_ticket_history(
-            t.id, "status_change", old_status, "closed",
-            actor_id=user.get("id"),
-            notes="Ticket closed - user confirmed problem was solved"
+            ticket_id = t.id,
+            event_type = "status_change",
+            old_value = old_status,
+            new_value = "closed",
+            actor_agent_id = user.get("id"),
+            note = "Ticket closed - user confirmed problem was solved"
         )
         
         db.session.commit()
@@ -1312,16 +1318,22 @@ def solution_response(thread_id):
     
     # Log status change
     log_ticket_history(
-        t.id, "status_change", old_status, "escalated",
-        actor_id=user.get("id"),
-        notes=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
+        ticket_id=t.id,
+        event_type="status_change",
+        old_value=old_status,
+        new_value="escalated",
+        actor_agent_id=user.get("id"),
+        note=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
     )
     
     # Log level change
     log_ticket_history(
-        t.id, "level_change", str(old), str(to_level),
-        actor_id=user.get("id"),
-        notes=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
+        ticket_id=t.id,
+        event_type="level_change",
+        old_value=str(old),
+        new_value=str(to_level),
+        actor_agent_id=user.get("id"),
+        note=f"Ticket escalated from L{old} to L{to_level} - user reported not solved"
     )
     
     db.session.commit()
@@ -1398,16 +1410,22 @@ def escalate_ticket(thread_id):
     
     # Log status change
     log_ticket_history(
-        ticket.id, "status_change", old_status, "escalated",
-        actor_id=current_agent_id,
-        notes=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
+        ticket.id,
+        event_type="status_change",
+        old_value=old_status,
+        new_value="escalated",
+        actor_agent_id=current_agent_id,
+        note=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
     )
     
     # Log level change
     log_ticket_history(
-        ticket.id, "level_change", str(old_level), str(to_level),
-        actor_id=current_agent_id,
-        notes=f"Manual escalation from L{old_level} to L{to_level} by {current_agent_role}"
+        ticket.id,
+        event_type="level_change",
+        old_value=str(old_level),
+        new_value=str(to_level),
+        actor_agent_id=current_agent_id,
+        note=f"Manual escalation from L{old_level} to L{to_level} by {current_agent_role}"
     )
     
     # Update department and assignment if specified
@@ -1554,14 +1572,14 @@ def escalate_ticket(thread_id):
 #     log_ticket_history(
 #         ticket.id, "status_change", old_status, "escalated",
 #         actor_id=actor_id,
-#         notes=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
+#         note=f"Ticket escalated from L{old_level} to L{to_level} via manual escalation"
 #     )
     
 #     # Log level change
 #     log_ticket_history(
 #         ticket.id, "level_change", str(old_level), str(to_level),
 #         actor_id=actor_id,
-#         notes=f"Manual escalation from L{old_level} to L{to_level} by {current_role}"
+#         note=f"Manual escalation from L{old_level} to L{to_level} by {current_role}"
 #     )
     
 #     # Update department and assignment if specified
@@ -1694,9 +1712,12 @@ def close_ticket(thread_id):
     actor = getattr(request, 'agent_ctx', None)
     actor_id = actor.get('id') if isinstance(actor, dict) else None
     log_ticket_history(
-        ticket.id, "status_change", old_status, "closed",
-        actor_id=actor_id,
-        notes=f"Ticket closed with reason: {reason or 'No reason provided'}"
+        ticket.id, 
+        event_type="status_change", 
+        old_value=old_status, 
+        new_value="closed",
+        actor_agent_id=actor_id,
+        note=f"Ticket closed with reason: {reason or 'No reason provided'}"
     )
     
     # Log event with reason
@@ -1750,10 +1771,14 @@ def archive_ticket(thread_id):
     # Log archive state change
     actor = getattr(request, 'agent_ctx', None)
     actor_id = actor.get('id') if isinstance(actor, dict) else None
+
     log_ticket_history(
-        ticket.id, "archive_change", str(old_archived), "True",
-        actor_id=actor_id,
-        notes=f"Ticket archived - reason: {reason}"
+        ticket.id, 
+        event_type="archive_change", 
+        old_value=str(old_archived), 
+        new_value="True",
+        actor_agent_id=actor_id,
+        note=f"Ticket archived - reason: {reason}"
     )
     
     # Log event with reason
@@ -1914,16 +1939,22 @@ def claim_ticket(thread_id):
         
         # Log initial ticket creation with status
         log_ticket_history(
-            thread_id, "status_change", None, "open",
-            actor_id=current_agent_id,  # Use current_agent_id instead of agent.id
-            notes="Ticket created with initial status 'open'"
+            thread_id, 
+            event_type="status_change", 
+            old_value=None,
+            new_value="open",        
+            actor_agent_id=current_agent_id,  # Use current_agent_id instead of agent.id
+            note="Ticket created with initial status 'open'"
         )
         
         # Log initial level assignment (default is 1)
         log_ticket_history(
-            thread_id, "level_change", None, "1",
-            actor_id=current_agent_id,  # Use current_agent_id instead of agent.id
-            notes="Ticket created with initial level L1"
+            thread_id, 
+            event_type="level_change", 
+            old_value=None, 
+            new_value="1",
+            actor_agent_id=current_agent_id,  # Use current_agent_id instead of agent.id
+            note="Ticket created with initial level L1"
         )
 
     # ROUTING PERMISSION CHECK - now using current_agent variables
@@ -2001,14 +2032,14 @@ def claim_ticket(thread_id):
 #         log_ticket_history(
 #             thread_id, "status_change", None, "open",
 #             actor_id=agent.id,
-#             notes="Ticket created with initial status 'open'"
+#             note="Ticket created with initial status 'open'"
 #         )
         
 #         # Log initial level assignment (default is 1)
 #         log_ticket_history(
 #             thread_id, "level_change", None, "1",
 #             actor_id=agent.id,
-#             notes="Ticket created with initial level L1"
+#             note="Ticket created with initial level L1"
 #         )
 
 #     # ROUTING PERMISSION CHECK
@@ -3381,16 +3412,22 @@ def deescalate_ticket(thread_id):
     actor = getattr(request, "agent_ctx", None)
     actor_id = actor.get("id") if isinstance(actor, dict) else None
     log_ticket_history(
-        t.id, "status_change", old_status, "de-escalated",
+        ticket_id=t.id, 
+        event_type="status_change", 
+        old_value=old_status, 
+        new_value="de-escalated",
         actor_id=actor_id,
-        notes=f"Ticket de-escalated from L{old} to L{to_level}"
+        note=f"Ticket de-escalated from L{old} to L{to_level}"
     )
     
     # Log level change
     log_ticket_history(
-        t.id, "level_change", str(old), str(to_level),
+        ticket_id=t.id, 
+        event_type="level_change", 
+        old_value=str(old),
+        new_value=str(to_level),    
         actor_id=actor_id,
-        notes=f"Manual de-escalation from L{old} to L{to_level}"
+        note=f"Manual de-escalation from L{old} to L{to_level}"
     )
     
     actor = getattr(request, "agent_ctx", None)
@@ -3729,16 +3766,22 @@ def confirm_solution():
                 
                 # Log status change
                 log_ticket_history(
-                    t.id, "status_change", old_status, "escalated",
+                    ticket_id=t.id, 
+                    event_type="status_change", 
+                    old_value=old_status,
+                    new_value="escalated",                    
                     actor_id=None,  # System action
-                    notes=f"Auto-escalated from L{old} to L{new_level} after solution marked 'not fixed'"
+                    note=f"Auto-escalated from L{old} to L{new_level} after solution marked 'not fixed'"
                 )
                 
                 # Log level change
                 log_ticket_history(
-                    t.id, "level_change", str(old), str(new_level),
+                    ticket_id=t.id, 
+                    event_type="level_change", 
+                    old_value=str(old), 
+                    new_value=str(new_level),
                     actor_id=None,  # System action
-                    notes=f"Auto-escalated from L{old} to L{new_level} due to 'not fixed' policy"
+                    note=f"Auto-escalated from L{old} to L{new_level} due to 'not fixed' policy"
                 )
                 
                 db.session.commit()
@@ -4396,9 +4439,12 @@ def submit_feedback(thread_id):
             
             # Log status change
             log_ticket_history(
-                t.id, "status_change", old_status, "open",
+                ticket_id=t.id,
+                event_type="status_change",
+                old_value=old_status,
+                new_value="open",
                 actor_id=None,  # System action
-                notes="Ticket re-opened due to solution rejection"
+                note="Ticket re-opened due to solution rejection"
             )
 
     db.session.commit()
@@ -5635,6 +5681,58 @@ def not_fixed_feedback():
     log_event(t.id, "FEEDBACK", {"kind":"not_fixed_detail", "attempt_id": att.id, "reason": att.rejected_reason})
     return jsonify(ok=True)
 
+def _format_history_summary(entry, actor_info, from_agent_info, to_agent_info, departments_map):
+    """Generate human-readable summary for history entry"""
+    actor_name = actor_info["name"] if actor_info else "System"
+    
+    if entry.event_type == "assign":
+        if entry.to_agent_id and entry.from_agent_id:
+            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
+            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
+            return f"{actor_name} reassigned ticket from {from_name} to {to_name}"
+        elif entry.to_agent_id:
+            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
+            return f"{actor_name} assigned ticket to {to_name}"
+        elif entry.from_agent_id:
+            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
+            return f"{actor_name} unassigned ticket from {from_name}"
+        else:
+            return f"{actor_name} updated ticket assignment"
+    
+    elif entry.event_type == "status_change":
+        old_status = entry.old_value or "unknown"
+        new_status = entry.new_value or "unknown"
+        return f"{actor_name} changed status from '{old_status}' to '{new_status}'"
+    
+    elif entry.event_type == "level_change":
+        old_level = f"L{entry.old_value}" if entry.old_value else "unknown"
+        new_level = f"L{entry.new_value}" if entry.new_value else "unknown"
+        return f"{actor_name} escalated ticket from {old_level} to {new_level}"
+    
+    elif entry.event_type == "dept_change":
+        old_dept = departments_map.get(int(entry.old_value)) if entry.old_value and entry.old_value.isdigit() else entry.old_value or "unassigned"
+        new_dept = departments_map.get(entry.department_id) if entry.department_id else entry.new_value or "unknown"
+        return f"{actor_name} moved ticket from {old_dept} to {new_dept} department"
+    
+    elif entry.event_type == "role_change":
+        old_role = entry.from_role or "unknown"
+        new_role = entry.to_role or "unknown"
+        return f"{actor_name} changed role from {old_role} to {new_role}"
+    
+    elif entry.event_type == "note":
+        return f"{actor_name} added a note"
+    
+    elif entry.event_type == "archive_change":
+        if entry.new_value == "True":
+            return f"{actor_name} archived the ticket"
+        else:
+            return f"{actor_name} unarchived the ticket"
+    
+    else:
+        # Generic fallback
+        return f"{actor_name} performed {entry.event_type.replace('_', ' ')}"
+
+
 @urls.route("/tickets/<ticket_id>/history", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER")
 def get_ticket_history(ticket_id):
@@ -5743,56 +5841,6 @@ def get_ticket_history(ticket_id):
         current_app.logger.error(f"Error fetching ticket history for {ticket_id}: {e}")
         return jsonify({"error": "Failed to fetch ticket history"}), 500
 
-def _format_history_summary(entry, actor_info, from_agent_info, to_agent_info, departments_map):
-    """Generate human-readable summary for history entry"""
-    actor_name = actor_info["name"] if actor_info else "System"
-    
-    if entry.event_type == "assign":
-        if entry.to_agent_id and entry.from_agent_id:
-            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
-            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
-            return f"{actor_name} reassigned ticket from {from_name} to {to_name}"
-        elif entry.to_agent_id:
-            to_name = to_agent_info["name"] if to_agent_info else f"Agent {entry.to_agent_id}"
-            return f"{actor_name} assigned ticket to {to_name}"
-        elif entry.from_agent_id:
-            from_name = from_agent_info["name"] if from_agent_info else f"Agent {entry.from_agent_id}"
-            return f"{actor_name} unassigned ticket from {from_name}"
-        else:
-            return f"{actor_name} updated ticket assignment"
-    
-    elif entry.event_type == "status_change":
-        old_status = entry.old_value or "unknown"
-        new_status = entry.new_value or "unknown"
-        return f"{actor_name} changed status from '{old_status}' to '{new_status}'"
-    
-    elif entry.event_type == "level_change":
-        old_level = f"L{entry.old_value}" if entry.old_value else "unknown"
-        new_level = f"L{entry.new_value}" if entry.new_value else "unknown"
-        return f"{actor_name} escalated ticket from {old_level} to {new_level}"
-    
-    elif entry.event_type == "dept_change":
-        old_dept = departments_map.get(int(entry.old_value)) if entry.old_value and entry.old_value.isdigit() else entry.old_value or "unassigned"
-        new_dept = departments_map.get(entry.department_id) if entry.department_id else entry.new_value or "unknown"
-        return f"{actor_name} moved ticket from {old_dept} to {new_dept} department"
-    
-    elif entry.event_type == "role_change":
-        old_role = entry.from_role or "unknown"
-        new_role = entry.to_role or "unknown"
-        return f"{actor_name} changed role from {old_role} to {new_role}"
-    
-    elif entry.event_type == "note":
-        return f"{actor_name} added a note"
-    
-    elif entry.event_type == "archive_change":
-        if entry.new_value == "True":
-            return f"{actor_name} archived the ticket"
-        else:
-            return f"{actor_name} unarchived the ticket"
-    
-    else:
-        # Generic fallback
-        return f"{actor_name} performed {entry.event_type.replace('_', ' ')}"
 
 # # TEMPORARY - REMOVE IN FINAL DEPLOYMENT
 # @urls.route("/threads", methods=["GET"]) 
