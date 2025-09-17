@@ -8,6 +8,7 @@ import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
 import KBDashboard from './KBDashboard';
 import AgentsPage from '../pages/agents';
+import AuthDebug from './AuthDebug';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
 import { apiGet } from '../lib/apiClient'; // only import what we use
@@ -193,6 +194,9 @@ export default function SupportInboxPlugin() {
           </div>
         </div>
       )}
+      
+      {/* Temporary debug component for authentication issues */}
+      <AuthDebug />
     </div>
   );
 }

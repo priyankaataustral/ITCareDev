@@ -257,26 +257,31 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
     const isL1 = currentUser?.role === 'L1';
     
-    // Debug logging
-    console.log('DepartmentOverride Debug:', {
+    // Enhanced debug logging
+    console.log('🔍 DepartmentOverride Permission Check:', {
       currentUser,
+      userProperties: Object.keys(currentUser || {}),
       isHelpdesk,
       isManager,
       isL2OrL3,
       isL1,
       department_id: currentUser?.department_id,
       role: currentUser?.role,
-      backendRequirement: 'L2, L3, or MANAGER only'
+      backendRequirement: 'L2, L3, or MANAGER only',
+      hasPermission: isManager || isL2OrL3
     });
     
     // Backend endpoint requires L2, L3, or MANAGER role
     if (!isManager && !isL2OrL3) {
-      console.log('Department override blocked: User role not L2/L3/MANAGER');
+      console.log('❌ Department override blocked: User role not L2/L3/MANAGER');
+      console.log('Current role:', currentUser?.role, 'Expected: L2, L3, or MANAGER');
       return false;
     }
     
     // Only Helpdesk L2/L3/Managers and other department L2/L3/Managers can change departments
-    return isHelpdesk || isManager || isL2OrL3;
+    const hasPermission = isHelpdesk || isManager || isL2OrL3;
+    console.log('✅ Department override permission result:', hasPermission);
+    return hasPermission;
   };
   
   const getAvailableDepartments = () => {
@@ -362,14 +367,30 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
     const isL1 = userRole === 'L1';
     const isInValidDepartment = currentUser?.department_id === 7; // Helpdesk
     
+    console.log('🟥 Department pill DISABLED. User details:', {
+      userRole,
+      department_id: currentUser?.department_id,
+      hasL2OrL3Role: ['L2', 'L3'].includes(userRole),
+      isManager: userRole === 'MANAGER',
+      tokenMightNeedRefresh: !currentUser?.department_id
+    });
+    
+    const tooltipMessage = !currentUser?.department_id 
+      ? 'Please log out and log back in to refresh permissions'
+      : isL1 && !isInValidDepartment 
+        ? 'L1 role only allowed in Helpdesk department' 
+        : 'Requires L2, L3, or Manager role';
+    
     return (
-      <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm cursor-not-allowed" title={isL1 && !isInValidDepartment ? 'L1 role only allowed in Helpdesk department' : 'Requires L2, L3, or Manager role'}>
+      <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-sm cursor-not-allowed" title={tooltipMessage}>
         <span>🏢</span>
         <span>{currentDept?.name || 'Dept'}</span>
         <span className="text-xs text-gray-400">
-          {isL1 && !isInValidDepartment 
-            ? '(L1 → Helpdesk only)' 
-            : '(Need L2/L3/Manager)'
+          {!currentUser?.department_id
+            ? '(Re-login needed)'
+            : isL1 && !isInValidDepartment 
+              ? '(L1 → Helpdesk only)' 
+              : '(Need L2/L3/Manager)'
           }
         </span>
       </div>
@@ -377,6 +398,15 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
   }
   
   const availableDepts = getAvailableDepartments();
+  
+  // Debug info for troubleshooting (remove after fixing)
+  console.log('👁️ Department Pill Render:', {
+    canChangeDept: canChangeDepartment(),
+    availableDepts: availableDepts.length,
+    userRole: currentUser?.role,
+    userDept: currentUser?.department_id,
+    ticketDept: ticket.department_id
+  });
   
   return (
     <div className="relative inline-block">
