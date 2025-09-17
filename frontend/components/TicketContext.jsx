@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ChatHistory from './ChatHistory';
 import QuickActions from './QuickActions';
 import MessageInput from './MessageInput';
-import DepartmentOverridePanel from './DepartmentOverridePanel';
+import DepartmentOverridePanel from './DepartmentOverridePill';
 
 export default function TicketContext({ ticket, knowledgeContext, onSend }) {
   const [draftText, setDraftText] = useState('');
