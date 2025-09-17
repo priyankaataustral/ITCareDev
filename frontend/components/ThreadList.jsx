@@ -62,25 +62,42 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
       return false;
     }
     
-    // Helpdesk (L2/L3/Manager) can assign to anyone within the ticket's department
-    if (isHelpdesk) return true;
-    
-    // Department L2/L3/Managers can only assign within their own department
-    if (currentUser?.department_id === ticket.department_id) {
+    // Helpdesk can assign to anyone within the ticket's department
+    if (isHelpdesk) {
+      console.log('Assignment allowed: Helpdesk user');
       return true;
     }
     
+    // Managers can assign within their own department OR to Helpdesk (for escalation/routing)
+    if (isManager) {
+      console.log('Assignment allowed: Manager can assign within own dept or to Helpdesk');
+      return true;
+    }
+    
+    // L2/L3 can only assign within their own department
+    if (isL2OrL3 && currentUser?.department_id === ticket.department_id) {
+      console.log('Assignment allowed: L2/L3 within same department');
+      return true;
+    }
+    
+    console.log('Assignment blocked: No valid permission found');
     return false;
   };
   
   const getTargetDepartmentForAgents = () => {
     const isHelpdesk = currentUser?.department_id === 7;
+    const isManager = currentUser?.role === 'MANAGER';
     
     if (isHelpdesk) {
       // Helpdesk can assign to agents in the ticket's current department
       return ticket.department_id;
+    } else if (isManager) {
+      // Managers can assign within their own department OR to Helpdesk (dept 7)
+      // For the assignment dropdown, show agents from the ticket's current department
+      // but also include Helpdesk agents for routing purposes
+      return ticket.department_id;
     } else {
-      // Department staff can only assign within their own department
+      // L2/L3 can only assign within their own department
       return currentUser?.department_id;
     }
   };
@@ -93,9 +110,32 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
     if (!isOpen) {
       setLoading(true);
       try {
-        const targetDepartmentId = getTargetDepartmentForAgents();
-        const response = await apiGet(`/agents?department_id=${targetDepartmentId}`);
-        setAgents(response.agents || []);
+        const isManager = currentUser?.role === 'MANAGER';
+        const isHelpdesk = currentUser?.department_id === 7;
+        
+        if (isManager && !isHelpdesk) {
+          // Managers from other departments can assign to their own dept + Helpdesk
+          const [ownDeptResponse, helpdeskResponse] = await Promise.all([
+            apiGet(`/agents?department_id=${currentUser.department_id}`),
+            apiGet(`/agents?department_id=7`) // Helpdesk
+          ]);
+          
+          const ownDeptAgents = ownDeptResponse.agents || [];
+          const helpdeskAgents = helpdeskResponse.agents || [];
+          
+          // Combine and deduplicate agents
+          const allAgents = [...ownDeptAgents, ...helpdeskAgents];
+          const uniqueAgents = allAgents.filter((agent, index, self) => 
+            index === self.findIndex(a => a.id === agent.id)
+          );
+          
+          setAgents(uniqueAgents);
+        } else {
+          // Helpdesk or L2/L3: use single department
+          const targetDepartmentId = getTargetDepartmentForAgents();
+          const response = await apiGet(`/agents?department_id=${targetDepartmentId}`);
+          setAgents(response.agents || []);
+        }
       } catch (error) {
         console.error('Failed to fetch agents:', error);
       }
@@ -155,9 +195,9 @@ const AssignmentPill = ({ ticket, onAssignmentChange }) => {
           <div className="py-2">
             <button
               onClick={() => handleAssign(null)}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/50 rounded transition-colors flex items-center gap-2"
+              className="w-full text-left px-4 py-2 text-sm hover:bg-rose-50 dark:hover:bg-rose-900/50 rounded transition-colors flex items-center gap-2"
             >
-              <span className="text-red-500">🚫</span>
+              <span className="text-rose-500">🚫</span>
               <span>Unassign</span>
             </button>
             {loading ? (
@@ -342,7 +382,7 @@ const DepartmentOverridePill = ({ ticket, onDepartmentChange }) => {
                     key={dept.id}
                     onClick={() => handleChange(dept.id)}
                     disabled={!reason.trim()}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed rounded"
                   >
                     <span>🏢</span>
                     <span>{dept.name}</span>
@@ -577,7 +617,7 @@ export default function ThreadList({
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded-md">
+                <span className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-md font-medium">
                   Level {t.level}
                   </span>
               </div>
@@ -626,7 +666,7 @@ export default function ThreadList({
                       e.stopPropagation();
                       // Handle archive action
                     }}
-                    className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors flex items-center gap-1"
+                    className="px-2 py-1 text-xs bg-violet-100 text-violet-700 rounded-md hover:bg-violet-200 transition-colors flex items-center gap-1 font-medium"
                   >
                     📦 Archive
                   </button>

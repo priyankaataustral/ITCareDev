@@ -117,7 +117,7 @@ export default function SupportInboxPlugin() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowAnalytics(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
             aria-label="Open Analytics Dashboard"
           >
             <i className="bi bi-graph-up mr-2"></i>
@@ -128,7 +128,7 @@ export default function SupportInboxPlugin() {
           {agent && ['L2', 'L3', 'MANAGER'].includes(agent.role) && (
             <button
               onClick={() => setShowAgents(true)}
-              className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+              className="flex items-center px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
               aria-label="Manage Agents"
             >
               <i className="bi bi-people mr-2"></i>

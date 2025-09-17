@@ -171,7 +171,7 @@ function TicketInfoCard({ ticket }) {
         {ticket.escalated && (
           <button
             onClick={handleDownloadSummary}
-            className="mt-3 px-3 py-1 rounded-full bg-indigo-500 text-white text-sm shadow hover:bg-indigo-600"
+            className="mt-3 px-3 py-1 rounded-full bg-slate-600 text-white text-sm shadow hover:bg-slate-700 transition-colors"
           >
             ⬇️ Download Summary
           </button>
@@ -186,9 +186,9 @@ function StepProgressBar({ stepInfo }) {
   return (
     <div className="flex items-center gap-2 px-4 py-2">
       <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className="h-2 bg-indigo-500" style={{ width: `${(stepInfo.step / stepInfo.total) * 100}%` }} />
+        <div className="h-2 bg-blue-600" style={{ width: `${(stepInfo.step / stepInfo.total) * 100}%` }} />
       </div>
-      <span className="text-xs text-indigo-700 dark:text-indigo-300 font-semibold">Step {stepInfo.step} of {stepInfo.total} ✔️</span>
+      <span className="text-xs text-blue-700 dark:text-blue-300 font-semibold">Step {stepInfo.step} of {stepInfo.total} ✔️</span>
     </div>
   );
 }
@@ -200,7 +200,7 @@ function ProposedSolutionBox({ text, onDraft, onDismiss }) {
       <div className="text-emerald-800 dark:text-emerald-100 font-semibold mb-2">Proposed solution</div>
       <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-100">{text}</pre>
       <div className="mt-3 flex gap-2">
-        <button onClick={onDraft} className="px-3 py-1 rounded-full bg-indigo-600 text-white text-sm">
+        <button onClick={onDraft} className="px-3 py-1 rounded-full bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors">
           ✉️ Draft email
         </button>
         <button
@@ -253,7 +253,7 @@ function DraftEmailEditor({
           <button
             onClick={onSend}
             disabled={loading}
-            className="px-4 py-2 rounded-full bg-indigo-600 text-white text-sm disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-blue-600 text-white text-sm disabled:opacity-50 hover:bg-blue-700 transition-colors"
           >
             {loading ? 'Sending…' : 'Send'}
           </button>
@@ -400,7 +400,7 @@ function RelatedTicketList({ tickets, loading, error, onClick, openSections, tog
               return (
                 <div
                   key={t.id || idx}
-                  className="mb-2 p-2 bg-purple-100 dark:bg-purple-900 rounded-xl text-purple-800 dark:text-purple-100 text-sm shadow-sm cursor-pointer border border-purple-200 dark:border-purple-700 hover:bg-purple-200 dark:hover:bg-purple-800 transition flex flex-col"
+                  className="mb-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-800 dark:text-slate-100 text-sm shadow-sm cursor-pointer border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex flex-col"
                   onClick={() => onClick(t)}
                 >
                   <div className="font-medium">
@@ -1197,7 +1197,7 @@ const openDraftEditor = (prefill) => {
         return (
           <span
             key={idx}
-            className="font-bold text-blue-700 bg-blue-100 rounded px-1 mx-0.5 cursor-pointer hover:underline"
+            className="font-bold text-blue-700 bg-blue-50 rounded px-1 mx-0.5 cursor-pointer hover:underline"
             onClick={() => onMentionClick(agentName)}
           >
             {part}
@@ -1916,7 +1916,7 @@ function TicketHistoryCollapsible({
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition text-blue-700 font-bold"
+            className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition text-slate-700 font-bold"
             aria-label="Back"
           >←</button>
           <span className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -1973,7 +1973,7 @@ function TicketHistoryCollapsible({
             <button
               onClick={() => setShowEscalationPopup(true)}
               disabled={actionLoading}
-              className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50 text-sm"
+              className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
             >🛠 Escalate</button>
           </Gate>
 
@@ -1994,7 +1994,7 @@ function TicketHistoryCollapsible({
               <button
                 onClick={() => setShowCloseConfirm(true)}
                 disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition disabled:opacity-50 text-sm"
+                className="flex items-center gap-1 px-3 py-1 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition disabled:opacity-50 text-sm shadow-sm"
               >🚫 Close</button>
             )}
           </Gate>
@@ -2005,14 +2005,14 @@ function TicketHistoryCollapsible({
               <button
                 onClick={() => setShowArchiveConfirm(true)}
                 disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition disabled:opacity-50 text-sm"
+                className="flex items-center gap-1 px-3 py-1 bg-violet-600 text-white rounded-full hover:bg-violet-700 transition disabled:opacity-50 text-sm shadow-sm"
               >📦 Archive</button>
             )}
             {ticket?.archived && (
               <button
                 onClick={() => handleAction('unarchive')}
                 disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded-full hover:bg-green-700 transition disabled:opacity-50 text-sm"
+                className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition disabled:opacity-50 text-sm shadow-sm"
               >📤 Unarchive</button>
             )}
           </Gate>
@@ -2327,8 +2327,8 @@ function TicketHistoryCollapsible({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                <span className="text-red-600 dark:text-red-400 text-xl">🚫</span>
+              <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900 rounded-full flex items-center justify-center">
+                <span className="text-rose-600 dark:text-rose-400 text-xl">🚫</span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -2367,7 +2367,7 @@ function TicketHistoryCollapsible({
               <button
                 onClick={handleCloseConfirm}
                 disabled={actionLoading || !closeReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {actionLoading ? 'Closing...' : 'Close Ticket'}
               </button>
@@ -2381,8 +2381,8 @@ function TicketHistoryCollapsible({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                <span className="text-purple-600 dark:text-purple-400 text-xl">📦</span>
+              <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900 rounded-full flex items-center justify-center">
+                <span className="text-violet-600 dark:text-violet-400 text-xl">📦</span>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -2421,7 +2421,7 @@ function TicketHistoryCollapsible({
               <button
                 onClick={handleArchiveConfirm}
                 disabled={actionLoading || !archiveReason.trim()}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {actionLoading ? 'Archiving...' : 'Archive Ticket'}
               </button>

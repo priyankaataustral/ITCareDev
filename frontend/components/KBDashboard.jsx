@@ -289,7 +289,7 @@ export default function KBDashboard({ open, onClose }) {
               {tab === 'feedback' && '💬 User feedback and ratings'}
               {tab === 'analytics' && '📊 Performance metrics and insights'}
             </span>
-          <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-50">Refresh</button>
+          <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm">Refresh</button>
           </div>
         </div>
 
@@ -366,8 +366,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={() => setShowUploadModal(true)}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                      <span className="text-purple-600 dark:text-purple-400">📤</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-violet-100 dark:bg-violet-900 rounded-lg flex items-center justify-center">
+                      <span className="text-violet-600 dark:text-violet-400">📤</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Upload Protocol</div>
@@ -379,8 +379,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={loadProtocols}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                      <span className="text-green-600 dark:text-green-400">📄</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                      <span className="text-emerald-600 dark:text-emerald-400">📄</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Load Protocols</div>
@@ -405,8 +405,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/network_troubleshooting.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                      <span className="text-purple-600 dark:text-purple-400">🌐</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                      <span className="text-indigo-600 dark:text-indigo-400">🌐</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Network Issues</div>
@@ -418,8 +418,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/password_reset.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                      <span className="text-yellow-600 dark:text-yellow-400">🔑</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                      <span className="text-amber-600 dark:text-amber-400">🔑</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Password Reset</div>
@@ -431,8 +431,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_setup.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                      <span className="text-red-600 dark:text-red-400">🖨️</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-rose-100 dark:bg-rose-900 rounded-lg flex items-center justify-center">
+                      <span className="text-rose-600 dark:text-rose-400">🖨️</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Setup</div>
@@ -457,8 +457,8 @@ export default function KBDashboard({ open, onClose }) {
                     onClick={() => window.open('https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/printer_duplex_configuration.txt', '_blank')}
                     className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-600 text-left group"
                   >
-                    <div className="flex-shrink-0 w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-                      <span className="text-orange-600 dark:text-orange-400">📄</span>
+                    <div className="flex-shrink-0 w-8 h-8 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                      <span className="text-amber-600 dark:text-amber-400">📄</span>
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100 text-sm">Printer Duplex</div>
@@ -527,7 +527,7 @@ export default function KBDashboard({ open, onClose }) {
                                   href={a.url || `https://proud-tree-0c99b8f00.1.azurestaticapps.net/kb_protocols/${a.filename || 'email_issues.txt'}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                                  className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-200 font-medium"
                                 >
                                   📄 View Source
                                 </a>
@@ -703,8 +703,8 @@ export default function KBDashboard({ open, onClose }) {
             )}
             
             {err && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-800 rounded-md">
-                <div className="text-sm text-red-600 dark:text-red-400">{err}</div>
+              <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-900/50 border border-rose-200 dark:border-rose-800 rounded-md">
+                <div className="text-sm text-rose-600 dark:text-rose-400">{err}</div>
               </div>
             )}
             
@@ -723,7 +723,7 @@ export default function KBDashboard({ open, onClose }) {
               <button
                 onClick={handleUploadProtocol}
                 disabled={!uploadFile || uploading}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
               >
                 {uploading ? 'Uploading...' : 'Upload'}
               </button>
@@ -798,7 +798,7 @@ function MiniSparkline({ series }){
         const h = Math.round((v/max)*96);
         return (
           <div key={i} className="flex flex-col items-center">
-            <div className="w-4 bg-indigo-400 rounded-t" style={{ height: h }} />
+            <div className="w-4 bg-blue-500 rounded-t" style={{ height: h }} />
             <div className="text-[10px] text-gray-500 mt-1">{p.day}</div>
           </div>
         );
