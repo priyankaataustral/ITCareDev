@@ -6,7 +6,7 @@
     {
       "route": "/kb/protocols/upload",
       "methods": ["POST", "OPTIONS"],
-      "rewrite": "itcaredev-hkeyh9cheucmbfbf.australiaeast-01.azurewebsites.net/kb/protocols/upload"
+      "rewrite": "/api/kb/protocols/upload"
     }
   ]
 }
