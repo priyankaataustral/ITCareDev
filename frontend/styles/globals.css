@@ -266,4 +266,156 @@
   }
 }
 
+/* Department Override Panel Styles */
+.override-toggle-btn {
+  background: #28a745;
+  border: 1px solid #20c997;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: white;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.override-toggle-btn:hover {
+  background: #20c997;
+}
+
+.override-toggle-btn.active {
+  background: #17a2b8;
+  border-color: #17a2b8;
+}
+
+.override-toggle-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.department-override-panel {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin: 10px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.override-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 8px 8px 0 0;
+}
+
+.override-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.override-content {
+  padding: 16px;
+}
+
+.current-info {
+  background: #e9ecef;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.instructions {
+  color: #6c757d;
+  font-size: 13px;
+  margin-bottom: 16px;
+  padding: 8px;
+  background: #fff3cd;
+  border-radius: 4px;
+}
+
+.override-form .form-group {
+  margin-bottom: 16px;
+}
+
+.override-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.override-form select,
+.override-form textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.override-form select:focus,
+.override-form textarea:focus {
+  outline: none;
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submit-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submit-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.no-options {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .ticket-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .override-toggle-btn {
+    margin-left: 0;
+  }
+}
 
