@@ -419,3 +419,33 @@
   }
 }
 
+/* === Restore two-column chat + right sidebar on desktop/laptop === */
+@media (min-width: 1024px) {
+  /* The container that holds the chat area (first child) and the sidebar (second child) */
+  .flex-1.flex.overflow-hidden {
+    /* force a stable two-column layout */
+    display: grid !important;
+    grid-template-columns: 1fr 20rem; /* 20rem = Tailwind w-80 */
+    align-items: stretch;
+    gap: 0;
+    overflow: hidden; /* keep internal scrollers doing the work */
+  }
+
+  /* Chat column */
+  .flex-1.flex.overflow-hidden > :first-child {
+    min-width: 0 !important;  /* prevents the grid from pushing the sidebar below */
+    overflow: hidden;
+  }
+
+  /* Right sidebar (collapsibles) */
+  .flex-1.flex.overflow-hidden > :last-child {
+    width: 20rem !important;   /* matches w-80 */
+    max-width: 20rem !important;
+    flex: 0 0 20rem;           /* defensive: if any flex styles leak in */
+  }
+}
+
+/* Defensive: if a tool injected wrapping, kill it globally for this row */
+.flex-1.flex.overflow-hidden { flex-wrap: nowrap !important; }
+
+
