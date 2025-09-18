@@ -2164,17 +2164,20 @@ function TicketHistoryCollapsible({
           setDarkMode={setDarkMode}
         />
 
-        <div className="mx-4 md:mx-4 mt-0 md:grid md:grid-cols-12 md:gap-4">
-          {/* LEFT: Ticket + Chat */}
-          <div className="md:col-span-8 flex flex-col">
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Ticket Info Card */}
+          <div className="flex-shrink-0">
             <TicketInfoCard ticket={ticket} />
+          </div>
 
-            {/* CHAT PANEL (moved here) */}
-            <div className="flex-1 flex flex-col relative min-w-0">
+          {/* Chat Panel */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Main Chat Area */}
+            <div className="flex-1 flex flex-col min-w-0">
               {/* Messages */}
               <div
                 ref={scrollRef}
-                className="overflow-y-auto p-2 sm:p-4 space-y-4 bg-[#F9FAFB] dark:bg-black scroll-smooth max-h-[calc(100vh-260px)] min-h-[200px]"
+                className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
                 style={{ paddingBottom: 'var(--composer-height, 120px)' }}
               >
                 {displayMessages.map((msg, i) => {
@@ -2232,7 +2235,7 @@ function TicketHistoryCollapsible({
                       ref={el => { if (el && msg.id) messageRefs.current[msg.id] = el; }}
                       className="flex w-full group justify-start"
                     >
-                      <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-3xl rounded-br-3xl rounded-tl-xl rounded-tr-lg border border-gray-200 dark:border-gray-700" style={{ padding: '12px 20px', margin: '4px 0', maxWidth: '75vw', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                      <div className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-3xl rounded-br-3xl rounded-tl-xl rounded-tr-lg border border-gray-200 dark:border-gray-700" style={{ padding: '12px 20px', margin: '4px 0', maxWidth: 'min(75%, 600px)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                         <div className="font-medium text-xs flex items-center gap-2 mb-1">
                           <span>{icon}</span>
                           <span className="inline-block align-middle text-[13px]">
@@ -2260,7 +2263,7 @@ function TicketHistoryCollapsible({
                       isUser
                         ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 rounded-tr-3xl rounded-bl-3xl rounded-tl-xl rounded-br-lg'
                         : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-3xl rounded-br-3xl rounded-tl-xl rounded-tr-lg'
-                    } style={{ padding: '12px 20px', margin: '4px 0', maxWidth: '75vw', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    } style={{ padding: '12px 20px', margin: '4px 0', maxWidth: 'min(75%, 600px)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                       <div className="font-medium text-xs">
                         <span className="inline-block align-middle text-[13px]">
                           {typeof displayContent === 'string'
@@ -2340,44 +2343,35 @@ function TicketHistoryCollapsible({
             </div>
           </div>
 
-          {/* RIGHT: Collapsibles */}
-          <div className="md:col-span-4 flex flex-col gap-2">
-            <div className="md:sticky md:top-20">
-              <TimelinePanel
-                events={timeline}
-                loading={timelineLoading}
-                error={timelineError}
-                openSections={openSections}
-                toggleSection={toggleSection}
-              />
-              <SuggestedPrompts
-                threadId={tid}
-                prompts={suggestedPrompts}
-                open={panelOpen}
-                onToggle={() => setPanelOpen(v => !v)}
-                apiBase={API_BASE}
-                onPromptSelect={handleSuggestedPromptClick}
-              />
-              <RelatedTicketList
-                tickets={relatedTickets}
-                loading={relatedTicketsLoading}
-                error={relatedTicketsError}
-                onClick={handleRelatedTicketClick}
-                openSections={openSections}
-                toggleSection={toggleSection}
-              />
-
-              {/* <TicketHistoryCollapsible
-                history={ticketHistory}
-                loading={ticketHistoryLoading}
-                error={ticketHistoryError}
-                openSections={openSections}
-                toggleSection={toggleSection}
-              /> */}
-              
-              <StepProgressBar stepInfo={stepInfo} />
+            {/* RIGHT: Collapsibles Sidebar */}
+            <div className="hidden xl:block flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                <TimelinePanel
+                  events={timeline}
+                  loading={timelineLoading}
+                  error={timelineError}
+                  openSections={openSections}
+                  toggleSection={toggleSection}
+                />
+                <SuggestedPrompts
+                  threadId={tid}
+                  prompts={suggestedPrompts}
+                  open={panelOpen}
+                  onToggle={() => setPanelOpen(v => !v)}
+                  apiBase={API_BASE}
+                  onPromptSelect={handleSuggestedPromptClick}
+                />
+                <RelatedTicketList
+                  tickets={relatedTickets}
+                  loading={relatedTicketsLoading}
+                  error={relatedTicketsError}
+                  onClick={handleRelatedTicketClick}
+                  openSections={openSections}
+                  toggleSection={toggleSection}
+                />
+                <StepProgressBar stepInfo={stepInfo} />
+              </div>
             </div>
-          </div>
         </div>
       </div>
       

@@ -26,6 +26,7 @@ export default function SupportInboxPlugin() {
   const [showAgents, setShowAgents] = useState(false);
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
   const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' or specific department ID
+  const [searchTerm, setSearchTerm] = useState(''); // Search term for ticket numbers
   const { agent } = useAuth();
 
   useEffect(() => {
@@ -86,6 +87,45 @@ export default function SupportInboxPlugin() {
     console.log('DEPARTMENTS', departments);
   }, [departments]);
 
+  // Filter threads based on search term
+  const filteredThreads = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+      return threads;
+    }
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return threads.filter(thread => {
+      // Search by ticket ID
+      const ticketId = String(thread.id || '').toLowerCase();
+      if (ticketId.includes(searchLower)) {
+        return true;
+      }
+      
+      // Search by subject/text
+      const subject = String(thread.subject || thread.text || '').toLowerCase();
+      if (subject.includes(searchLower)) {
+        return true;
+      }
+      
+      // Search by requester name
+      const requesterName = String(thread.requester_name || '').toLowerCase();
+      if (requesterName.includes(searchLower)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [threads, searchTerm]);
+
+  const handleSearchChange = (term) => {
+    setSearchTerm(term);
+  };
+
+  const handleDepartmentFilterChange = (deptId) => {
+    setDepartmentFilter(deptId);
+    loadThreads(ticketFilter, deptId);
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 w-full h-full min-h-screen h-screen bg-gray-50 flex items-center justify-center">
@@ -95,17 +135,71 @@ export default function SupportInboxPlugin() {
   }
 
   return (
-    <div className="fixed inset-0 w-full h-full min-h-screen h-screen bg-gray-50 shadow-2xl overflow-auto grid grid-cols-[1fr_3fr] grid-rows-[auto_1fr_auto]">
-      {/* Sidebar with tabs */}
-      <div className="row-start-2 row-end-3 col-start-1 col-end-2 flex flex-col items-start h-full overflow-y-auto bg-white p-0">
-        <Sidebar
-          agentId={agent?.id}
-          onSelect={setSelectedId}
-          selectedId={selectedId}
-          threads={threads}
-          departments={departments}
-          useNewList={false}
-          ticketFilter={ticketFilter}
+    <div className="fixed inset-0 w-full h-full min-h-screen bg-gray-50 overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-4 lg:px-6 py-3">
+          <div className="flex items-center space-x-4">
+            {selectedId ? (
+              <h2 className="text-xl font-semibold text-indigo-900">#{selectedId}</h2>
+            ) : (
+              <div className="text-indigo-900 font-medium">Select a ticket</div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 lg:gap-3">
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all text-xs lg:text-sm font-medium shadow-sm"
+              aria-label="Open My Dashboard"
+            >
+              <i className="bi bi-speedometer2 mr-1 lg:mr-2"></i>
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+            
+            <button
+              onClick={() => setShowAnalytics(true)}
+              className="flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs lg:text-sm font-medium shadow-sm"
+              aria-label="Open Analytics Dashboard"
+            >
+              <i className="bi bi-graph-up mr-1 lg:mr-2"></i>
+              <span className="hidden sm:inline">Analytics</span>
+            </button>
+            
+            {/* Agents Management - Only for L2, L3, MANAGER */}
+            {agent && ['L2', 'L3', 'MANAGER'].includes(agent.role) && (
+              <button
+                onClick={() => setShowAgents(true)}
+                className="flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors text-xs lg:text-sm font-medium shadow-sm"
+                aria-label="Manage Agents"
+              >
+                <i className="bi bi-people mr-1 lg:mr-2"></i>
+                <span className="hidden sm:inline">Agents</span>
+              </button>
+            )}
+            <button
+              onClick={() => setDark((d) => !d)}
+              className="bg-white text-black dark:bg-black dark:text-white p-1.5 lg:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              {dark ? <i className="bi bi-sun text-sm"></i> : <i className="bi bi-moon-stars text-sm"></i>}
+            </button>
+            <ProfileDropdown />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="flex-shrink-0 w-80 xl:w-96 bg-white border-r border-gray-200 overflow-hidden">
+          <Sidebar
+            agentId={agent?.id}
+            onSelect={setSelectedId}
+            selectedId={selectedId}
+            threads={filteredThreads}
+            departments={departments}
+            useNewList={false}
+            ticketFilter={ticketFilter}
             onFilterChange={(filter) => {
               setTicketFilter(filter);
               loadThreads(filter, departmentFilter);
@@ -115,67 +209,21 @@ export default function SupportInboxPlugin() {
               loadThreads(ticketFilter, deptFilter);
             }}
             departmentFilter={departmentFilter}
-        />
-      </div>
-
-      {/* Header */}
-      <div className="col-start-2 row-start-1 row-end-2 border-b bg-white flex items-center justify-between px-6">
-        <div className="flex items-center">
-          {selectedId ? (
-            <h2 className="text-xl font-semibold ml-2 text-indigo-900">#{selectedId}</h2>
-          ) : (
-            <div className="text-indigo-900">Select a ticket</div>
-          )}
+            onSearchChange={handleSearchChange}
+          />
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowDashboard(true)}
-            className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all text-sm font-medium shadow-sm"
-            aria-label="Open My Dashboard"
-          >
-            <i className="bi bi-speedometer2 mr-2"></i>
-            Dashboard
-          </button>
-          
-          <button
-            onClick={() => setShowAnalytics(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
-            aria-label="Open Analytics Dashboard"
-          >
-            <i className="bi bi-graph-up mr-2"></i>
-            Analytics
-          </button>
-          
-          {/* Agents Management - Only for L2, L3, MANAGER */}
-          {agent && ['L2', 'L3', 'MANAGER'].includes(agent.role) && (
-            <button
-              onClick={() => setShowAgents(true)}
-              className="flex items-center px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
-              aria-label="Manage Agents"
-            >
-              <i className="bi bi-people mr-2"></i>
-              Agents
-            </button>
-          )}
-          <button
-            onClick={() => setDark((d) => !d)}
-            className="bg-white text-black dark:bg-black dark:text-white p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? <i className="bi bi-sun"></i> : <i className="bi bi-moon-stars"></i>}
-          </button>
-          <ProfileDropdown />
-        </div>
-      </div>
 
-      {/* Chat / Content */}
-      <div className="row-start-2 row-end-3 col-start-2 col-end-3 flex items-center justify-center h-full bg-transparent">
-        <div className="flex-1 bg-white p-6 shadow-lg h-full flex flex-col">
+        {/* Chat / Content Area */}
+        <div className="flex-1 bg-gray-50 overflow-hidden">
           {selectedId ? (
-            <ChatHistory threadId={selectedId} onBack={handleBack} className="flex-1" />
+            <ChatHistory threadId={selectedId} onBack={handleBack} className="h-full" />
           ) : (
-            <div className="h-full flex items-center justify-center text-indigo-900">
-              No ticket selected
+            <div className="h-full flex items-center justify-center bg-white">
+              <div className="text-center text-gray-500">
+                <div className="text-6xl mb-4">📋</div>
+                <div className="text-xl font-medium text-indigo-900 mb-2">No ticket selected</div>
+                <div className="text-sm text-gray-600">Choose a ticket from the sidebar to start</div>
+              </div>
             </div>
           )}
         </div>
@@ -186,6 +234,10 @@ export default function SupportInboxPlugin() {
         <MyDashboard 
           open={showDashboard} 
           onClose={() => setShowDashboard(false)} 
+          onSelectTicket={(ticketId) => {
+            setSelectedId(ticketId);
+            setShowDashboard(false);
+          }}
         />
       )}
 

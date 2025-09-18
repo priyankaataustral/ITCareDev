@@ -301,7 +301,7 @@ export default function KBDashboard({ open, onClose }) {
               {tab === 'analytics' && '📊 Performance metrics and insights'}
             </span>
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm">Refresh</button>
-          </div>
+              </div>
         </div>
 
         {err && <div className="px-5 py-2 text-sm text-red-600">{err}</div>}
@@ -544,12 +544,12 @@ export default function KBDashboard({ open, onClose }) {
                                 </a>
                               )}
                               {a.source !== 'protocol' && a.source !== 'Protocol' && (
-                                <Gate roles={["L2","L3","MANAGER"]}>
-                                  {String(a.status).toLowerCase()==='draft' && (
-                                    <button className="btn-subtle" onClick={()=>publishArticle(a)}>🚀 Publish</button>
-                                  )}
+                              <Gate roles={["L2","L3","MANAGER"]}>
+                                {String(a.status).toLowerCase()==='draft' && (
+                                  <button className="btn-subtle" onClick={()=>publishArticle(a)}>🚀 Publish</button>
+                                )}
                                 </Gate>
-                              )}
+                                )}
                             </div>
                           </td>
                         </tr>
@@ -681,8 +681,8 @@ export default function KBDashboard({ open, onClose }) {
               setAnalyticsTab={setAnalyticsTab}
             />
           )}
-        </div>
-      </div>
+                </div>
+              </div>
 
       {/* Upload Protocol Modal */}
       {showUploadModal && (
@@ -738,8 +738,8 @@ export default function KBDashboard({ open, onClose }) {
               >
                 {uploading ? 'Uploading...' : 'Upload'}
               </button>
-            </div>
-          </div>
+        </div>
+      </div>
         </div>
       )}
     </div>

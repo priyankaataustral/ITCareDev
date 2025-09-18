@@ -2584,31 +2584,54 @@ def debug_send_email(thread_id):
 
 # ─── Draft Email Endpoint ─────────────────────────────────────────────────────
 @urls.route('/threads/<thread_id>/draft-email', methods=['POST'])
+@require_role("L1","L2","L3","MANAGER")
 def draft_email(thread_id):
     data = request.json or {}
     solution = data.get('solution', '').strip()
     if not solution:
         return jsonify(error="Missing solution text"), 400
     
-    # Enhanced prompt for user-friendly emails
-    prompt = f"""Draft a professional but simple email to explain this solution to a non-technical user.
+    # Get ticket info for personalization
+    t = db.session.get(Ticket, thread_id)
+    requester_name = "there"  # Default fallback
+    if t and t.requester_name:
+        requester_name = t.requester_name
+    elif t:
+        # Try to extract from CSV if not in ticket
+        from db_helpers import _csv_row_for_ticket
+        row = _csv_row_for_ticket(thread_id)
+        if row and row.get("email"):
+            email = row.get("email", "")
+            requester_name = email.split("@")[0].title() if email else "there"
+    
+    # Get agent info for signature
+    agent_ctx = getattr(request, "agent_ctx", None) or {}
+    agent_name = agent_ctx.get("name", "Support Team")
+    
+    # Debug logging
+    current_app.logger.info(f"[DRAFT_EMAIL] ticket_id={thread_id}, requester_name='{requester_name}', agent_name='{agent_name}'")
+    
+    # Enhanced prompt with personalization
+    prompt = f"""Draft a professional but simple email to explain this solution to a non-technical user named {requester_name}.
 
 SOLUTION TO EXPLAIN:
 {solution}
 
 REQUIREMENTS:
+- Start with "Hi {requester_name}," (use this exact name, don't change it)
 - Write in plain, everyday language that anyone can understand
 - Avoid ALL technical terms (no server logs, IP addresses, blacklists, etc.)
 - Use simple step-by-step instructions
 - Be helpful and reassuring
 - Keep it short and friendly
-- If technical steps are needed, explain them in everyday terms"""
+- If technical steps are needed, explain them in everyday terms
+- End with "Best regards,\\n{agent_name}" """
 
     try:
         resp = client.chat.completions.create(
             model=CHAT_MODEL,
             messages=[
-                {"role": "system", "content": """You are writing emails for everyday people who are not tech-savvy. Your audience includes seniors, busy professionals, and people who just want their technology to work without understanding how.
+                {"role": "system", "content": f"""You are writing emails for everyday people who are not tech-savvy. Your audience includes seniors, busy professionals, and people who just want their technology to work without understanding how.
 
 WRITING STYLE:
 - Use simple, everyday language
@@ -2616,6 +2639,8 @@ WRITING STYLE:
 - Write like you're talking to a family member
 - Be patient and reassuring
 - Focus on what the user needs to DO, not technical details
+- ALWAYS start emails with "Hi {requester_name}," (use this exact greeting)
+- ALWAYS end emails with "Best regards,\\n{agent_name}"
 
 AVOID THESE TECHNICAL TERMS:
 - Server, IP address, blacklist, domain, DNS, SMTP, logs
@@ -2635,7 +2660,20 @@ INSTEAD USE:
             max_tokens=400
         )
         email_text = resp.choices[0].message.content.strip()
+        
+        # Additional safety check - ensure personalization worked
+        if email_text.startswith("Hi there"):
+            email_text = email_text.replace("Hi there", f"Hi {requester_name}", 1)
+            current_app.logger.info(f"[DRAFT_EMAIL] Fixed greeting: 'Hi there' -> 'Hi {requester_name}'")
+        
+        if "Support Team" in email_text and agent_name != "Support Team":
+            email_text = email_text.replace("Support Team", agent_name)
+            current_app.logger.info(f"[DRAFT_EMAIL] Fixed signature: 'Support Team' -> '{agent_name}'")
+            
+        current_app.logger.info(f"[DRAFT_EMAIL] Final email preview: {email_text[:100]}...")
+        
     except Exception as e:
+        current_app.logger.exception("Failed to draft email")
         return jsonify(error=f"Failed to draft email: {e}"), 500
     return jsonify(email=email_text)
 
@@ -2921,27 +2959,52 @@ def send_email(thread_id):
         
         # Replace generic greetings with personalized greeting
         personalized_body = email_body
-        if personalized_body.startswith("Hi there"):
-            personalized_body = personalized_body.replace("Hi there", f"Hi {requester_name}", 1)
-            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Hi there' with 'Hi {requester_name}'")
-        elif personalized_body.startswith("Hello there"):
-            personalized_body = personalized_body.replace("Hello there", f"Hello {requester_name}", 1)
-            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Hello there' with 'Hello {requester_name}'")
-        elif personalized_body.startswith("Dear User"):
-            personalized_body = personalized_body.replace("Dear User", f"Dear {requester_name}", 1)
-            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Dear User' with 'Dear {requester_name}'")
-        elif not any(personalized_body.startswith(greeting) for greeting in ["Hi ", "Hello ", "Dear "]):
-            # If no greeting, add one
+        
+        # More comprehensive greeting replacement patterns
+        greeting_patterns = [
+            ("Hi there,", f"Hi {requester_name},"),
+            ("Hi there", f"Hi {requester_name}"),
+            ("Hello there,", f"Hello {requester_name},"),
+            ("Hello there", f"Hello {requester_name}"),
+            ("Dear User,", f"Dear {requester_name},"),
+            ("Dear User", f"Dear {requester_name}"),
+            ("Dear Customer,", f"Dear {requester_name},"),
+            ("Dear Customer", f"Dear {requester_name}"),
+        ]
+        
+        greeting_replaced = False
+        for old_pattern, new_pattern in greeting_patterns:
+            if personalized_body.startswith(old_pattern):
+                personalized_body = personalized_body.replace(old_pattern, new_pattern, 1)
+                current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced '{old_pattern}' with '{new_pattern}'")
+                greeting_replaced = True
+                break
+        
+        # If no standard greeting found, add one
+        if not greeting_replaced and not any(personalized_body.startswith(greeting) for greeting in ["Hi ", "Hello ", "Dear "]):
             personalized_body = f"Hi {requester_name},\n\n{personalized_body}"
             current_app.logger.info(f"[EMAIL_PERSONALIZATION] Added greeting 'Hi {requester_name},'")
         
-        # Add agent signature if not already present
-        if not any(signature in personalized_body.lower() for signature in ["best regards", "thanks", "sincerely"]):
+        # Handle agent signature replacement
+        signature_patterns = [
+            ("Support Team", agent_name),
+            ("Best regards,\nSupport Team", f"Best regards,\n{agent_name}"),
+            ("Thanks,\nSupport Team", f"Thanks,\n{agent_name}"),
+            ("Sincerely,\nSupport Team", f"Sincerely,\n{agent_name}"),
+        ]
+        
+        signature_replaced = False
+        for old_sig, new_sig in signature_patterns:
+            if old_sig in personalized_body:
+                personalized_body = personalized_body.replace(old_sig, new_sig)
+                current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced signature '{old_sig}' with '{new_sig}'")
+                signature_replaced = True
+                break
+        
+        # If no signature found, add one
+        if not signature_replaced and not any(signature in personalized_body.lower() for signature in ["best regards", "thanks", "sincerely"]):
             personalized_body = f"{personalized_body}\n\nBest regards,\n{agent_name}"
             current_app.logger.info(f"[EMAIL_PERSONALIZATION] Added signature 'Best regards, {agent_name}'")
-        elif "Support Team" in personalized_body:
-            personalized_body = personalized_body.replace("Support Team", agent_name)
-            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Support Team' with '{agent_name}'")
         
         final_body = (
             f"{personalized_body}\n\n"
@@ -5680,14 +5743,22 @@ def get_my_dashboard():
                 "latest_message_preview": message_preview
             })
         
-        # === DEPARTMENT TICKETS (all tickets in agent's department) ===
+        # === DEPARTMENT TICKETS (all tickets in agent's department OR all tickets for helpdesk) ===
         dept_tickets_list = []
         dept_tickets_counts = {"open": 0, "closed": 0, "escalated": 0, "resolved": 0}
         
         if agent_department_id:
-            # Query tickets by department
-            dept_tickets_query = Ticket.query.filter_by(department_id=agent_department_id, archived=False)
-            dept_tickets = dept_tickets_query.all()
+            # Helpdesk (department_id = 7) can see all tickets across all departments
+            if agent_department_id == 7:  # Helpdesk department
+                # Query all tickets across all departments
+                dept_tickets_query = Ticket.query.filter_by(archived=False)
+                dept_tickets = dept_tickets_query.all()
+                current_app.logger.info(f"Helpdesk agent {agent_id} viewing all department tickets: {len(dept_tickets)} total")
+            else:
+                # Other departments only see their own tickets
+                dept_tickets_query = Ticket.query.filter_by(department_id=agent_department_id, archived=False)
+                dept_tickets = dept_tickets_query.all()
+                current_app.logger.info(f"Department agent {agent_id} viewing department {agent_department_id} tickets: {len(dept_tickets)} total")
             
             for ticket in dept_tickets:
                 # Count by status
@@ -5710,6 +5781,11 @@ def get_my_dashboard():
                     else:
                         message_preview = str(content)
                 
+                # Get ticket department info (especially important for helpdesk viewing all departments)
+                ticket_dept = None
+                if ticket.department_id:
+                    ticket_dept = db.session.get(Department, ticket.department_id)
+                
                 dept_tickets_list.append({
                     "id": ticket.id,
                     "subject": ticket.subject or "No subject",
@@ -5721,6 +5797,10 @@ def get_my_dashboard():
                     "category": ticket.category,
                     "requester_name": ticket.requester_name,
                     "requester_email": ticket.requester_email,
+                    "department": {
+                        "id": ticket_dept.id if ticket_dept else None,
+                        "name": ticket_dept.name if ticket_dept else "Unassigned"
+                    },
                     "assigned_agent": {
                         "id": assigned_agent.id if assigned_agent else None,
                         "name": assigned_agent.name if assigned_agent else "Unassigned"
@@ -5790,7 +5870,8 @@ def get_my_dashboard():
                 "total": len(dept_tickets_list),
                 "counts": dept_tickets_counts,
                 "tickets": dept_tickets_list[:30],  # Limit to 30 for performance
-                "department_name": department.name if department else "No Department"
+                "department_name": "All Departments" if agent_department_id == 7 else (department.name if department else "No Department"),
+                "is_helpdesk_view": agent_department_id == 7
             },
             "recent_activity": recent_activity[:10],
             "summary": {

@@ -15,11 +15,13 @@ export default function Sidebar({
   ticketFilter = 'open',
   onFilterChange,
   onDepartmentFilterChange,
-  departmentFilter = 'all'
+  departmentFilter = 'all',
+  onSearchChange
 }) {
   const [view, setView] = useState('all');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [escalationCount, setEscalationCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
   const filterPanelRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
@@ -48,9 +50,17 @@ export default function Sidebar({
     }
   }, [showFilterPanel]);
 
+  // Handle search input changes
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
+
   // Helper functions for filter state
   const hasActiveFilters = () => {
-    return ticketFilter !== 'open' || departmentFilter !== 'all';
+    return ticketFilter !== 'open' || departmentFilter !== 'all' || searchTerm.trim() !== '';
   };
 
   const getActiveFilterChips = () => {
@@ -73,6 +83,14 @@ export default function Sidebar({
         value: departmentFilter
       });
     }
+    if (searchTerm.trim() !== '') {
+      chips.push({
+        type: 'search',
+        label: `"${searchTerm}"`,
+        icon: '🔍',
+        value: searchTerm
+      });
+    }
     return chips;
   };
 
@@ -81,12 +99,15 @@ export default function Sidebar({
       onFilterChange('open');
     } else if (type === 'department') {
       onDepartmentFilterChange('all');
+    } else if (type === 'search') {
+      handleSearchChange('');
     }
   };
 
   const clearAllFilters = () => {
     onFilterChange('open');
     onDepartmentFilterChange('all');
+    handleSearchChange('');
     setShowFilterPanel(false);
   };
 
@@ -95,6 +116,26 @@ export default function Sidebar({
       {/* Compact Filter Button & Chips */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-3 mb-3">
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Search ticket #..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            />
+            <i className="bi bi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+            {searchTerm && (
+              <button
+                onClick={() => handleSearchChange('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="bi bi-x text-sm"></i>
+              </button>
+            )}
+          </div>
+          
           {/* Filter Button */}
           <div className="relative" ref={filterPanelRef}>
             <button
@@ -134,6 +175,29 @@ export default function Sidebar({
                 
                 {/* Panel Content */}
                 <div className="p-4 space-y-4">
+                  {/* Search Section */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Search</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Enter ticket number..."
+                        value={searchTerm}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        className="w-full pl-9 pr-10 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      />
+                      <i className="bi bi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                      {searchTerm && (
+                        <button
+                          onClick={() => handleSearchChange('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <i className="bi bi-x text-sm"></i>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
                   {/* Status Filter Section */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
