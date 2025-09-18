@@ -5,7 +5,16 @@ import Gate from './Gate';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from '../components/AuthContext';
-import { apiGet, apiPost, apiPatch } from '../lib/apiClient'; // <— use centralized client
+import { apiGet, apiPost, apiPatch, API_BASE } from '../lib/apiClient'; // <— use centralized client
+
+const authHeaders = () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  } catch {
+    return {};
+  }
+};
 // DepartmentOverridePill component will be defined inline below
 
 dayjs.extend(relativeTime);
@@ -669,8 +678,45 @@ export default function ThreadList({
                 </div>
               </div>
               
-              {/* Archive Button for Closed Tickets */}
+              {/* Action Buttons */}
               <div className="flex items-center gap-2">
+                {/* Download Report for Escalated Tickets */}
+                {(t.status === 'escalated' || t.level > 1) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = `${API_BASE}/threads/${t.id}/download-summary`;
+                      fetch(url, {
+                        method: 'GET',
+                        headers: authHeaders(),
+                      })
+                        .then(response => {
+                          if (!response.ok) {
+                            throw new Error('Failed to download report');
+                          }
+                          return response.blob();
+                        })
+                        .then(blob => {
+                          const link = document.createElement('a');
+                          link.href = window.URL.createObjectURL(blob);
+                          link.download = `escalation_report_${t.id}.txt`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        })
+                        .catch(err => {
+                          console.error('Download failed:', err);
+                          alert('Failed to download escalation report');
+                        });
+                    }}
+                    className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors flex items-center gap-1 font-medium"
+                    title="Download escalation report"
+                  >
+                    📄 Report
+                  </button>
+                )}
+                
+                {/* Archive Button for Closed Tickets */}
                 {(t.status === 'closed' || t.status === 'resolved') && !t.archived && (
                   <button
                     onClick={(e) => {

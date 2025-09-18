@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { apiGet, apiPost } from '../lib/apiClient';
+import { apiGet, apiPost, API_BASE } from '../lib/apiClient';
+
+const authHeaders = () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  } catch {
+    return {};
+  }
+};
 
 export default function EscalationSummaries({ onUnreadCountChange }) {
   const [summaries, setSummaries] = useState([]);
@@ -30,6 +39,32 @@ export default function EscalationSummaries({ onUnreadCountChange }) {
       ));
     } catch (err) {
       console.error('Failed to mark as read:', err);
+    }
+  };
+
+  // Download escalation report function
+  const downloadEscalationReport = async (ticketId, summaryId) => {
+    try {
+      const url = `${API_BASE}/threads/${ticketId}/download-summary`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: authHeaders(),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to download report');
+      }
+      
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `escalation_report_${ticketId}_${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download escalation report:', err);
+      alert('Failed to download escalation report');
     }
   };
 
@@ -81,18 +116,29 @@ export default function EscalationSummaries({ onUnreadCountChange }) {
             {summaries.map((summary) => (
               <div
                 key={summary.id}
-                className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer ${
+                className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
                   !summary.is_read ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
                 }`}
-                onClick={() => !summary.is_read && markAsRead(summary.id)}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="font-medium text-blue-600 dark:text-blue-400">
                     Ticket #{summary.ticket_id}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {new Date(summary.created_at).toLocaleDateString()} at{' '}
-                    {new Date(summary.created_at).toLocaleTimeString()}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadEscalationReport(summary.ticket_id, summary.id);
+                      }}
+                      className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors shadow-sm"
+                      title="Download comprehensive escalation report"
+                    >
+                      📄 Download
+                    </button>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {new Date(summary.created_at).toLocaleDateString()} at{' '}
+                      {new Date(summary.created_at).toLocaleTimeString()}
+                    </div>
                   </div>
                 </div>
 
@@ -136,6 +182,21 @@ export default function EscalationSummaries({ onUnreadCountChange }) {
                 {summary.summary_note && (
                   <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded">
                     <strong>Note:</strong> {summary.summary_note}
+                  </div>
+                )}
+
+                {/* Mark as read functionality */}
+                {!summary.is_read && (
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsRead(summary.id);
+                      }}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                    >
+                      Mark as Read
+                    </button>
                   </div>
                 )}
               </div>

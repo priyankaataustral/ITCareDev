@@ -140,7 +140,8 @@ function CollapsibleSection({ title, children, isOpen, onToggle }) {
 
 function TicketInfoCard({ ticket }) {
   if (!ticket) return null;
-  // Download summary handler
+  
+  // Enhanced download summary handler
   const handleDownloadSummary = () => {
     if (!ticket.id) return;
     const url = `${API_BASE}/threads/${ticket.id}/download-summary`;
@@ -149,16 +150,27 @@ function TicketInfoCard({ ticket }) {
       method: 'GET',
       headers: authHeaders(),
     })
-      .then(response => response.blob())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to download report');
+        }
+        return response.blob();
+      })
       .then(blob => {
         const link = document.createElement('a');
         link.href = window.URL.createObjectURL(blob);
-        link.download = `ticket_${ticket.id}_summary.txt`;
+        link.download = `escalation_report_${ticket.id}_${new Date().toISOString().slice(0,10)}.txt`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+      })
+      .catch(err => {
+        console.error('Download failed:', err);
+        alert('Failed to download escalation report');
       });
   };
+
+  const isEscalated = ticket.status === 'escalated' || ticket.level > 1;
   return (
     <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-4 border-l-4 border-yellow-500 shadow-md mb-4 mx-4 flex items-start gap-4">
       <span className="text-yellow-500 dark:text-yellow-300 text-3xl mt-1">📄</span>
@@ -166,15 +178,26 @@ function TicketInfoCard({ ticket }) {
         <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-base mb-1">Ticket Summary</div>
         <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line">
           {(ticket.created || ticket.created_at) && <div>🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
+          {ticket.level > 1 && <div>⬆️ <b>Level:</b> L{ticket.level}</div>}
           {ticket.text && <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{ticket.text}</div>}
         </div>
-        {ticket.escalated && (
-          <button
-            onClick={handleDownloadSummary}
-            className="mt-3 px-3 py-1 rounded-full bg-slate-600 text-white text-sm shadow hover:bg-slate-700 transition-colors"
-          >
-            ⬇️ Download Summary
-          </button>
+        
+        {/* Show download button for escalated tickets */}
+        {isEscalated && (
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleDownloadSummary}
+              className="px-3 py-1 rounded-full bg-green-600 text-white text-sm shadow hover:bg-green-700 transition-colors"
+              title="Download comprehensive escalation report with ticket history"
+            >
+              📄 Download Escalation Report
+            </button>
+            {ticket.status === 'escalated' && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                🚨 Escalated
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

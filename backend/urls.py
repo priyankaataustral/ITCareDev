@@ -292,64 +292,221 @@ def download_summary_options(thread_id):
     return response
 
 @urls.route("/threads/<thread_id>/download-summary", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
 def download_ticket_summary(thread_id):
+    """Generate and download a comprehensive escalation report with ticket history, escalation details, and summary"""
     import logging
     logging.warning(f"[DOWNLOAD] Origin: {request.headers.get('Origin')}")
     logging.warning(f"[DOWNLOAD] Request headers: {dict(request.headers)}")
-    t = db.session.get(Ticket, thread_id)
-    if not t:
-        return jsonify(error="Ticket not found"), 404
-    # Find the agent who escalated (from timeline events)
-    events = (TicketEvent.query
-              .filter_by(ticket_id=thread_id)
-              .order_by(TicketEvent.created_at.asc())
-              .all())
-    escalated_event = next((e for e in events if e.event_type == "ESCALATED"), None)
-    agent_name = None
-    escalation_time = None
-    if escalated_event:
-        escalation_time = escalated_event.created_at
-        if escalated_event.actor_agent_id:
-            agent = db.session.get(Agent, escalated_event.actor_agent_id)
-            agent_name = agent.name if agent else None
-    # Get all messages after escalation
-    messages = Message.query.filter_by(ticket_id=thread_id).order_by(Message.timestamp.asc()).all()
-    if escalation_time:
-        messages = [m for m in messages if str(m.timestamp) >= str(escalation_time)]
-    chat_text = "\n".join(m.content for m in messages)
-    # Summarize with OpenAI
-    summary = ""
-    if chat_text:
+    
+    try:
+        # Get ticket details
+        ticket = db.session.get(Ticket, thread_id)
+        if not ticket:
+            return jsonify(error="Ticket not found"), 404
+        
+        # Get escalation summary details
+        escalation_summary = EscalationSummary.query.filter_by(ticket_id=thread_id).order_by(EscalationSummary.created_at.desc()).first()
+        
+        # Get ticket history
+        ticket_history = TicketHistory.query.filter_by(ticket_id=thread_id).order_by(TicketHistory.created_at.asc()).all()
+        
+        # Get all messages
+        messages = Message.query.filter_by(ticket_id=thread_id).order_by(Message.timestamp.asc()).all()
+        
+        # Get all ticket events
+        events = TicketEvent.query.filter_by(ticket_id=thread_id).order_by(TicketEvent.created_at.asc()).all()
+        
+        # Get department info
+        department = db.session.get(Department, ticket.department_id) if ticket.department_id else None
+        
+        # Get assigned agent info
+        assigned_agent = db.session.get(Agent, ticket.assigned_to) if ticket.assigned_to else None
+        
+        # Build comprehensive report
+        report_lines = []
+        report_lines.append("=" * 60)
+        report_lines.append("ESCALATION SUMMARY REPORT")
+        report_lines.append("=" * 60)
+        report_lines.append("")
+        
+        # Ticket Information
+        report_lines.append("TICKET INFORMATION:")
+        report_lines.append("-" * 30)
+        report_lines.append(f"Ticket ID: {ticket.id}")
+        report_lines.append(f"Subject: {ticket.subject or 'No subject'}")
+        report_lines.append(f"Status: {ticket.status}")
+        report_lines.append(f"Priority: {ticket.priority}")
+        report_lines.append(f"Impact Level: {ticket.impact_level}")
+        report_lines.append(f"Urgency Level: {ticket.urgency_level}")
+        report_lines.append(f"Current Level: L{ticket.level}")
+        report_lines.append(f"Category: {ticket.category}")
+        report_lines.append(f"Department: {department.name if department else 'Unassigned'}")
+        report_lines.append(f"Assigned Agent: {assigned_agent.name if assigned_agent else 'Unassigned'}")
+        report_lines.append(f"Requester: {ticket.requester_name}")
+        report_lines.append(f"Requester Email: {ticket.requester_email}")
+        report_lines.append(f"Created At: {ticket.created_at}")
+        report_lines.append(f"Last Updated: {ticket.updated_at}")
+        report_lines.append("")
+        
+        # Escalation Details
+        if escalation_summary:
+            report_lines.append("ESCALATION DETAILS:")
+            report_lines.append("-" * 30)
+            report_lines.append(f"Escalation ID: {escalation_summary.id}")
+            report_lines.append(f"Escalated From: L{escalation_summary.from_level}")
+            report_lines.append(f"Escalated To: L{escalation_summary.to_level}")
+            
+            # Get escalated by agent
+            escalated_by_agent = db.session.get(Agent, escalation_summary.escalated_by_agent_id) if escalation_summary.escalated_by_agent_id else None
+            report_lines.append(f"Escalated By: {escalated_by_agent.name if escalated_by_agent else 'Unknown'}")
+            
+            # Get target department
+            target_dept = db.session.get(Department, escalation_summary.escalated_to_department_id) if escalation_summary.escalated_to_department_id else None
+            report_lines.append(f"Target Department: {target_dept.name if target_dept else 'Not specified'}")
+            
+            # Get target agent
+            target_agent = db.session.get(Agent, escalation_summary.escalated_to_agent_id) if escalation_summary.escalated_to_agent_id else None
+            report_lines.append(f"Target Agent: {target_agent.name if target_agent else 'Not specified'}")
+            
+            report_lines.append(f"Escalation Date: {escalation_summary.created_at}")
+            report_lines.append(f"Escalation Reason: {escalation_summary.reason}")
+            
+            if escalation_summary.summary_note:
+                report_lines.append(f"Additional Notes: {escalation_summary.summary_note}")
+            report_lines.append("")
+        
+        # Ticket History Timeline
+        if ticket_history:
+            report_lines.append("TICKET HISTORY TIMELINE:")
+            report_lines.append("-" * 30)
+            for history in ticket_history:
+                actor_agent = db.session.get(Agent, history.actor_agent_id) if history.actor_agent_id else None
+                report_lines.append(f"[{history.created_at}] {history.event_type}")
+                report_lines.append(f"  Actor: {actor_agent.name if actor_agent else 'System'}")
+                if history.old_value and history.new_value:
+                    report_lines.append(f"  Changed: {history.old_value} → {history.new_value}")
+                if history.note:
+                    report_lines.append(f"  Note: {history.note}")
+                report_lines.append("")
+        
+        # Ticket Events
+        if events:
+            report_lines.append("SYSTEM EVENTS:")
+            report_lines.append("-" * 30)
+            for event in events:
+                actor_agent = db.session.get(Agent, event.actor_agent_id) if event.actor_agent_id else None
+                report_lines.append(f"[{event.created_at}] {event.event_type}")
+                report_lines.append(f"  Actor: {actor_agent.name if actor_agent else 'System'}")
+                if event.details:
+                    report_lines.append(f"  Details: {event.details}")
+                report_lines.append("")
+        
+        # Chat Messages
+        if messages:
+            report_lines.append("CHAT CONVERSATION:")
+            report_lines.append("-" * 30)
+            for msg in messages:
+                sender_agent = db.session.get(Agent, msg.sender_agent_id) if msg.sender_agent_id else None
+                sender_name = sender_agent.name if sender_agent else msg.sender
+                timestamp = msg.timestamp.strftime("%Y-%m-%d %H:%M:%S") if msg.timestamp else "No timestamp"
+                report_lines.append(f"[{timestamp}] {sender_name}:")
+                
+                # Handle content formatting
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                # Indent message content
+                content_lines = content.split('\n')
+                for line in content_lines:
+                    report_lines.append(f"  {line}")
+                report_lines.append("")
+        
+        # Generate AI Summary if available
         try:
-            resp = client.chat.completions.create(
-                model=CHAT_MODEL,
-                messages=[
-                    {"role": "system", "content": "Summarize the following support ticket chat after escalation in 1-2 sentences."},
-                    {"role": "user", "content": chat_text}
-                ],
-                max_tokens=80, temperature=0.5
-            )
-            summary = resp.choices[0].message.content.strip()
+            if messages:
+                chat_content = "\n".join([f"{msg.sender}: {msg.content}" for msg in messages[-10:]])  # Last 10 messages
+                resp = client.chat.completions.create(
+                    model=CHAT_MODEL,
+                    messages=[
+                        {"role": "system", "content": "Create a brief technical summary of this support ticket escalation, focusing on the key issues, actions taken, and current status. Keep it professional and concise."},
+                        {"role": "user", "content": f"Ticket: {ticket.subject}\nCategory: {ticket.category}\nRecent conversation:\n{chat_content}"}
+                    ],
+                    max_tokens=200,
+                    temperature=0.3
+                )
+                ai_summary = resp.choices[0].message.content.strip()
+                
+                report_lines.append("AI TECHNICAL SUMMARY:")
+                report_lines.append("-" * 30)
+                report_lines.append(ai_summary)
+                report_lines.append("")
+            
         except Exception as e:
-            summary = chat_text[:200] + "..." if chat_text else "No chat after escalation."
-    else:
-        summary = "No chat messages after escalation."
-    summary_text = f"Ticket ID: {t.id}\nStatus: {t.status}\nLevel: {t.level}\nSubject: {t.subject}\n\nSummary: {summary}\n\nEscalated by: {agent_name or 'Unknown'}\n"
-    # Create downloadable file
-    file_stream = io.BytesIO()
-    file_stream.write(summary_text.encode('utf-8'))
-    file_stream.seek(0)
-    response = send_file(file_stream, as_attachment=True, download_name=f"ticket_{t.id}_summary.txt", mimetype="text/plain")
-    allowed_origins = [
-        "https://proud-tree-0c99b8f00.1.azurestaticapps.net",
-    ]
-    origin = request.headers.get("Origin")
-    if origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-    else:
-        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'  # fallback or remove for stricter security
+            report_lines.append("AI TECHNICAL SUMMARY:")
+            report_lines.append("-" * 30)
+            report_lines.append("AI summary unavailable")
+            report_lines.append("")
+        
+        # Footer
+        report_lines.append("=" * 60)
+        report_lines.append(f"Report generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        report_lines.append("=" * 60)
+        
+        # Create file
+        report_text = "\n".join(report_lines)
+        file_stream = io.BytesIO()
+        file_stream.write(report_text.encode('utf-8'))
+        file_stream.seek(0)
+        
+        # Create response
+        response = send_file(
+            file_stream, 
+            as_attachment=True, 
+            download_name=f"escalation_report_{ticket.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", 
+            mimetype="text/plain"
+        )
+        
+        # CORS headers
+        allowed_origins = [
+            "https://proud-tree-0c99b8f00.1.azurestaticapps.net",
+            "http://localhost:3000"
+        ]
+        origin = request.headers.get("Origin")
+        if origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+        
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Vary'] = 'Origin'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating escalation report: {str(e)}")
+        return jsonify(error=f"Failed to generate report: {str(e)}"), 500
+
+@urls.route("/escalation-summaries/<int:summary_id>/download-report", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def download_escalation_summary_report(summary_id):
+    """Download report for a specific escalation summary"""
+    try:
+        escalation_summary = db.session.get(EscalationSummary, summary_id)
+        if not escalation_summary:
+            return jsonify(error="Escalation summary not found"), 404
+        
+        # Redirect to the comprehensive report for the ticket
+        return download_ticket_summary(escalation_summary.ticket_id)
+        
+    except Exception as e:
+        return jsonify(error=f"Failed to generate report: {str(e)}"), 500
+
+@urls.route("/escalation-summaries/<int:summary_id>/download-report", methods=["OPTIONS"])
+def download_escalation_summary_report_options(summary_id):
+    response = make_response()
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', 'http://localhost:3000')
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Vary'] = 'Origin'
     return response
 
 
