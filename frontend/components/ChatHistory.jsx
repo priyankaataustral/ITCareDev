@@ -1975,7 +1975,7 @@ function TicketHistoryCollapsible({
   };
 
   // TicketHeader
-  function TicketHeader({ ticket, onBack, onEscalate, onClose, actionLoading, darkMode, setDarkMode}) {
+  function TicketHeader({ ticket, onBack, onClose, actionLoading, darkMode, setDarkMode}) {
     // Legacy handleDeescalate removed - now using professional popup system
 
     return (
@@ -2157,7 +2157,7 @@ function TicketHistoryCollapsible({
         <TicketHeader
           ticket={ticket}
           onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
-          onEscalate={() => handleAction('escalate')}
+          // onEscalate={() => handleAction('escalate')}
           onClose={() => handleAction('close')}
           actionLoading={actionLoading}
           darkMode={darkMode}
