@@ -2164,16 +2164,15 @@ function TicketHistoryCollapsible({
           setDarkMode={setDarkMode}
         />
 
-        <div className="flex flex-col h-full overflow-hidden">
-          {/* Ticket Info Card */}
-          <div className="flex-shrink-0">
-            <TicketInfoCard ticket={ticket} />
-          </div>
+        {/* Ticket Info Card */}
+        <div className="flex-shrink-0">
+          <TicketInfoCard ticket={ticket} />
+        </div>
 
-          {/* Chat Panel */}
-          <div className="flex-1 flex overflow-hidden">
+        {/* Main Content Area - Chat + Right Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
               <div
                 ref={scrollRef}
@@ -2343,8 +2342,8 @@ function TicketHistoryCollapsible({
             </div>
           </div>
 
-          {/* RIGHT: Collapsibles Sidebar */}
-          <div className="flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
+          {/* RIGHT: Collapsibles Sidebar - Always Visible */}
+          <div className="w-80 bg-white border-l border-gray-200 overflow-y-auto" style={{minWidth: '320px', maxWidth: '320px'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
@@ -2373,26 +2372,25 @@ function TicketHistoryCollapsible({
             </div>
           </div>
         </div>
-
-      </div>
       
-        {/* Escalation Popup */}
-        <EscalationPopup
-          isOpen={showEscalationPopup}
-          onClose={() => setShowEscalationPopup(false)}
-          onEscalate={handleEscalateWithForm}
-          ticketId={tid}
-          ticket={ticket}
-        />
+      
+      {/* Escalation Popup */}
+      <EscalationPopup
+        isOpen={showEscalationPopup}
+        onClose={() => setShowEscalationPopup(false)}
+        onEscalate={handleEscalateWithForm}
+        ticketId={tid}
+        ticket={ticket}
+      />
 
-        {/* De-escalation Popup */}
-        <DeescalationPopup
-          isOpen={showDeescalationPopup}
-          onClose={() => setShowDeescalationPopup(false)}
-          onDeescalate={handleDeescalateWithForm}
-          ticketId={tid}
-          ticket={ticket}
-        />
+      {/* De-escalation Popup */}
+      <DeescalationPopup
+        isOpen={showDeescalationPopup}
+        onClose={() => setShowDeescalationPopup(false)}
+        onDeescalate={handleDeescalateWithForm}
+        ticketId={tid}
+        ticket={ticket}
+      />
 
       {/* Close Confirmation Modal */}
       {showCloseConfirm && (
