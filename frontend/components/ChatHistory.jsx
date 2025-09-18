@@ -541,7 +541,7 @@ for (const ev of safeEvents) {
 
 function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus, drawerOpen }) {
   return (
-    <div className={`composer-bar w-full px-4 py-3 bg-white/90 dark:bg-black/90 shadow-xl sticky bottom-0 rounded-t-2xl ` + (drawerOpen ? 'pointer-events-none opacity-40 z-10' : 'z-40')}>
+    <div className={`composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700 ` + (drawerOpen ? 'pointer-events-none opacity-40 z-10' : 'z-40')}>
       <div className="flex items-center w-full max-w-4xl mx-auto gap-3">
         <input
           ref={textareaRef}
@@ -2327,20 +2327,18 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer */}
-              <div className="flex-shrink-0">
-                <ChatComposer
-                  value={newMsg}
-                  onChange={v => {
-                    if (typeof v === 'string') setNewMsg(v);
-                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                  }}
-                  onSend={sendMessage}
-                  sending={sending}
-                  textareaRef={textareaRef}
-                  drawerOpen={showDraftEditor}
-                />
-              </div>
+              {/* Composer - Fixed at bottom */}
+              <ChatComposer
+                value={newMsg}
+                onChange={v => {
+                  if (typeof v === 'string') setNewMsg(v);
+                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                }}
+                onSend={sendMessage}
+                sending={sending}
+                textareaRef={textareaRef}
+                drawerOpen={showDraftEditor}
+              />
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
