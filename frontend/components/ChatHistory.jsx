@@ -2343,35 +2343,35 @@ function TicketHistoryCollapsible({
             </div>
           </div>
 
-            {/* RIGHT: Collapsibles Sidebar */}
-            <div className="hidden xl:block flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
-              <div className="p-4 space-y-4">
-                <TimelinePanel
-                  events={timeline}
-                  loading={timelineLoading}
-                  error={timelineError}
-                  openSections={openSections}
-                  toggleSection={toggleSection}
-                />
-                <SuggestedPrompts
-                  threadId={tid}
-                  prompts={suggestedPrompts}
-                  open={panelOpen}
-                  onToggle={() => setPanelOpen(v => !v)}
-                  apiBase={API_BASE}
-                  onPromptSelect={handleSuggestedPromptClick}
-                />
-                <RelatedTicketList
-                  tickets={relatedTickets}
-                  loading={relatedTicketsLoading}
-                  error={relatedTicketsError}
-                  onClick={handleRelatedTicketClick}
-                  openSections={openSections}
-                  toggleSection={toggleSection}
-                />
-                <StepProgressBar stepInfo={stepInfo} />
-              </div>
+          {/* RIGHT: Collapsibles Sidebar */}
+          <div className="flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              <TimelinePanel
+                events={timeline}
+                loading={timelineLoading}
+                error={timelineError}
+                openSections={openSections}
+                toggleSection={toggleSection}
+              />
+              <SuggestedPrompts
+                threadId={tid}
+                prompts={suggestedPrompts}
+                open={panelOpen}
+                onToggle={() => setPanelOpen(v => !v)}
+                apiBase={API_BASE}
+                onPromptSelect={handleSuggestedPromptClick}
+              />
+              <RelatedTicketList
+                tickets={relatedTickets}
+                loading={relatedTicketsLoading}
+                error={relatedTicketsError}
+                onClick={handleRelatedTicketClick}
+                openSections={openSections}
+                toggleSection={toggleSection}
+              />
+              <StepProgressBar stepInfo={stepInfo} />
             </div>
+          </div>
         </div>
       </div>
       
