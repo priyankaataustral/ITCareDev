@@ -156,7 +156,7 @@ export default function Sidebar({
             
             {/* Filter Panel */}
             {showFilterPanel && (
-              <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
+              <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden max-h-96 overflow-y-auto">
                 {/* Panel Header */}
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <div className="flex items-center justify-between">
@@ -175,29 +175,6 @@ export default function Sidebar({
                 
                 {/* Panel Content */}
                 <div className="p-4 space-y-4">
-                  {/* Search Section */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Search</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Enter ticket number..."
-                        value={searchTerm}
-                        onChange={(e) => handleSearchChange(e.target.value)}
-                        className="w-full pl-9 pr-10 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      />
-                      <i className="bi bi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
-                      {searchTerm && (
-                        <button
-                          onClick={() => handleSearchChange('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                          <i className="bi bi-x text-sm"></i>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  
                   {/* Status Filter Section */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>

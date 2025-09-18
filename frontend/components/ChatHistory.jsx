@@ -2344,7 +2344,7 @@ function TicketHistoryCollapsible({
           </div>
 
           {/* RIGHT: Collapsibles Sidebar */}
-          <div className="flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
+          <div className="hidden xl:block flex-shrink-0 w-80 bg-white border-l border-gray-200 overflow-y-auto">
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
