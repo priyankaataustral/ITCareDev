@@ -173,28 +173,28 @@ function TicketInfoCard({ ticket }) {
 
   const isEscalated = ticket.status === 'escalated' || ticket.level > 1;
   return (
-    <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-4 border-l-4 border-yellow-500 shadow-md mb-4 mx-4 flex items-start gap-4">
-      <span className="text-yellow-500 dark:text-yellow-300 text-3xl mt-1">📄</span>
+    <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-3 border-l-4 border-yellow-500 shadow-sm mb-3 mx-4 flex items-start gap-3">
+      <span className="text-yellow-500 dark:text-yellow-300 text-2xl">📄</span>
       <div>
-        <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-base mb-1">Ticket Summary</div>
-        <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line">
-          {(ticket.created || ticket.created_at) && <div>🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
-          {ticket.level > 1 && <div>⬆️ <b>Level:</b> L{ticket.level}</div>}
-          {ticket.text && <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">{ticket.text}</div>}
+        <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm mb-1">Ticket Summary</div>
+        <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line text-sm">
+          {(ticket.created || ticket.created_at) && <div className="text-xs">🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
+          {ticket.level > 1 && <div className="text-xs">⬆️ <b>Level:</b> L{ticket.level}</div>}
+          {ticket.text && <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">{ticket.text}</div>}
         </div>
         
         {/* Show download button for escalated tickets */}
         {isEscalated && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2 flex gap-2">
             <button
               onClick={handleDownloadSummary}
-              className="px-3 py-1 rounded-full bg-green-600 text-white text-sm shadow hover:bg-green-700 transition-colors"
+              className="px-2 py-1 rounded-full bg-green-600 text-white text-xs shadow hover:bg-green-700 transition-colors"
               title="Download comprehensive escalation report with ticket history"
             >
-              📄 Download Escalation Report
+              📄 Download Report
             </button>
             {ticket.status === 'escalated' && (
-              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+              <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-xs rounded-full">
                 🚨 Escalated
               </span>
             )}
@@ -2177,7 +2177,7 @@ function TicketHistoryCollapsible({
               <div
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                style={{ paddingBottom: 'var(--composer-height, 120px)' }}
+                style={{ paddingBottom: '140px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2328,17 +2328,19 @@ function TicketHistoryCollapsible({
               />
 
               {/* Composer */}
-              <ChatComposer
-                value={newMsg}
-                onChange={v => {
-                  if (typeof v === 'string') setNewMsg(v);
-                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                }}
-                onSend={sendMessage}
-                sending={sending}
-                textareaRef={textareaRef}
-                drawerOpen={showDraftEditor}
-              />
+              <div className="flex-shrink-0">
+                <ChatComposer
+                  value={newMsg}
+                  onChange={v => {
+                    if (typeof v === 'string') setNewMsg(v);
+                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                  }}
+                  onSend={sendMessage}
+                  sending={sending}
+                  textareaRef={textareaRef}
+                  drawerOpen={showDraftEditor}
+                />
+              </div>
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
