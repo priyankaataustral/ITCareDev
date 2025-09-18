@@ -293,12 +293,12 @@ def list_threads():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-        # Return exact same format as original
+    # Return exact same format as original
     return jsonify(
-            total=total,
-            limit=limit,
-            offset=offset,
-            threads=threads
+        total=total,
+        limit=limit,
+        offset=offset,
+        threads=threads
     ), 200
         
 
