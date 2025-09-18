@@ -2327,8 +2327,8 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-               {/* Composer - Always visible at bottom */}
-               <div className="absolute bottom-0 left-0 right-0 z-50">
+               {/* Composer - Positioned slightly higher */}
+               <div className="absolute bottom-4 left-0 right-0 z-50">
                  <ChatComposer
                    value={newMsg}
                    onChange={v => {
