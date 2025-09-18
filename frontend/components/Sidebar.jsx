@@ -13,12 +13,16 @@ export default function Sidebar({
   departments = [],
   useNewList = false,
   ticketFilter = 'open',
-  onFilterChange
+  onFilterChange,
+  onDepartmentFilterChange,
+  departmentFilter = 'all'
 }) {
   const [view, setView] = useState('all');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [escalationCount, setEscalationCount] = useState(0);
   const dropdownRef = useRef(null);
+  const deptDropdownRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
   const filterOptions = [
@@ -32,19 +36,22 @@ export default function Sidebar({
 
   const currentFilter = filterOptions.find(opt => opt.value === ticketFilter) || filterOptions[0];
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(event.target)) {
+        setShowDeptDropdown(false);
+      }
     }
 
-    if (showDropdown) {
+    if (showDropdown || showDeptDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showDropdown]);
+  }, [showDropdown, showDeptDropdown]);
 
   return (
     <div className="sidebar" style={{ width: 350, minWidth: 350, maxWidth: 350 }}>
@@ -82,6 +89,62 @@ export default function Sidebar({
                 >
                   <span className="text-lg">{option.icon}</span>
                   <span className="font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Department Filter Dropdown */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="relative" ref={deptDropdownRef}>
+          <button
+            onClick={() => setShowDeptDropdown(!showDeptDropdown)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl shadow-sm hover:from-purple-100 hover:to-pink-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🏢</span>
+              <div className="text-left">
+                <div className="font-semibold text-gray-900">
+                  {departmentFilter === 'all' ? 'All Departments' : 
+                   departments.find(d => d.id == departmentFilter)?.name || 'Unknown Dept'}
+                </div>
+                <div className="text-sm text-gray-500">Filter by department</div>
+              </div>
+            </div>
+            <svg className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${showDeptDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showDeptDropdown && (
+            <div className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              <button
+                onClick={() => {
+                  onDepartmentFilterChange('all');
+                  setShowDeptDropdown(false);
+                }}
+                className={`w-full px-4 py-3 text-left hover:bg-purple-50 flex items-center gap-3 transition-colors ${
+                  departmentFilter === 'all' ? 'bg-purple-50 text-purple-700 border-r-4 border-purple-500' : 'text-gray-900'
+                }`}
+              >
+                <span className="text-lg">🏢</span>
+                <span className="font-medium">All Departments</span>
+              </button>
+              {departments.map((dept) => (
+                <button
+                  key={dept.id}
+                  onClick={() => {
+                    onDepartmentFilterChange(dept.id);
+                    setShowDeptDropdown(false);
+                  }}
+                  className={`w-full px-4 py-3 text-left hover:bg-purple-50 flex items-center gap-3 transition-colors ${
+                    departmentFilter == dept.id ? 'bg-purple-50 text-purple-700 border-r-4 border-purple-500' : 'text-gray-900'
+                  }`}
+                >
+                  <span className="text-lg">🏢</span>
+                  <span className="font-medium">{dept.name}</span>
                 </button>
               ))}
             </div>

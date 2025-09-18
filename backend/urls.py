@@ -163,6 +163,7 @@ def list_threads():
         # Get filter parameters
         show_archived = request.args.get("archived", "false").lower() == "true"
         status_filter = request.args.get("status", "all")  # all, open, closed, archived
+        department_filter = request.args.get("department_id")  # optional department filter
 
         # Get user role and department from JWT
         user = getattr(request, "agent_ctx", None)
@@ -178,20 +179,41 @@ def list_threads():
         else:
             query = query.filter_by(archived=False)
         
-        # Apply department-based visibility rules
-        # Helpdesk (department_id = 7) can see all tickets
-        # Other departments can only see their own tickets
-        # Users without departments can see all tickets (fallback for admins/unassigned users)
-        if user_department_id == 7:  # Helpdesk
-            current_app.logger.info(f"Department filtering: Helpdesk user can see all tickets")
-            # No filtering - see all tickets
-        elif user_department_id:  # Specific department
-            query = query.filter_by(department_id=user_department_id)
-            current_app.logger.info(f"Department filtering: User dept {user_department_id} can only see tickets from their department")
+        # Apply manual department filter if provided (overrides automatic rules)
+        if department_filter:
+            try:
+                dept_id = int(department_filter)
+                # Check if user has permission to view this department
+                if user_department_id == 7:  # Helpdesk can filter by any department
+                    query = query.filter_by(department_id=dept_id)
+                    current_app.logger.info(f"Manual department filter: Helpdesk user filtering by dept {dept_id}")
+                elif user_department_id == dept_id:  # User can filter their own department
+                    query = query.filter_by(department_id=dept_id)
+                    current_app.logger.info(f"Manual department filter: User filtering by their own dept {dept_id}")
+                elif not user_department_id:  # Admin users can filter any department
+                    query = query.filter_by(department_id=dept_id)
+                    current_app.logger.info(f"Manual department filter: Admin user filtering by dept {dept_id}")
+                else:
+                    # User trying to access department they don't have permission for
+                    current_app.logger.warning(f"Access denied: User dept {user_department_id} tried to filter dept {dept_id}")
+                    return jsonify(error="Access denied to filter by this department"), 403
+            except ValueError:
+                return jsonify(error="Invalid department_id parameter"), 400
         else:
-            # If user has no department, show all tickets (for admin/system users)
-            current_app.logger.info(f"Department filtering: User has no department, showing all tickets (admin fallback)")
-            # No filtering - see all tickets
+            # Apply automatic department-based visibility rules
+            # Helpdesk (department_id = 7) can see all tickets
+            # Other departments can only see their own tickets
+            # Users without departments can see all tickets (fallback for admins/unassigned users)
+            if user_department_id == 7:  # Helpdesk
+                current_app.logger.info(f"Department filtering: Helpdesk user can see all tickets")
+                # No filtering - see all tickets
+            elif user_department_id:  # Specific department
+                query = query.filter_by(department_id=user_department_id)
+                current_app.logger.info(f"Department filtering: User dept {user_department_id} can only see tickets from their department")
+            else:
+                # If user has no department, show all tickets (for admin/system users)
+                current_app.logger.info(f"Department filtering: User has no department, showing all tickets (admin fallback)")
+                # No filtering - see all tickets
         
         tickets = query.all()
         current_app.logger.info(f"Department filtering result: {len(tickets)} tickets returned for user dept {user_department_id}")
@@ -5087,12 +5109,25 @@ def get_agents():
 @urls.route("/agents/management", methods=["GET"])
 @require_role("L2", "L3", "MANAGER")
 def get_agents_management():
-    """Get detailed agent list for management page with statistics"""
+    """Get detailed agent list for management page with statistics, optionally filtered by department"""
     try:
-        # Get all agents with department info
-        agents = db.session.query(Agent, Department.name.label('department_name')).outerjoin(
+        # Get department filter parameter
+        department_filter = request.args.get("department_id")
+        
+        # Build query with optional department filter
+        query = db.session.query(Agent, Department.name.label('department_name')).outerjoin(
             Department, Agent.department_id == Department.id
-        ).all()
+        )
+        
+        # Apply department filter if provided
+        if department_filter:
+            try:
+                dept_id = int(department_filter)
+                query = query.filter(Agent.department_id == dept_id)
+            except ValueError:
+                return jsonify({"error": "Invalid department_id parameter"}), 400
+        
+        agents = query.all()
         
         result = []
         for agent, dept_name in agents:

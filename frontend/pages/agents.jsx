@@ -12,6 +12,7 @@ export default function AgentsPage() {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
+  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -36,11 +37,22 @@ export default function AgentsPage() {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  // Reload data when department filter changes
+  useEffect(() => {
+    loadData(departmentFilter);
+  }, [departmentFilter]);
+
+  const loadData = async (deptFilter = departmentFilter) => {
     setLoading(true);
     try {
+      // Build agents URL with optional department filter
+      let agentsUrl = '/agents/management';
+      if (deptFilter && deptFilter !== 'all') {
+        agentsUrl += `?department_id=${deptFilter}`;
+      }
+      
       const [agentsRes, deptRes] = await Promise.all([
-        apiGet('/agents/management'),
+        apiGet(agentsUrl),
         apiGet('/departments')
       ]);
       
@@ -64,7 +76,7 @@ export default function AgentsPage() {
         await apiPost('/agents', formData);
       }
       
-      await loadData();
+      await loadData(departmentFilter);
       resetForm();
     } catch (err) {
       setError(err.message);
@@ -76,7 +88,7 @@ export default function AgentsPage() {
     
     try {
       await apiDelete(`/agents/${agentId}`);
-      await loadData();
+      await loadData(departmentFilter);
     } catch (err) {
       setError(err.message);
     }
@@ -131,8 +143,27 @@ export default function AgentsPage() {
       <div className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div>
-              <p className="text-gray-600">Manage support team members</p>
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-gray-600">Manage support team members</p>
+              </div>
+              
+              {/* Department Filter */}
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700">Filter by Department:</label>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="all">All Departments</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             {canCreateDelete && (
               <button

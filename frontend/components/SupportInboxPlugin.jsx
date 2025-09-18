@@ -23,29 +23,35 @@ export default function SupportInboxPlugin() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAgents, setShowAgents] = useState(false);
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
+  const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' or specific department ID
   const { agent } = useAuth();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
   }, [dark]);
 
-  // Function to load threads based on filter
-  const loadThreads = React.useCallback(async (filter = ticketFilter) => {
+  // Function to load threads based on filters
+  const loadThreads = React.useCallback(async (statusFilter = ticketFilter, deptFilter = departmentFilter) => {
     setLoading(true);
     setError(null);
     
     try {
       let apiUrl = '/threads?limit=50&offset=0';
       
-      if (filter === 'archived') {
+      if (statusFilter === 'archived') {
         // Show archived tickets (regardless of status)
         apiUrl += '&archived=true';
-      } else if (filter === 'all') {
+      } else if (statusFilter === 'all') {
         // Show all non-archived tickets (all statuses)
         apiUrl += '&archived=false';
       } else {
         // Show non-archived tickets with specific status
-        apiUrl += '&archived=false&status=' + filter;
+        apiUrl += '&archived=false&status=' + statusFilter;
+      }
+      
+      // Add department filter if specified
+      if (deptFilter && deptFilter !== 'all') {
+        apiUrl += '&department_id=' + deptFilter;
       }
       
       const payload = await apiGet(apiUrl);
@@ -57,7 +63,7 @@ export default function SupportInboxPlugin() {
     } finally {
       setLoading(false);
     }
-  }, [ticketFilter]);
+  }, [ticketFilter, departmentFilter]);
 
   // Load threads when component mounts or filter changes
   useEffect(() => {
@@ -98,10 +104,15 @@ export default function SupportInboxPlugin() {
           departments={departments}
           useNewList={false}
           ticketFilter={ticketFilter}
-          onFilterChange={(filter) => {
-            setTicketFilter(filter);
-            loadThreads(filter);
-          }}
+            onFilterChange={(filter) => {
+              setTicketFilter(filter);
+              loadThreads(filter, departmentFilter);
+            }}
+            onDepartmentFilterChange={(deptFilter) => {
+              setDepartmentFilter(deptFilter);
+              loadThreads(ticketFilter, deptFilter);
+            }}
+            departmentFilter={departmentFilter}
         />
       </div>
 
