@@ -419,33 +419,42 @@
   }
 }
 
-/* === Restore two-column chat + right sidebar on desktop/laptop === */
-@media (min-width: 1024px) {
-  /* The container that holds the chat area (first child) and the sidebar (second child) */
+/* === Three-column desktop layout: tickets | chat | sidebar === */
+@media (min-width: 1280px) {
+  /* Main container that wraps tickets + chat + sidebar */
   .flex-1.flex.overflow-hidden {
-    /* force a stable two-column layout */
     display: grid !important;
-    grid-template-columns: 1fr 20rem; /* 20rem = Tailwind w-80 */
-    align-items: stretch;
+    grid-template-columns: 18rem 1fr 20rem; /* left | center | right */
+    grid-template-areas: "tickets chat sidebar";
     gap: 0;
-    overflow: hidden; /* keep internal scrollers doing the work */
-  }
-
-  /* Chat column */
-  .flex-1.flex.overflow-hidden > :first-child {
-    min-width: 0 !important;  /* prevents the grid from pushing the sidebar below */
     overflow: hidden;
   }
 
-  /* Right sidebar (collapsibles) */
+  /* Left tickets column */
+  .flex-1.flex.overflow-hidden > :first-child {
+    grid-area: tickets;
+    width: 18rem !important;  /* adjust if your ticket panel has another width */
+    max-width: 18rem;
+    min-width: 0;
+    overflow-y: auto;
+  }
+
+  /* Middle chat column */
+  .flex-1.flex.overflow-hidden > :nth-child(2) {
+    grid-area: chat;
+    min-width: 0 !important;  /* prevents sidebar from pushing it down */
+    overflow: hidden;
+  }
+
+  /* Right collapsibles sidebar */
   .flex-1.flex.overflow-hidden > :last-child {
-    width: 20rem !important;   /* matches w-80 */
+    grid-area: sidebar;
+    width: 20rem !important;   /* Tailwind w-80 */
     max-width: 20rem !important;
-    flex: 0 0 20rem;           /* defensive: if any flex styles leak in */
+    flex: 0 0 20rem;
+    overflow-y: auto;
   }
 }
 
-/* Defensive: if a tool injected wrapping, kill it globally for this row */
+/* Kill wrapping just in case */
 .flex-1.flex.overflow-hidden { flex-wrap: nowrap !important; }
-
-
