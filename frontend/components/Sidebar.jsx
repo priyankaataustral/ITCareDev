@@ -18,11 +18,9 @@ export default function Sidebar({
   departmentFilter = 'all'
 }) {
   const [view, setView] = useState('all');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showDeptDropdown, setShowDeptDropdown] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [escalationCount, setEscalationCount] = useState(0);
-  const dropdownRef = useRef(null);
-  const deptDropdownRef = useRef(null);
+  const filterPanelRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
   const filterOptions = [
@@ -36,152 +34,204 @@ export default function Sidebar({
 
   const currentFilter = filterOptions.find(opt => opt.value === ticketFilter) || filterOptions[0];
 
-  // Close dropdowns when clicking outside
+  // Close filter panel when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-      if (deptDropdownRef.current && !deptDropdownRef.current.contains(event.target)) {
-        setShowDeptDropdown(false);
+      if (filterPanelRef.current && !filterPanelRef.current.contains(event.target)) {
+        setShowFilterPanel(false);
       }
     }
 
-    if (showDropdown || showDeptDropdown) {
+    if (showFilterPanel) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showDropdown, showDeptDropdown]);
+  }, [showFilterPanel]);
+
+  // Helper functions for filter state
+  const hasActiveFilters = () => {
+    return ticketFilter !== 'open' || departmentFilter !== 'all';
+  };
+
+  const getActiveFilterChips = () => {
+    const chips = [];
+    if (ticketFilter !== 'open') {
+      const filterOption = filterOptions.find(opt => opt.value === ticketFilter);
+      chips.push({
+        type: 'status',
+        label: filterOption?.label || ticketFilter,
+        icon: filterOption?.icon || '📋',
+        value: ticketFilter
+      });
+    }
+    if (departmentFilter !== 'all') {
+      const dept = departments.find(d => d.id == departmentFilter);
+      chips.push({
+        type: 'department',
+        label: dept?.name || 'Unknown',
+        icon: '🏢',
+        value: departmentFilter
+      });
+    }
+    return chips;
+  };
+
+  const removeFilter = (type, value) => {
+    if (type === 'status') {
+      onFilterChange('open');
+    } else if (type === 'department') {
+      onDepartmentFilterChange('all');
+    }
+  };
+
+  const clearAllFilters = () => {
+    onFilterChange('open');
+    onDepartmentFilterChange('all');
+    setShowFilterPanel(false);
+  };
 
   return (
     <div className="sidebar" style={{ width: 350, minWidth: 350, maxWidth: 350 }}>
-      {/* Compact Filter Section */}
+      {/* Compact Filter Button & Chips */}
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <i className="bi bi-funnel text-gray-500"></i>
-            Filters
-            {/* Active filter indicator */}
-            {(ticketFilter !== 'open' || departmentFilter !== 'all') && (
-              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-            )}
-          </h4>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">{threads?.length || 0} tickets</span>
-            {/* Clear filters button */}
-            {(ticketFilter !== 'open' || departmentFilter !== 'all') && (
-              <button
-                onClick={() => {
-                  onFilterChange('open');
-                  onDepartmentFilterChange('all');
-                }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                title="Clear all filters"
-              >
-                Clear
-              </button>
+        <div className="flex items-center gap-3 mb-3">
+          {/* Filter Button */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilterPanel(!showFilterPanel)}
+              className={`relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
+                hasActiveFilters() 
+                  ? 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200' 
+                  : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+              }`}
+              title="Open filters"
+            >
+              <i className="bi bi-funnel text-sm"></i>
+              {/* Active filter badge */}
+              {hasActiveFilters() && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
+            
+            {/* Filter Panel */}
+            {showFilterPanel && (
+              <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
+                {/* Panel Header */}
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <i className="bi bi-funnel text-gray-600"></i>
+                      Filters
+                    </h3>
+                    <button
+                      onClick={() => setShowFilterPanel(false)}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <i className="bi bi-x-lg text-sm"></i>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Panel Content */}
+                <div className="p-4 space-y-4">
+                  {/* Status Filter Section */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {filterOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => onFilterChange(option.value)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            ticketFilter === option.value
+                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          <span>{option.icon}</span>
+                          <span className="font-medium truncate">{option.label.replace(' Tickets', '')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Department Filter Section */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Department</label>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      <button
+                        onClick={() => onDepartmentFilterChange('all')}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          departmentFilter === 'all'
+                            ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                      >
+                        <i className="bi bi-building text-gray-500"></i>
+                        <span className="font-medium">All Departments</span>
+                      </button>
+                      {departments.map((dept) => (
+                        <button
+                          key={dept.id}
+                          onClick={() => onDepartmentFilterChange(dept.id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            departmentFilter == dept.id
+                              ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          <i className="bi bi-building text-gray-500"></i>
+                          <span className="font-medium">{dept.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Panel Footer */}
+                {hasActiveFilters() && (
+                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                    <button
+                      onClick={clearAllFilters}
+                      className="w-full px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
+          
+          {/* Ticket Count */}
+          <span className="text-sm text-gray-500 font-medium">{threads?.length || 0} tickets</span>
         </div>
         
-        <div className="space-y-3">
-          {/* Status Filter */}
-          <div className="relative" ref={dropdownRef}>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className={`w-full flex items-center justify-between px-3 py-2 bg-white border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                ticketFilter !== 'open' 
-                  ? 'border-blue-300 bg-blue-50 hover:border-blue-400' 
-                  : 'border-gray-200 hover:border-blue-300 focus:border-blue-500'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-base">{currentFilter.icon}</span>
-                <span className="font-medium text-gray-900">{currentFilter.label}</span>
-              </div>
-              <i className={`bi bi-chevron-down text-gray-400 transition-transform duration-200 ${
-                showDropdown ? 'rotate-180' : ''
-              }`}></i>
-            </button>
-            
-            {showDropdown && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                {filterOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      onFilterChange(option.value);
-                      setShowDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 transition-colors text-sm ${
-                      ticketFilter === option.value ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' : 'text-gray-900'
-                    }`}
-                  >
-                    <span className="text-base">{option.icon}</span>
-                    <span className="font-medium">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Department Filter */}
-          <div className="relative" ref={deptDropdownRef}>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Department</label>
-            <button
-              onClick={() => setShowDeptDropdown(!showDeptDropdown)}
-              className={`w-full flex items-center justify-between px-3 py-2 bg-white border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors ${
-                departmentFilter !== 'all' 
-                  ? 'border-purple-300 bg-purple-50 hover:border-purple-400' 
-                  : 'border-gray-200 hover:border-purple-300 focus:border-purple-500'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <i className="bi bi-building text-gray-500"></i>
-                <span className="font-medium text-gray-900">
-                  {departmentFilter === 'all' ? 'All Departments' : 
-                   departments.find(d => d.id == departmentFilter)?.name || 'Unknown'}
-                </span>
-              </div>
-              <i className={`bi bi-chevron-down text-gray-400 transition-transform duration-200 ${
-                showDeptDropdown ? 'rotate-180' : ''
-              }`}></i>
-            </button>
-            
-            {showDeptDropdown && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+        {/* Active Filter Chips */}
+        {hasActiveFilters() && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {getActiveFilterChips().map((chip, index) => (
+              <div
+                key={index}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                  chip.type === 'status' 
+                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    : 'bg-purple-50 text-purple-700 border-purple-200'
+                }`}
+              >
+                <span>{chip.icon}</span>
+                <span>{chip.label}</span>
                 <button
-                  onClick={() => {
-                    onDepartmentFilterChange('all');
-                    setShowDeptDropdown(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 transition-colors text-sm ${
-                    departmentFilter === 'all' ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-500' : 'text-gray-900'
-                  }`}
+                  onClick={() => removeFilter(chip.type, chip.value)}
+                  className="hover:bg-black/10 rounded-full p-0.5 ml-1 transition-colors"
+                  title={`Remove ${chip.label} filter`}
                 >
-                  <i className="bi bi-building text-gray-500"></i>
-                  <span className="font-medium">All Departments</span>
+                  <i className="bi bi-x text-xs"></i>
                 </button>
-                {departments.map((dept) => (
-                  <button
-                    key={dept.id}
-                    onClick={() => {
-                      onDepartmentFilterChange(dept.id);
-                      setShowDeptDropdown(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 transition-colors text-sm ${
-                      departmentFilter == dept.id ? 'bg-purple-50 text-purple-700 border-r-2 border-purple-500' : 'text-gray-900'
-                    }`}
-                  >
-                    <i className="bi bi-building text-gray-500"></i>
-                    <span className="font-medium">{dept.name}</span>
-                  </button>
-                ))}
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}

@@ -2323,13 +2323,13 @@ function TicketHistoryCollapsible({
                 toggleSection={toggleSection}
               />
 
-              <TicketHistoryCollapsible
+              {/* <TicketHistoryCollapsible
                 history={ticketHistory}
                 loading={ticketHistoryLoading}
                 error={ticketHistoryError}
                 openSections={openSections}
                 toggleSection={toggleSection}
-              />
+              /> */}
               
               <StepProgressBar stepInfo={stepInfo} />
             </div>
