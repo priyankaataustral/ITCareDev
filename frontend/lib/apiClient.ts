@@ -12,7 +12,6 @@ async function handle<T>(res: Response): Promise<T> {
   if (res.status === 401) {
     // Only redirect to login if we're not already there (prevents double redirect)
     if (typeof window !== "undefined" && !window.location.pathname.includes('/login')) {
-      console.log('🔄 API 401 - redirecting to login');
       window.location.href = "/login";
     }
     throw new Error("Unauthorized");

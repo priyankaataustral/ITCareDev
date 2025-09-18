@@ -17,6 +17,7 @@ export default function Sidebar({
 }) {
   const [view, setView] = useState('all');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [escalationCount, setEscalationCount] = useState(0);
   const dropdownRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
@@ -118,7 +119,24 @@ export default function Sidebar({
         <button
           className={view === 'escalations' ? 'active' : ''}
           onClick={() => setView('escalations')}
-        >📋 Escalations</button>
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            📋 Escalations
+            {escalationCount > 0 && (
+              <span style={{
+                background: '#ef4444',
+                color: 'white',
+                fontSize: 12,
+                borderRadius: '999px',
+                padding: '2px 7px',
+                minWidth: 18,
+                textAlign: 'center'
+              }}>
+                {escalationCount}
+              </span>
+            )}
+          </span>
+        </button>
       </div>
 
       {/* Content */}
@@ -149,7 +167,10 @@ export default function Sidebar({
           />
         )}
         {view === 'escalations' && (
-          <EscalationSummaries agentId={agentId} />
+          <EscalationSummaries 
+            agentId={agentId} 
+            onUnreadCountChange={setEscalationCount}
+          />
         )}
       </div>
     </div>

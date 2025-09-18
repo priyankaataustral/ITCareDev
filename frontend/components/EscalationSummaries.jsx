@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../lib/apiClient';
 
-export default function EscalationSummaries() {
+export default function EscalationSummaries({ onUnreadCountChange }) {
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,6 +34,13 @@ export default function EscalationSummaries() {
   };
 
   const unreadCount = summaries.filter(s => !s.is_read).length;
+
+  // Notify parent component of unread count changes
+  useEffect(() => {
+    if (onUnreadCountChange) {
+      onUnreadCountChange(unreadCount);
+    }
+  }, [unreadCount, onUnreadCountChange]);
 
   if (loading) {
     return (
