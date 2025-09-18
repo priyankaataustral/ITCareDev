@@ -116,26 +116,6 @@ export default function Sidebar({
       {/* Compact Filter Button & Chips */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-3 mb-3">
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search ticket #..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            />
-            <i className="bi bi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
-            {searchTerm && (
-              <button
-                onClick={() => handleSearchChange('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <i className="bi bi-x text-sm"></i>
-              </button>
-            )}
-          </div>
-          
           {/* Filter Button */}
           <div className="relative" ref={filterPanelRef}>
             <button
@@ -241,6 +221,26 @@ export default function Sidebar({
                   </div>
                 )}
               </div>
+            )}
+          </div>
+          
+          {/* Search Input */}
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Search ticket #..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            />
+            <i className="bi bi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+            {searchTerm && (
+              <button
+                onClick={() => handleSearchChange('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="bi bi-x text-sm"></i>
+              </button>
             )}
           </div>
           
