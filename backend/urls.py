@@ -2163,7 +2163,28 @@ def claim_ticket(thread_id):
     # 1) ensure ticket exists
     ticket = db.session.get(Ticket, thread_id)
     if not ticket:
-        ticket = Ticket(id=thread_id, status="open")
+        # Extract requester_name from thread_id if possible or set default
+        requester_name = "Customer"  # Default fallback
+        if thread_id.startswith("TICKET"):
+            # Try to get requester info from CSV or other sources
+            from db_helpers import _csv_row_for_ticket
+            row = _csv_row_for_ticket(thread_id)
+            if row and row.get("email"):
+                # Extract name from email or use email prefix
+                email = row.get("email", "")
+                requester_name = email.split("@")[0].title() if email else "Customer"
+        
+        ticket = Ticket(
+            id=thread_id, 
+            status="open",
+            requester_name=requester_name,
+            subject=f"Support Request {thread_id}",
+            category="General",
+            priority="Medium",
+            impact_level="Medium", 
+            urgency_level="Medium",
+            requester_email=""  # Will be populated from CSV if available
+        )
         db.session.add(ticket)
         
         # Log initial ticket creation with status
@@ -2894,23 +2915,33 @@ def send_email(thread_id):
         agent_name = agent_ctx.get("name", "Support Team")
         requester_name = t.requester_name or "there"
         
+        # Debug logging for personalization
+        current_app.logger.info(f"[EMAIL_PERSONALIZATION] ticket_id={thread_id}, requester_name='{requester_name}', agent_name='{agent_name}'")
+        current_app.logger.info(f"[EMAIL_PERSONALIZATION] original_email_length={len(email_body)}")
+        
         # Replace generic greetings with personalized greeting
         personalized_body = email_body
         if personalized_body.startswith("Hi there"):
             personalized_body = personalized_body.replace("Hi there", f"Hi {requester_name}", 1)
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Hi there' with 'Hi {requester_name}'")
         elif personalized_body.startswith("Hello there"):
             personalized_body = personalized_body.replace("Hello there", f"Hello {requester_name}", 1)
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Hello there' with 'Hello {requester_name}'")
         elif personalized_body.startswith("Dear User"):
             personalized_body = personalized_body.replace("Dear User", f"Dear {requester_name}", 1)
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Dear User' with 'Dear {requester_name}'")
         elif not any(personalized_body.startswith(greeting) for greeting in ["Hi ", "Hello ", "Dear "]):
             # If no greeting, add one
             personalized_body = f"Hi {requester_name},\n\n{personalized_body}"
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Added greeting 'Hi {requester_name},'")
         
         # Add agent signature if not already present
         if not any(signature in personalized_body.lower() for signature in ["best regards", "thanks", "sincerely"]):
             personalized_body = f"{personalized_body}\n\nBest regards,\n{agent_name}"
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Added signature 'Best regards, {agent_name}'")
         elif "Support Team" in personalized_body:
             personalized_body = personalized_body.replace("Support Team", agent_name)
+            current_app.logger.info(f"[EMAIL_PERSONALIZATION] Replaced 'Support Team' with '{agent_name}'")
         
         final_body = (
             f"{personalized_body}\n\n"
@@ -3648,56 +3679,165 @@ def count_unassigned_tickets():
 @urls.route("/threads/<thread_id>/deescalate", methods=["POST"])
 @require_role("L2","L3","MANAGER")
 def deescalate_ticket(thread_id):
-    # #ensure_ticket_record_from_csv(thread_id)
-    t = db.session.get(Ticket, thread_id)
-    if not t:
+    ticket = db.session.get(Ticket, thread_id)
+    if not ticket:
         return jsonify(error="Ticket not found"), 404
-    body = request.json or {}
-    note = (body.get("note") or "").strip()
-    old = t.level or 1
-    if old <= 1:
+    
+    # Get request data for new de-escalation form
+    data = request.json or {}
+    deescalation_reason = data.get('reason', '').strip()
+    target_department_id = data.get('department_id')
+    target_agent_id = data.get('agent_id')
+    
+    # Support legacy 'note' parameter for backward compatibility
+    if not deescalation_reason:
+        deescalation_reason = data.get('note', '').strip()
+    
+    # Require reason for de-escalation
+    if not deescalation_reason:
+        return jsonify(error="De-escalation reason is required"), 400
+    
+    # Get current agent info from token
+    current_agent_id = request.agent_ctx.get('id')
+    current_agent_role = request.agent_ctx.get('role', '').upper()
+    current_agent_dept = request.agent_ctx.get('department_id')
+    
+    # ENHANCED ROUTING PERMISSION CHECKS for de-escalation (matching escalation patterns)
+    if target_department_id:
+        if current_agent_dept == 7:  # Helpdesk
+            # Helpdesk can de-escalate to any department
+            pass
+        elif current_agent_role == "MANAGER":
+            # Department managers can de-escalate within their dept OR to Helpdesk
+            if target_department_id != current_agent_dept and target_department_id != 7:
+                return jsonify({"error": "Department managers can only de-escalate within their department or to Helpdesk"}), 403
+        elif current_agent_role in ["L2", "L3"]:
+            # L2/L3 can only de-escalate within their own department
+            if target_department_id != current_agent_dept:
+                return jsonify({"error": "L2/L3 agents can only de-escalate within their own department"}), 403
+    
+    # Validate agent routing permissions  
+    if target_agent_id:
+        target_agent = Agent.query.get(target_agent_id)
+        if target_agent:
+            if current_agent_dept == 7:  # Helpdesk
+                # Helpdesk can de-escalate to agents in any department
+                pass
+            elif current_agent_role == "MANAGER":
+                # Department managers can de-escalate to agents in their dept OR Helpdesk
+                if target_agent.department_id != current_agent_dept and target_agent.department_id != 7:
+                    return jsonify({"error": "Department managers can only de-escalate to agents within their department or to Helpdesk"}), 403
+            elif current_agent_role in ["L2", "L3"]:
+                # L2/L3 can only de-escalate to agents within their own department
+                if target_agent.department_id != current_agent_dept:
+                    return jsonify({"error": "L2/L3 agents can only de-escalate to agents within their own department"}), 403
+
+    old_level = ticket.level or 1
+    if old_level <= 1:
         return jsonify(error="Already at L1"), 400
 
-    to_level = old - 1
+    to_level = old_level - 1
     now = datetime.now(timezone.utc).isoformat()
-    old_status = t.status
-    t.level = to_level
-    t.status = "de-escalated"
-    t.updated_at = now
+    old_status = ticket.status
+    ticket.level = to_level
+    ticket.status = "de-escalated"
+    ticket.updated_at = now
+    
+    # Update department and assignment if specified
+    if target_department_id:
+        old_dept_id = ticket.department_id
+        ticket.department_id = target_department_id
+        # Log department change during de-escalation
+        log_ticket_history(
+            ticket_id=ticket.id,
+            event_type="department_change",
+            old_value=str(old_dept_id),
+            new_value=str(target_department_id),
+            actor_agent_id=current_agent_id,
+            note=f"Department changed during de-escalation to level {to_level}"
+        )
+    
+    if target_agent_id:
+        old_assigned_id = ticket.assigned_to
+        ticket.assigned_to = target_agent_id
+        # Log assignment change during de-escalation
+        log_ticket_history(
+            ticket_id=ticket.id,
+            event_type="assign",
+            actor_agent_id=current_agent_id,
+            from_agent_id=old_assigned_id,
+            to_agent_id=target_agent_id,
+            note=f"Assigned during de-escalation to level {to_level}"
+        )
     
     # Log status change
     actor = getattr(request, "agent_ctx", None)
     actor_id = actor.get("id") if isinstance(actor, dict) else None
     log_ticket_history(
-        ticket_id=t.id, 
+        ticket_id=ticket.id, 
         event_type="status_change", 
         old_value=old_status, 
         new_value="de-escalated",
-        actor_id=actor_id,
-        note=f"Ticket de-escalated from L{old} to L{to_level}"
+        actor_agent_id=actor_id,
+        note=f"Ticket de-escalated from L{old_level} to L{to_level}. Reason: {deescalation_reason}"
     )
     
     # Log level change
     log_ticket_history(
-        ticket_id=t.id, 
+        ticket_id=ticket.id, 
         event_type="level_change", 
-        old_value=str(old),
+        old_value=str(old_level),
         new_value=str(to_level),    
-        actor_id=actor_id,
-        note=f"Manual de-escalation from L{old} to L{to_level}"
+        actor_agent_id=actor_id,
+        note=f"Manual de-escalation from L{old_level} to L{to_level}"
     )
     
-    actor = getattr(request, "agent_ctx", None)
-    actor_id = actor.get("id") if isinstance(actor, dict) else None
-    add_event(t.id, "DE-ESCALATED",
+    # Log event with additional details
+    event_details = {
+        'from_level': old_level, 
+        'to_level': to_level,
+        'reason': deescalation_reason
+    }
+    if target_department_id:
+        dept = db.session.get(Department, target_department_id)
+        if dept:
+            event_details['target_department'] = dept.name
+    if target_agent_id:
+        target_agent = db.session.get(Agent, target_agent_id)
+        if target_agent:
+            event_details['target_agent'] = target_agent.name
+    
+    add_event(ticket.id, "DE-ESCALATED",
             actor_agent_id=actor_id,
-            from_level=old, to_level=to_level, note=note)
+            **event_details)
     db.session.commit()
 
-    insert_message_with_mentions(thread_id, "assistant",
-        f"[SYSTEM] De-escalated to L{to_level}." + (f" Note: {note}" if note else ""))
-    enqueue_status_email(thread_id, "Updated", f"Ticket moved to L{to_level}.")
-    return jsonify(status=t.status, level=to_level), 200
+    # Generate comprehensive de-escalation message
+    level_name = f"L{to_level}"
+    deescalation_msg = f"↩️ Ticket de-escalated to {level_name} support."
+    if target_department_id:
+        dept = db.session.get(Department, target_department_id)
+        if dept:
+            deescalation_msg += f" Department: {dept.name}."
+    if target_agent_id:
+        target_agent = db.session.get(Agent, target_agent_id)
+        if target_agent:
+            deescalation_msg += f" Assigned to: {target_agent.name}."
+    deescalation_msg += f" Reason: {deescalation_reason}"
+
+    insert_message_with_mentions(thread_id, "assistant", deescalation_msg)
+    insert_message_with_mentions(thread_id, "assistant", f"[SYSTEM] Ticket has been de-escalated to {level_name} support.")
+    enqueue_status_email(thread_id, "Updated", f"Ticket moved to {level_name} support.")
+    
+    return jsonify(
+        status="de-escalated", 
+        level=to_level, 
+        message={
+            "sender": "assistant",
+            "content": deescalation_msg,
+            "timestamp": now
+        }
+    ), 200
 
 
 @urls.route("/solutions/confirm", methods=["GET"])

@@ -2,6 +2,7 @@
 import KBDashboard from './KBDashboard';
 import Gate from './Gate';
 import EscalationPopup from './EscalationPopup';
+import DeescalationPopup from './DeescalationPopup';
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -580,7 +581,8 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [panelOpen, setPanelOpen] = useState(true);
   
   // Escalation popup state
-  const [showEscalationPopup, setShowEscalationPopup] = useState(false); 
+  const [showEscalationPopup, setShowEscalationPopup] = useState(false);
+  const [showDeescalationPopup, setShowDeescalationPopup] = useState(false); 
 
 
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
@@ -1063,36 +1065,61 @@ const openDraftEditor = (prefill) => {
   // Refresh messages when timeline changes (merge, not replace)
   useEffect(() => {
     if (!activeThreadId) return;
-    apiGet(`/threads/${activeThreadId}`)
-      .then(data => {
-        const fresh = Array.isArray(data.messages)
-          ? data.messages.map(m => ({
-              ...m,
-              sender: (m.sender === 'bot' ? 'assistant' : m.sender),
-              content: toDisplayString(m.content),
-            }))
-          : [];
-        setMessages(prev => {
-          const seen = new Set(prev.map(m => m.id));
-          const merged = [...prev];
-          for (const m of fresh) {
-            if (m?.source === 'suggested' || m?.transient || m?.meta?.transient) continue;
-            if (!m?.id || seen.has(m.id)) continue;
-            const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-            const mIsAssistant = m.sender === 'assistant' || m.sender === 'bot';
-            const existsByText =
-              mIsAssistant &&
-              merged.some(p =>
-                (p.sender === 'assistant' || p.sender === 'bot') &&
-                norm(toDisplayString(p.content)) === norm(toDisplayString(m.content))
-              );
-            if (existsByText) continue;
-            merged.push(m);
-          }
-          return merged;
-        });
-      })
-      .catch(() => {});
+    
+    // Debounce rapid timeline changes to prevent duplicate requests
+    const timeoutId = setTimeout(() => {
+      apiGet(`/threads/${activeThreadId}`)
+        .then(data => {
+          const fresh = Array.isArray(data.messages)
+            ? data.messages.map(m => ({
+                ...m,
+                sender: (m.sender === 'bot' ? 'assistant' : m.sender),
+                content: toDisplayString(m.content),
+              }))
+            : [];
+          setMessages(prev => {
+            // Enhanced deduplication logic
+            const seen = new Set(prev.map(m => m.id));
+            const seenTempIds = new Set(prev.filter(m => m.id?.toString().startsWith('temp-')).map(m => m.id));
+            const merged = [...prev];
+            
+            for (const m of fresh) {
+              if (m?.source === 'suggested' || m?.transient || m?.meta?.transient) continue;
+              if (!m?.id || seen.has(m.id)) continue;
+              
+              // Skip if this is a duplicate temporary message
+              if (m.id?.toString().startsWith('temp-') && seenTempIds.has(m.id)) continue;
+              
+              const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+              const mIsAssistant = m.sender === 'assistant' || m.sender === 'bot';
+              
+              // Enhanced text-based duplicate detection
+              const existsByText =
+                mIsAssistant &&
+                merged.some(p => {
+                  const pIsAssistant = p.sender === 'assistant' || p.sender === 'bot';
+                  if (!pIsAssistant) return false;
+                  
+                  const pContent = norm(toDisplayString(p.content));
+                  const mContent = norm(toDisplayString(m.content));
+                  
+                  // Exact match or very similar content (accounting for timestamps)
+                  return pContent === mContent || 
+                         (pContent.length > 10 && mContent.length > 10 && 
+                          pContent.substring(0, Math.min(pContent.length, 50)) === 
+                          mContent.substring(0, Math.min(mContent.length, 50)));
+                });
+                
+              if (existsByText) continue;
+              merged.push(m);
+            }
+            return merged;
+          });
+        })
+        .catch(() => {});
+    }, 100); // 100ms debounce
+    
+    return () => clearTimeout(timeoutId);
   }, [timelineRefresh, activeThreadId]);
 
   useEffect(() => { setActiveThreadId(threadId); }, [threadId]);
@@ -1807,6 +1834,40 @@ function TicketHistoryCollapsible({
     }
   };
 
+  // New de-escalation function that uses the popup form data
+  const handleDeescalateWithForm = async (deescalationData) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const data = await apiPost(`/threads/${tid}/deescalate`, deescalationData);
+      
+      // Update ticket status and level
+      setTicket(t => ({ ...t, status: data.status, level: data.level }));
+
+      // Add de-escalation message from backend response
+      if (data.message) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `temp-${Date.now()}-deescalate`,
+            sender: 'bot',
+            content: data.message.content + (notifyUser ? ' (notification sent)' : ' (no notification)'),
+            timestamp: data.message.timestamp,
+          }
+        ]);
+      }
+      
+      // Refresh timeline and mentions
+      setTimelineRefresh(x => x + 1);
+      // Trigger mentions refresh to update sidebar counts
+    } catch (e) {
+      setActionError(e.message || String(e));
+      throw e; // Re-throw to be handled by popup
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
  
 
   // Escalate / Close (with downloadable report) - Legacy function for non-popup escalations
@@ -1915,24 +1976,7 @@ function TicketHistoryCollapsible({
 
   // TicketHeader
   function TicketHeader({ ticket, onBack, onEscalate, onClose, actionLoading, darkMode, setDarkMode}) {
-    const handleDeescalate = async () => {
-      const note = window.prompt('Add a short note for de-escalation (optional):') || '';
-      setActionLoading(true);
-      try {
-        const data = await apiPost(`/threads/${ticket?.id}/deescalate`, { note });
-        setTicket(t => ({ ...t, status: data.status, level: Number(data.level) }));
-        setMessages(prev => [...prev, {
-          id: `temp-${Date.now()}-deesc`,
-          sender: 'system',
-          content: `↩️ De-escalated to L${data.level}${note ? ` (note: ${note})` : ''}.`
-        }]);
-        setTimelineRefresh(x => x + 1);
-      } catch (e) {
-        setActionError(e.message);
-      } finally {
-        setActionLoading(false);
-      }
-    };
+    // Legacy handleDeescalate removed - now using professional popup system
 
     return (
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-black/80 backdrop-blur-md sticky top-0 z-40">
@@ -2004,9 +2048,9 @@ function TicketHistoryCollapsible({
           <Gate roles={["L2", "L3", "MANAGER"]}>
             {ticket?.level > 1 && (
               <button
-                onClick={handleDeescalate}
+                onClick={() => setShowDeescalationPopup(true)}
                 disabled={actionLoading}
-                className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm"
+                className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
               >↩️ De-escalate</button>
             )}
           </Gate>
@@ -2337,14 +2381,23 @@ function TicketHistoryCollapsible({
         </div>
       </div>
       
-      {/* Escalation Popup */}
-      <EscalationPopup
-        isOpen={showEscalationPopup}
-        onClose={() => setShowEscalationPopup(false)}
-        onEscalate={handleEscalateWithForm}
-        ticketId={tid}
-        ticket={ticket}
-      />
+        {/* Escalation Popup */}
+        <EscalationPopup
+          isOpen={showEscalationPopup}
+          onClose={() => setShowEscalationPopup(false)}
+          onEscalate={handleEscalateWithForm}
+          ticketId={tid}
+          ticket={ticket}
+        />
+
+        {/* De-escalation Popup */}
+        <DeescalationPopup
+          isOpen={showDeescalationPopup}
+          onClose={() => setShowDeescalationPopup(false)}
+          onDeescalate={handleDeescalateWithForm}
+          ticketId={tid}
+          ticket={ticket}
+        />
 
       {/* Close Confirmation Modal */}
       {showCloseConfirm && (

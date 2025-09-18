@@ -400,19 +400,37 @@ def ensure_ticket_record_from_csv(ticket_id: str):
     t = db.session.get(Ticket, ticket_id)
     created_now = False
     if not t:
-        t = Ticket(id=ticket_id, status='open')
+        # Create ticket with required fields populated
+        t = Ticket(
+            id=ticket_id, 
+            status='open',
+            requester_name="Customer",  # Default, will be updated below if CSV has data
+            subject=f"Support Request {ticket_id}",
+            category="General",
+            priority="Medium",
+            impact_level="Medium",
+            urgency_level="Medium",
+            requester_email=""
+        )
         created_now = True
         db.session.add(t)
 
     row = _csv_row_for_ticket(ticket_id)
     if row:
-        # only set if missing in DB (don’t overwrite later edits)
+        # only set if missing in DB (don't overwrite later edits)
         if not t.subject:         t.subject = _derive_subject_from_text(row.get("text", ""))
         if not t.requester_email: t.requester_email = (row.get("email") or "").strip().lower()
-        if not t.priority:        t.priority = row.get("level") or None
-        if not t.urgency_level:   t.urgency_level = row.get("urgency_level") or None
-        if not t.impact_level:    t.impact_level = row.get("impact_level") or None
-        if not t.category:        t.category = row.get("category_id") or None
+        if not t.requester_name:  
+            # Extract name from email or use default
+            email = (row.get("email") or "").strip()
+            if email:
+                t.requester_name = email.split("@")[0].title()
+            else:
+                t.requester_name = "Customer"
+        if not t.priority:        t.priority = row.get("level") or "Medium"
+        if not t.urgency_level:   t.urgency_level = row.get("urgency_level") or "Medium"
+        if not t.impact_level:    t.impact_level = row.get("impact_level") or "Medium"
+        if not t.category:        t.category = row.get("category_id") or "General"
 
     now = datetime.utcnow().isoformat()
     if not t.created_at: t.created_at = now
