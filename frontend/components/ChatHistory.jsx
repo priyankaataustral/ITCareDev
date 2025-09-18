@@ -541,7 +541,7 @@ for (const ev of safeEvents) {
 
 function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus, drawerOpen }) {
   return (
-    <div className={`composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700 ` + (drawerOpen ? 'pointer-events-none opacity-40 z-10' : 'z-40')}>
+    <div className="composer-bar w-full px-4 py-3 bg-blue-50 border-2 border-blue-500 shadow-xl">
       <div className="flex items-center w-full max-w-4xl mx-auto gap-3">
         <input
           ref={textareaRef}
@@ -556,7 +556,7 @@ function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus
           onKeyDown={e => !sending && e.key === 'Enter' && onSend()}
           autoFocus={autoFocus}
         />
-        <button
+        <button 
           onClick={onSend}
           aria-label="Send message"
           disabled={sending}
@@ -2172,12 +2172,12 @@ function TicketHistoryCollapsible({
         {/* Main Content Area - Chat + Right Sidebar */}
         <div className="flex-1 flex overflow-hidden">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0 h-full" style={{maxWidth: 'calc(100% - 320px)'}}>
+            <div className="flex-1 flex flex-col min-w-0" style={{maxWidth: 'calc(100% - 320px)', height: 'calc(100vh - 250px)'}}>
               {/* Messages */}
               <div
                 ref={scrollRef}
                 className="flex-1 overflow-y-scroll p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                style={{ paddingBottom: '20px', maxHeight: 'calc(100vh - 300px)' }}
+                style={{ paddingBottom: '20px', maxHeight: 'calc(100vh - 400px)' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2327,8 +2327,9 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Fixed at bottom */}
-              <div className="flex-shrink-0 mt-auto">
+              {/* Composer - Always visible at bottom */}
+              <div className="w-full bg-red-200 p-2 border-4 border-red-500 flex-shrink-0 sticky bottom-0">
+                <div className="text-center text-red-800 font-bold mb-2">MESSAGE BOX HERE</div>
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
