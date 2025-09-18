@@ -2343,8 +2343,8 @@ function TicketHistoryCollapsible({
           </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
-          <div className="w-80 bg-white border-l border-gray-200 overflow-y-auto" style={{minWidth: '320px', maxWidth: '320px'}}>
-            <div className="p-4 space-y-4">
+          <div className="md:col-span-4 flex flex-col gap-2">
+            <div className="md:sticky md:top-20">
               <TimelinePanel
                 events={timeline}
                 loading={timelineLoading}
