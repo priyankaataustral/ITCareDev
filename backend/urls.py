@@ -5467,6 +5467,207 @@ def mark_escalation_summary_read(summary_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@urls.route("/dashboard/my-tickets", methods=["GET"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def get_my_dashboard():
+    """Get personalized dashboard data for the current agent including their tickets and department overview"""
+    try:
+        # Get current agent info
+        agent_context = getattr(request, 'agent_ctx', {}) or {}
+        agent_id = agent_context.get('id')
+        agent_department_id = agent_context.get('department_id')
+        agent_role = agent_context.get('role')
+        
+        if not agent_id:
+            return jsonify({"error": "Agent not found"}), 403
+        
+        # Get agent details
+        agent = db.session.get(Agent, agent_id)
+        if not agent:
+            return jsonify({"error": "Agent record not found"}), 404
+        
+        # Get department info
+        department = None
+        if agent_department_id:
+            department = db.session.get(Department, agent_department_id)
+        
+        # === MY TICKETS (assigned to this agent) ===
+        my_tickets_query = Ticket.query.filter_by(assigned_to=agent_id, archived=False)
+        my_tickets = my_tickets_query.all()
+        
+        # Build my tickets with enriched data
+        my_tickets_list = []
+        my_tickets_counts = {"open": 0, "closed": 0, "escalated": 0, "resolved": 0}
+        
+        for ticket in my_tickets:
+            # Get department info for ticket
+            ticket_dept = None
+            if ticket.department_id:
+                ticket_dept = db.session.get(Department, ticket.department_id)
+            
+            # Count by status
+            status = ticket.status or 'open'
+            if status in my_tickets_counts:
+                my_tickets_counts[status] += 1
+            
+            # Get latest message preview
+            latest_message = Message.query.filter_by(ticket_id=ticket.id).order_by(Message.timestamp.desc()).first()
+            message_preview = ""
+            if latest_message:
+                content = latest_message.content or ""
+                if isinstance(content, str) and len(content) > 100:
+                    message_preview = content[:100] + "..."
+                else:
+                    message_preview = str(content)
+            
+            my_tickets_list.append({
+                "id": ticket.id,
+                "subject": ticket.subject or "No subject",
+                "status": status,
+                "priority": ticket.priority,
+                "impact_level": ticket.impact_level,
+                "urgency_level": ticket.urgency_level,
+                "level": ticket.level,
+                "category": ticket.category,
+                "requester_name": ticket.requester_name,
+                "requester_email": ticket.requester_email,
+                "department": {
+                    "id": ticket_dept.id if ticket_dept else None,
+                    "name": ticket_dept.name if ticket_dept else "Unassigned"
+                },
+                "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                "latest_message_preview": message_preview
+            })
+        
+        # === DEPARTMENT TICKETS (all tickets in agent's department) ===
+        dept_tickets_list = []
+        dept_tickets_counts = {"open": 0, "closed": 0, "escalated": 0, "resolved": 0}
+        
+        if agent_department_id:
+            # Query tickets by department
+            dept_tickets_query = Ticket.query.filter_by(department_id=agent_department_id, archived=False)
+            dept_tickets = dept_tickets_query.all()
+            
+            for ticket in dept_tickets:
+                # Count by status
+                status = ticket.status or 'open'
+                if status in dept_tickets_counts:
+                    dept_tickets_counts[status] += 1
+                
+                # Get assigned agent info
+                assigned_agent = None
+                if ticket.assigned_to:
+                    assigned_agent = db.session.get(Agent, ticket.assigned_to)
+                
+                # Get latest message preview
+                latest_message = Message.query.filter_by(ticket_id=ticket.id).order_by(Message.timestamp.desc()).first()
+                message_preview = ""
+                if latest_message:
+                    content = latest_message.content or ""
+                    if isinstance(content, str) and len(content) > 100:
+                        message_preview = content[:100] + "..."
+                    else:
+                        message_preview = str(content)
+                
+                dept_tickets_list.append({
+                    "id": ticket.id,
+                    "subject": ticket.subject or "No subject",
+                    "status": status,
+                    "priority": ticket.priority,
+                    "impact_level": ticket.impact_level,
+                    "urgency_level": ticket.urgency_level,
+                    "level": ticket.level,
+                    "category": ticket.category,
+                    "requester_name": ticket.requester_name,
+                    "requester_email": ticket.requester_email,
+                    "assigned_agent": {
+                        "id": assigned_agent.id if assigned_agent else None,
+                        "name": assigned_agent.name if assigned_agent else "Unassigned"
+                    },
+                    "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                    "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                    "latest_message_preview": message_preview,
+                    "is_mine": ticket.assigned_to == agent_id
+                })
+        
+        # === RECENT ACTIVITY (tickets I've worked on recently) ===
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        recent_activity = []
+        
+        # Get tickets I've recently updated or have messages from me
+        recent_ticket_ids = set()
+        
+        # Tickets I'm assigned to that were updated recently
+        recent_assigned = Ticket.query.filter(
+            Ticket.assigned_to == agent_id,
+            Ticket.updated_at >= seven_days_ago
+        ).all()
+        for t in recent_assigned:
+            recent_ticket_ids.add(t.id)
+        
+        # Tickets where I sent messages recently
+        recent_messages = Message.query.filter(
+            Message.sender_agent_id == agent_id,
+            Message.timestamp >= seven_days_ago
+        ).all()
+        for msg in recent_messages:
+            recent_ticket_ids.add(msg.ticket_id)
+        
+        # Get ticket details for recent activity
+        for ticket_id in list(recent_ticket_ids)[:10]:  # Limit to 10 most recent
+            ticket = db.session.get(Ticket, ticket_id)
+            if ticket and not ticket.archived:
+                recent_activity.append({
+                    "id": ticket.id,
+                    "subject": ticket.subject or "No subject",
+                    "status": ticket.status,
+                    "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                    "action": "updated" if ticket.assigned_to == agent_id else "commented"
+                })
+        
+        # Sort recent activity by updated time
+        recent_activity.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+        
+        # === BUILD RESPONSE ===
+        dashboard_data = {
+            "agent": {
+                "id": agent.id,
+                "name": agent.name,
+                "email": agent.email,
+                "role": agent.role,
+                "department": {
+                    "id": department.id if department else None,
+                    "name": department.name if department else "Unassigned"
+                }
+            },
+            "my_tickets": {
+                "total": len(my_tickets_list),
+                "counts": my_tickets_counts,
+                "tickets": my_tickets_list[:20]  # Limit to 20 for performance
+            },
+            "department_tickets": {
+                "total": len(dept_tickets_list),
+                "counts": dept_tickets_counts,
+                "tickets": dept_tickets_list[:30],  # Limit to 30 for performance
+                "department_name": department.name if department else "No Department"
+            },
+            "recent_activity": recent_activity[:10],
+            "summary": {
+                "my_open_tickets": my_tickets_counts["open"],
+                "my_total_tickets": len(my_tickets_list),
+                "dept_open_tickets": dept_tickets_counts["open"],
+                "dept_total_tickets": len(dept_tickets_list),
+                "recent_activity_count": len(recent_activity)
+            }
+        }
+        
+        return jsonify(dashboard_data)
+        
+    except Exception as e:
+        current_app.logger.error(f"Dashboard error: {str(e)}")
+        return jsonify({"error": f"Failed to load dashboard: {str(e)}"}), 500
+
 @urls.route("/kb/analytics/agents", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER") 
 def analytics_agents():

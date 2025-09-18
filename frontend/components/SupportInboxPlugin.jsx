@@ -7,6 +7,7 @@ import LoadingBot from './LoadingBot';
 import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
 import KBDashboard from './KBDashboard';
+import MyDashboard from './MyDashboard';
 import AgentsPage from '../pages/agents';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
@@ -21,6 +22,7 @@ export default function SupportInboxPlugin() {
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [showAgents, setShowAgents] = useState(false);
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
   const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' or specific department ID
@@ -127,6 +129,15 @@ export default function SupportInboxPlugin() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowDashboard(true)}
+            className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all text-sm font-medium shadow-sm"
+            aria-label="Open My Dashboard"
+          >
+            <i className="bi bi-speedometer2 mr-2"></i>
+            Dashboard
+          </button>
+          
+          <button
             onClick={() => setShowAnalytics(true)}
             className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
             aria-label="Open Analytics Dashboard"
@@ -169,6 +180,14 @@ export default function SupportInboxPlugin() {
           )}
         </div>
       </div>
+
+      {/* My Dashboard Modal */}
+      {showDashboard && (
+        <MyDashboard 
+          open={showDashboard} 
+          onClose={() => setShowDashboard(false)} 
+        />
+      )}
 
       {/* Analytics Dashboard Modal */}
       {showAnalytics && (
