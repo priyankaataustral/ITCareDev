@@ -2172,7 +2172,7 @@ function TicketHistoryCollapsible({
         {/* Main Content Area - Chat + Right Sidebar */}
         <div className="flex-1 flex overflow-hidden">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0" style={{maxWidth: 'calc(100% - 320px)', height: 'calc(100vh - 250px)'}}>
+            <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)', height: 'calc(100vh - 250px)'}}>
               {/* Messages */}
                <div
                  ref={scrollRef}
@@ -2328,7 +2328,7 @@ function TicketHistoryCollapsible({
               />
 
                {/* Composer - Always visible at bottom */}
-               <div className="fixed bottom-0 left-0 right-80 z-50">
+               <div className="absolute bottom-0 left-0 right-0 z-50">
                  <ChatComposer
                    value={newMsg}
                    onChange={v => {
