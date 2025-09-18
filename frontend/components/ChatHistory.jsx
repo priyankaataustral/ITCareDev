@@ -2172,12 +2172,12 @@ function TicketHistoryCollapsible({
         {/* Main Content Area - Chat + Right Sidebar */}
         <div className="flex-1 flex overflow-hidden">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0" style={{maxWidth: 'calc(100% - 320px)'}}>
+            <div className="flex-1 flex flex-col min-w-0 h-full" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
               <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                style={{ paddingBottom: '140px' }}
+                className="flex-1 overflow-y-scroll p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
+                style={{ paddingBottom: '20px', maxHeight: 'calc(100vh - 300px)' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2328,17 +2328,19 @@ function TicketHistoryCollapsible({
               />
 
               {/* Composer - Fixed at bottom */}
-              <ChatComposer
-                value={newMsg}
-                onChange={v => {
-                  if (typeof v === 'string') setNewMsg(v);
-                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                }}
-                onSend={sendMessage}
-                sending={sending}
-                textareaRef={textareaRef}
-                drawerOpen={showDraftEditor}
-              />
+              <div className="flex-shrink-0 mt-auto">
+                <ChatComposer
+                  value={newMsg}
+                  onChange={v => {
+                    if (typeof v === 'string') setNewMsg(v);
+                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                  }}
+                  onSend={sendMessage}
+                  sending={sending}
+                  textareaRef={textareaRef}
+                  drawerOpen={showDraftEditor}
+                />
+              </div>
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
