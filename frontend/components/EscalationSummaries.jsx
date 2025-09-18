@@ -60,7 +60,7 @@ export default function EscalationSummaries({ onUnreadCountChange }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+     {/*} <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-semibold text-gray-900 dark:text-white">
           📋 Escalation Summaries
         </h3>
@@ -69,7 +69,7 @@ export default function EscalationSummaries({ onUnreadCountChange }) {
             {unreadCount} new
           </span>
         )}
-      </div>
+      </div>*/}
 
       <div className="max-h-96 overflow-y-auto">
         {summaries.length === 0 ? (
