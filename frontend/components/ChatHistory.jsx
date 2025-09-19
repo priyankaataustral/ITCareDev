@@ -582,7 +582,8 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   
   // Escalation popup state
   const [showEscalationPopup, setShowEscalationPopup] = useState(false);
-  const [showDeescalationPopup, setShowDeescalationPopup] = useState(false); 
+  const [showDeescalationPopup, setShowDeescalationPopup] = useState(false);
+  const [popupLock, setPopupLock] = useState(false); 
 
 
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
@@ -1777,6 +1778,7 @@ function TicketHistoryCollapsible({
 
   // New escalation function that uses the popup form data
   const handleEscalateWithForm = async (escalationData) => {
+    if (actionLoading) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -1825,6 +1827,8 @@ function TicketHistoryCollapsible({
       
       // Refresh timeline and mentions
       setTimelineRefresh(x => x + 1);
+      setShowEscalationPopup(false);
+      setPopupLock(false);
       // Trigger mentions refresh to update sidebar counts
     } catch (e) {
       setActionError(e.message || String(e));
@@ -1836,6 +1840,7 @@ function TicketHistoryCollapsible({
 
   // New de-escalation function that uses the popup form data
   const handleDeescalateWithForm = async (deescalationData) => {
+    if (actionLoading) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -1859,6 +1864,8 @@ function TicketHistoryCollapsible({
       
       // Refresh timeline and mentions
       setTimelineRefresh(x => x + 1);
+      setShowDeescalationPopup(false);
+      setPopupLock(false);
       // Trigger mentions refresh to update sidebar counts
     } catch (e) {
       setActionError(e.message || String(e));
@@ -2038,8 +2045,15 @@ function TicketHistoryCollapsible({
           {/* Escalate: L1, L2, L3, MANAGER */}
           <Gate roles={["L1", "L2", "L3", "MANAGER"]}>
             <button
-              onClick={() => setShowEscalationPopup(true)}
-              disabled={actionLoading}
+                onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (popupLock) return;
+                setPopupLock(true);
+                setShowEscalationPopup(true);
+                setTimeout(() => setPopupLock(false), 100);
+              }}
+              disabled={actionLoading || popupLock}
               className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
             >🛠 Escalate</button>
           </Gate>
@@ -2048,8 +2062,15 @@ function TicketHistoryCollapsible({
           <Gate roles={["L2", "L3", "MANAGER"]}>
             {ticket?.level > 1 && (
               <button
-                onClick={() => setShowDeescalationPopup(true)}
-                disabled={actionLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (popupLock) return;
+                  setPopupLock(true);
+                  setShowDeescalationPopup(true);
+                  setTimeout(() => setPopupLock(false), 100);
+                }}
+                disabled={actionLoading || popupLock}
                 className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
               >↩️ De-escalate</button>
             )}
@@ -2059,7 +2080,11 @@ function TicketHistoryCollapsible({
           <Gate roles={["L2", "L3", "MANAGER"]}>
             {(ticket?.status === 'open' || ticket?.status === 'escalated') && (
               <button
-                onClick={() => setShowCloseConfirm(true)}
+                onClick={(e) => {
+                  e.stopPropagation(); // ← Add this
+                  e.preventDefault();  // ← Add this
+                  setShowCloseConfirm(true);
+                }}
                 disabled={actionLoading}
                 className="flex items-center gap-1 px-3 py-1 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition disabled:opacity-50 text-sm shadow-sm"
               >🚫 Close</button>
@@ -2378,7 +2403,10 @@ function TicketHistoryCollapsible({
       {/* Escalation Popup */}
       <EscalationPopup
         isOpen={showEscalationPopup}
-        onClose={() => setShowEscalationPopup(false)}
+        onClose={() => {
+          setShowEscalationPopup(false);
+          setPopupLock(false);
+        }}
         onEscalate={handleEscalateWithForm}
         ticketId={tid}
         ticket={ticket}
@@ -2387,7 +2415,10 @@ function TicketHistoryCollapsible({
       {/* De-escalation Popup */}
       <DeescalationPopup
         isOpen={showDeescalationPopup}
-        onClose={() => setShowDeescalationPopup(false)}
+        onClose={() => {
+          setShowDeescalationPopup(false);
+          setPopupLock(false);
+        }}
         onDeescalate={handleDeescalateWithForm}
         ticketId={tid}
         ticket={ticket}
