@@ -1125,6 +1125,13 @@ const openDraftEditor = (prefill) => {
 
   useEffect(() => { setActiveThreadId(threadId); }, [threadId]);
 
+  // Prevent both popups from being open simultaneously
+  useEffect(() => {
+    if (showEscalationPopup && showDeescalationPopup) {
+      setShowDeescalationPopup(false);
+    }
+  }, [showEscalationPopup, showDeescalationPopup]);
+
   // useEffect(() => {
   //   setConfirmLinks({ confirm: '', notConfirm: '' });
   // }, [tid]);
@@ -2048,12 +2055,13 @@ function TicketHistoryCollapsible({
                 onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                if (popupLock) return;
+                if (popupLock || showDeescalationPopup) return; // ← Prevent if other popup is open
                 setPopupLock(true);
+                setShowDeescalationPopup(false); // ← Ensure other popup is closed
                 setShowEscalationPopup(true);
                 setTimeout(() => setPopupLock(false), 100);
               }}
-              disabled={actionLoading || popupLock}
+              disabled={actionLoading || popupLock || showDeescalationPopup} // ← Disable if other popup open
               className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
             >🛠 Escalate</button>
           </Gate>
@@ -2065,12 +2073,13 @@ function TicketHistoryCollapsible({
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  if (popupLock) return;
+                  if (popupLock || showEscalationPopup) return; // ← Prevent if other popup is open
                   setPopupLock(true);
+                  setShowEscalationPopup(false); // ← Ensure other popup is closed
                   setShowDeescalationPopup(true);
                   setTimeout(() => setPopupLock(false), 100);
                 }}
-                disabled={actionLoading || popupLock}
+                disabled={actionLoading || popupLock || showEscalationPopup} // ← Disable if other popup open
                 className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
               >↩️ De-escalate</button>
             )}
@@ -2402,7 +2411,7 @@ function TicketHistoryCollapsible({
       
       {/* Escalation Popup */}
       <EscalationPopup
-        isOpen={showEscalationPopup}
+        isOpen={showEscalationPopup && !showDeescalationPopup} // ← Only open if deescalation is closed
         onClose={() => {
           setShowEscalationPopup(false);
           setPopupLock(false);
@@ -2414,7 +2423,7 @@ function TicketHistoryCollapsible({
 
       {/* De-escalation Popup */}
       <DeescalationPopup
-        isOpen={showDeescalationPopup}
+        isOpen={showDeescalationPopup && !showEscalationPopup} // ← Only open if escalation is closed
         onClose={() => {
           setShowDeescalationPopup(false);
           setPopupLock(false);
