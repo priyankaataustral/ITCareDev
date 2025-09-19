@@ -588,6 +588,9 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const ROLES_ALL  = useMemo(() => ["L1","L2","L3","MANAGER"], []);
   const ROLES_L2UP = useMemo(() => ["L2","L3","MANAGER"], []);
 
+  const [escOpenStable, setEscOpenStable] = useState(false);
+  const [deescOpenStable, setDeescOpenStable] = useState(false);
+
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
   const displayMessages = useMemo(() => {
     const out = [];
@@ -1158,6 +1161,19 @@ const openDraftEditor = (prefill) => {
     }
   }, [pendingSolution]);
 
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setEscOpenStable(showEscalationPopup && !showDeescalationPopup);
+    }, 50);
+    return () => clearTimeout(id);
+  }, [showEscalationPopup, showDeescalationPopup]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDeescOpenStable(showDeescalationPopup && !showEscalationPopup);
+    }, 50);
+    return () => clearTimeout(id);
+  }, [showDeescalationPopup, showEscalationPopup]);
 
   // Initial thread load
   useEffect(() => {
@@ -2413,7 +2429,7 @@ function TicketHistoryCollapsible({
       
       {/* Escalation Popup */}
       <EscalationPopup
-        isOpen={showEscalationPopup && !showDeescalationPopup} // ← Only open if deescalation is closed
+        isOpen={escOpenStable} // ← Only open if deescalation is closed
         onClose={() => {
           setShowEscalationPopup(false);
           setPopupLock(false);
@@ -2425,7 +2441,7 @@ function TicketHistoryCollapsible({
 
       {/* De-escalation Popup */}
       <DeescalationPopup
-        isOpen={showDeescalationPopup && !showEscalationPopup} // ← Only open if escalation is closed
+        isOpen={deescOpenStable} // ← Only open if escalation is closed
         onClose={() => {
           setShowDeescalationPopup(false);
           setPopupLock(false);
