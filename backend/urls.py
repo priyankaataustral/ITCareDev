@@ -5888,6 +5888,23 @@ def get_my_dashboard():
     except Exception as e:
         current_app.logger.error(f"Dashboard error: {str(e)}")
         return jsonify({"error": f"Failed to load dashboard: {str(e)}"}), 500
+    
+@urls.route("/dashboard/views", methods=["GET", "POST", "OPTIONS"])
+def dashboard_views():
+    if request.method == "OPTIONS":
+        # Flask-CORS will add headers; just return OK
+        return ("", 204)
+
+    if request.method == "GET":
+        scope = request.args.get("scope", "personal")
+        target = request.args.get("for", "my-tickets")
+        # TODO: return actual views for scope/target
+        return jsonify({"views": [], "scope": scope, "for": target})
+
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        # TODO: create a view
+        return jsonify({"ok": True, "view": payload}), 201
 
 @urls.route("/kb/analytics/agents", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER") 
