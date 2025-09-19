@@ -8,7 +8,9 @@ import { apiGet, apiPost } from '../lib/apiClient';
 
 dayjs.extend(relativeTime);
 
-// Professional Assignment Pill Component for Dashboard
+// -------------------------------------
+// DashboardAssignmentPill (unchanged)
+// -------------------------------------
 const DashboardAssignmentPill = ({ ticket, onAssignmentChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [agents, setAgents] = useState([]);
@@ -17,32 +19,22 @@ const DashboardAssignmentPill = ({ ticket, onAssignmentChange }) => {
   const { agent: currentUser } = useAuth();
   
   useEffect(() => {
-    // Find current assigned agent name
     if (ticket.assigned_to && agents.length > 0) {
       const agent = agents.find(a => a.id === ticket.assigned_to);
       setCurrentAgent(agent);
     }
   }, [ticket.assigned_to, agents]);
   
-  // Check if user can assign tickets based on department routing rules
   const canAssignTickets = () => {
     const isHelpdesk = currentUser?.department_id === 7;
     const isManager = currentUser?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
-    
-    // Backend endpoint requires L2, L3, or MANAGER role
-    if (!isManager && !isL2OrL3) {
-      return false;
-    }
-    
+    if (!isManager && !isL2OrL3) return false;
     return isHelpdesk || isManager || isL2OrL3;
   };
   
   const handleDropdownOpen = async () => {
-    if (!canAssignTickets()) {
-      return;
-    }
-    
+    if (!canAssignTickets()) return;
     if (!isOpen) {
       setLoading(true);
       try {
@@ -50,24 +42,19 @@ const DashboardAssignmentPill = ({ ticket, onAssignmentChange }) => {
         const isHelpdesk = currentUser?.department_id === 7;
         
         if (isManager && !isHelpdesk) {
-          // Managers from other departments can assign to their own dept + Helpdesk
           const [ownDeptResponse, helpdeskResponse] = await Promise.all([
             apiGet(`/agents?department_id=${currentUser.department_id}`),
-            apiGet(`/agents?department_id=7`) // Helpdesk
+            apiGet(`/agents?department_id=7`),
           ]);
           
           const ownDeptAgents = ownDeptResponse.agents || [];
           const helpdeskAgents = helpdeskResponse.agents || [];
-          
-          // Combine and deduplicate agents
           const allAgents = [...ownDeptAgents, ...helpdeskAgents];
           const uniqueAgents = allAgents.filter((agent, index, self) => 
             index === self.findIndex(a => a.id === agent.id)
           );
-          
           setAgents(uniqueAgents);
         } else {
-          // Helpdesk or L2/L3: use ticket's department or user's department
           const targetDepartmentId = isHelpdesk ? ticket.department_id : currentUser?.department_id;
           const response = await apiGet(`/agents?department_id=${targetDepartmentId}`);
           setAgents(response.agents || []);
@@ -155,7 +142,9 @@ const DashboardAssignmentPill = ({ ticket, onAssignmentChange }) => {
   );
 };
 
-// Department Override Pill Component for Dashboard
+// -------------------------------------
+// DashboardDepartmentPill (unchanged)
+// -------------------------------------
 const DashboardDepartmentPill = ({ ticket, onDepartmentChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [departments, setDepartments] = useState([]);
@@ -163,50 +152,34 @@ const DashboardDepartmentPill = ({ ticket, onDepartmentChange }) => {
   const [reason, setReason] = useState('');
   const { agent: currentUser } = useAuth();
   
-  // Get current department info
   const currentDept = departments.find(d => d.id === ticket.department_id) || ticket.department;
   
-  // Check if user can change departments based on routing rules
   const canChangeDepartment = () => {
     const isHelpdesk = currentUser?.department_id === 7;
     const isManager = currentUser?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
-    
-    // Backend endpoint requires L2, L3, or MANAGER role
-    if (!isManager && !isL2OrL3) {
-      return false;
-    }
-    
-    // Only Helpdesk L2/L3/Managers and other department L2/L3/Managers can change departments
+    if (!isManager && !isL2OrL3) return false;
     return isHelpdesk || isManager || isL2OrL3;
   };
   
   const getAvailableDepartments = () => {
     if (!departments.length) return [];
-    
     const isHelpdesk = currentUser?.department_id === 7;
     const isManager = currentUser?.role === 'MANAGER';
     const isL2OrL3 = ['L2', 'L3'].includes(currentUser?.role);
     
     if (isHelpdesk) {
-      // Helpdesk can route to any department
       return departments.filter(dept => dept.id !== ticket.department_id);
     } else if (isManager && currentUser?.department_id !== 7) {
-      // Department managers can only send back to Helpdesk (id: 7)
       return departments.filter(dept => dept.id === 7);
     } else if (isL2OrL3 && currentUser?.department_id !== 7) {
-      // L2/L3 from other departments can only send back to Helpdesk (id: 7)
       return departments.filter(dept => dept.id === 7);
     }
-    
     return [];
   };
   
   const handleDropdownOpen = async () => {
-    if (!canChangeDepartment()) {
-      return;
-    }
-    
+    if (!canChangeDepartment()) return;
     if (!isOpen) {
       setLoading(true);
       try {
@@ -313,15 +286,20 @@ const DashboardDepartmentPill = ({ ticket, onDepartmentChange }) => {
   );
 };
 
+// -------------------------------------
+// MyDashboard (with window controls + new tab)
+// -------------------------------------
 export default function MyDashboard({ open, onClose, onSelectTicket }) {
   const { agent } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('my-tickets'); // 'my-tickets', 'department-tickets', 'activity'
+  const [activeTab, setActiveTab] = useState('my-tickets'); // + 'insights'
+  const [winState, setWinState] = useState('normal'); // 'normal' | 'max' | 'min'
 
   useEffect(() => {
     if (open) {
+      setWinState('normal');
       loadDashboard();
     }
   }, [open]);
@@ -342,7 +320,6 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
   const handleAssignmentChange = async (ticketId, agentId) => {
     try {
       await apiPost(`/threads/${ticketId}/assign`, { agent_id: agentId });
-      // Reload dashboard to reflect changes
       await loadDashboard();
     } catch (error) {
       console.error('Assignment failed:', error);
@@ -356,12 +333,11 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
         department_id: departmentId, 
         reason: reason 
       });
-      // Reload dashboard to reflect changes
       await loadDashboard();
     } catch (error) {
       console.error('Department change failed:', error);
       alert('Failed to change department. Please try again.');
-      throw error; // Re-throw to prevent modal from closing
+      throw error;
     }
   };
 
@@ -393,14 +369,40 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
     return colors[level] || 'bg-gray-100 text-gray-800';
   };
 
+  // Closed: nothing
   if (!open) return null;
+
+  // Minimized: show dock pill
+  if (winState === 'min') {
+    return (
+      <button
+        onClick={() => setWinState('normal')}
+        className="fixed bottom-4 right-4 z-[1000] px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-lg flex items-center gap-2 hover:shadow-xl transition"
+        aria-label="Restore My Dashboard"
+      >
+        <span className="w-6 h-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+          <i className="bi bi-speedometer2 text-white text-sm" />
+        </span>
+        <span className="text-sm font-medium text-gray-800">My Dashboard</span>
+        <i className="bi bi-chevron-up text-gray-500" />
+      </button>
+    );
+  }
+
+  const frameSizing =
+    winState === 'max'
+      ? 'w-[95vw] h-[96vh] max-w-[95vw] max-h-[96vh]'
+      : 'w-full max-w-7xl h-full max-h-[90vh]';
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className={`bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col ${frameSizing}`}>
         
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        {/* Header with window controls */}
+        <div
+          className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 select-none"
+          onDoubleClick={() => setWinState(s => (s === 'max' ? 'normal' : 'max'))}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <i className="bi bi-speedometer2 text-white text-xl"></i>
@@ -410,16 +412,42 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
               <p className="text-gray-600">Personal workload and department overview</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            aria-label="Close dashboard"
-          >
-            <i className="bi bi-x-lg text-2xl"></i>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWinState('min')}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Minimize"
+            >
+              <i className="bi bi-dash-lg text-xl" />
+            </button>
+            {winState !== 'max' ? (
+              <button
+                onClick={() => setWinState('max')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Maximize"
+              >
+                <i className="bi bi-fullscreen text-xl" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setWinState('normal')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Restore"
+              >
+                <i className="bi bi-fullscreen-exit text-xl" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg text-xl" />
+            </button>
+          </div>
         </div>
 
-        {/* Loading State */}
+        {/* Loading */}
         {loading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -429,7 +457,7 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error */}
         {error && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -448,16 +476,18 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
           </div>
         )}
 
-        {/* Dashboard Content */}
+        {/* Content */}
         {!loading && !error && dashboardData && (
           <>
-            {/* Tabs Navigation */}
+            {/* Tabs */}
             <div className="px-6 pt-6">
               <div className="flex gap-1 rounded-xl bg-gray-100 p-1 w-fit">
                 {[
                   { id: 'my-tickets', label: '👤 My Tickets', count: dashboardData.my_tickets.total },
                   { id: 'department-tickets', label: '🏢 Department Tickets', count: dashboardData.department_tickets.total },
-                  { id: 'activity', label: '📈 Recent Activity', count: dashboardData.recent_activity.length }
+                  { id: 'activity', label: '📈 Recent Activity', count: dashboardData.recent_activity.length },
+                  // NEW tab
+                  { id: 'insights', label: '🔎 Insights', count: 1 },
                 ].map(tab => (
                   <button 
                     key={tab.id} 
@@ -477,10 +507,10 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
               </div>
             </div>
 
-            {/* Content Area */}
+            {/* Tab Panels */}
             <div className="flex-1 overflow-auto p-6">
               
-              {/* My Tickets Tab */}
+              {/* My Tickets */}
               {activeTab === 'my-tickets' && (
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -552,7 +582,6 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
                                 <span>📅 {dayjs(ticket.created_at).fromNow()}</span>
                               </div>
                               
-                              {/* Interactive Assignment and Department Pills */}
                               <div className="flex items-center gap-2 mb-3">
                                 <DashboardAssignmentPill 
                                   ticket={ticket} 
@@ -578,7 +607,7 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
                 </div>
               )}
 
-              {/* Department Tickets Tab */}
+              {/* Department Tickets */}
               {activeTab === 'department-tickets' && (
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -669,7 +698,6 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
                                 <span>📅 {dayjs(ticket.created_at).fromNow()}</span>
                               </div>
                               
-                              {/* Interactive Assignment and Department Pills */}
                               <div className="flex items-center gap-2 mb-3">
                                 <DashboardAssignmentPill 
                                   ticket={ticket} 
@@ -695,7 +723,7 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
                 </div>
               )}
 
-              {/* Recent Activity Tab */}
+              {/* Recent Activity */}
               {activeTab === 'activity' && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Activity (Last 7 Days)</h3>
@@ -728,6 +756,76 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* NEW: Insights */}
+              {activeTab === 'insights' && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">Insights</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white">
+                      <div className="text-xs text-gray-500 mb-1">My Open Tickets</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {dashboardData?.my_tickets?.counts?.open ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white">
+                      <div className="text-xs text-gray-500 mb-1">Dept Open</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {dashboardData?.department_tickets?.counts?.open ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white">
+                      <div className="text-xs text-gray-500 mb-1">Escalated</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {dashboardData?.department_tickets?.counts?.escalated ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-gray-200 bg-white">
+                      <div className="text-xs text-gray-500 mb-1">Closed (7d)</div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {
+                          (dashboardData?.recent_activity || []).filter(a => a.status === 'closed').length
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-gray-900">Quick Wins</h4>
+                      <span className="text-xs text-gray-500">
+                        Based on your recent activity
+                      </span>
+                    </div>
+                    <ul className="space-y-2">
+                      {(dashboardData?.my_tickets?.tickets || []).slice(0, 5).map(t => (
+                        <li key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(t.priority)}`}>
+                              {t.priority}
+                            </span>
+                            <span className="text-gray-800 font-medium">#{t.id} — {t.subject}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (onSelectTicket) {
+                                onSelectTicket(t.id);
+                                onClose();
+                              }
+                            }}
+                            className="text-sm px-3 py-1 rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50"
+                          >
+                            Open
+                          </button>
+                        </li>
+                      ))}
+                      {(!dashboardData?.my_tickets?.tickets || dashboardData.my_tickets.tickets.length === 0) && (
+                        <li className="text-sm text-gray-500 p-3">Nothing to show here yet.</li>
+                      )}
+                    </ul>
                   </div>
                 </div>
               )}

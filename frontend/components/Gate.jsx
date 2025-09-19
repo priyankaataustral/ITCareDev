@@ -18,3 +18,4 @@ export default function Gate({ roles = [], children, fallback = null }) {
   }
   return fallback;
 }
+
