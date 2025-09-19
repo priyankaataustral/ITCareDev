@@ -585,6 +585,8 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [showDeescalationPopup, setShowDeescalationPopup] = useState(false);
   const [popupLock, setPopupLock] = useState(false); 
 
+  const ROLES_ALL  = useMemo(() => ["L1","L2","L3","MANAGER"], []);
+  const ROLES_L2UP = useMemo(() => ["L2","L3","MANAGER"], []);
 
   // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
   const displayMessages = useMemo(() => {
@@ -2050,7 +2052,7 @@ function TicketHistoryCollapsible({
           </label>
 
           {/* Escalate: L1, L2, L3, MANAGER */}
-          <Gate roles={["L1", "L2", "L3", "MANAGER"]}>
+          <Gate roles={ROLES_ALL}>
             <button
                 onClick={(e) => {
                 e.stopPropagation();
@@ -2067,7 +2069,7 @@ function TicketHistoryCollapsible({
           </Gate>
 
           {/* De-escalate: L2, L3, MANAGER only */}
-          <Gate roles={["L2", "L3", "MANAGER"]}>
+          <Gate roles={ROLES_L2UP}>
             {ticket?.level > 1 && (
               <button
                 onClick={(e) => {
@@ -2086,7 +2088,7 @@ function TicketHistoryCollapsible({
           </Gate>
 
           {/* Close: MANAGER */}
-          <Gate roles={["L2", "L3", "MANAGER"]}>
+          <Gate roles={ROLES_L2UP}>
             {(ticket?.status === 'open' || ticket?.status === 'escalated') && (
               <button
                 onClick={(e) => {
@@ -2101,7 +2103,7 @@ function TicketHistoryCollapsible({
           </Gate>
 
           {/* Archive/Unarchive: L2, L3, MANAGER only for closed tickets */}
-          <Gate roles={["L2", "L3", "MANAGER"]}>
+          <Gate roles={ROLES_L2UP}>
           {(ticket?.status === 'closed' || ticket?.status === 'resolved') && !ticket?.archived && (
               <button
                 onClick={() => setShowArchiveConfirm(true)}
