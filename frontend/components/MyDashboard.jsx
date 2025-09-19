@@ -460,11 +460,7 @@ function ViewToolbar({
     }
     setSaving(true);
     try {
-      await apiPost(`/dashboard/views/${selectedViewId}`, {
-        _method: 'PUT',
-        filters,
-        sort,
-      });
+      await apiPut(`/dashboard/views/${selectedViewId}`, { filters, sort });
       setSavedViews(prev => prev.map(v => v.id === selectedViewId ? { ...v, filters, sort } : v));
     } catch {
       alert('Failed to update view.');
@@ -478,7 +474,7 @@ function ViewToolbar({
     if (!confirm('Delete this view?')) return;
     setSaving(true);
     try {
-      await apiPost(`/dashboard/views/${selectedViewId}`, { _method: 'DELETE' });
+      await apiDelete(`/dashboard/views/${selectedViewId}`);
       setSavedViews(prev => prev.filter(v => v.id !== selectedViewId));
       setSelectedViewId(null);
     } catch {

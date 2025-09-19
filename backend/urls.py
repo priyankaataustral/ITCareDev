@@ -5906,6 +5906,32 @@ def dashboard_views():
         # TODO: create a view
         return jsonify({"ok": True, "view": payload}), 201
 
+@urls.route("/dashboard/views/<int:view_id>", methods=["DELETE", "OPTIONS"])
+def dashboard_view_delete(view_id):
+    if request.method == "OPTIONS":
+        return "", 204
+
+    # 🔐 authn/authz — adapt to your app
+    user_id = getattr(g, "user_id", None)
+    if not user_id:
+        return jsonify({"error": "unauthorized"}), 401
+
+    view = DashboardView.query.filter_by(id=view_id).first()
+    if not view:
+        return jsonify({"error": "not_found"}), 404
+
+    if view.owner_id != user_id and not getattr(g, "is_admin", False):
+        return jsonify({"error": "forbidden"}), 403
+
+    try:
+        db.session.delete(view)
+        db.session.commit()
+        return "", 204  # ✅ clean REST response
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "server_error", "detail": str(e)}), 500
+
+
 @urls.route("/kb/analytics/agents", methods=["GET"])
 @require_role("L1", "L2", "L3", "MANAGER") 
 def analytics_agents():
