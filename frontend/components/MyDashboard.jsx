@@ -819,25 +819,6 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
           onDoubleClick={() => setWinState(s => (s === 'max' ? 'normal' : 'max'))}
         >
           <div className="flex items-center gap-4">
-            {/* macOS dots */}
-            <div className="hidden sm:flex items-center gap-2 mr-2">
-              <button
-                title="Close"
-                onClick={onClose}
-                className="w-3.5 h-3.5 rounded-full bg-[#FF5F57] hover:brightness-95 border border-black/10"
-              />
-              <button
-                title="Minimize"
-                onClick={() => setWinState('min')}
-                className="w-3.5 h-3.5 rounded-full bg-[#FFBD2E] hover:brightness-95 border border-black/10"
-              />
-              <button
-                title={winState !== 'max' ? 'Maximize' : 'Restore'}
-                onClick={() => setWinState(s => (s !== 'max' ? 'max' : 'normal'))}
-                className="w-3.5 h-3.5 rounded-full bg-[#28C840] hover:brightness-95 border border-black/10"
-              />
-            </div>
-
             <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <i className="bi bi-speedometer2 text-white text-xl"></i>
             </div>
