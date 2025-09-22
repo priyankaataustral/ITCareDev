@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useAuth } from './AuthContext';
-import { apiGet, apiPost } from '../lib/apiClient';
+import { apiGet, apiPost, apiPut, apiDelete } from '../lib/apiClient';
 
 dayjs.extend(relativeTime);
 
