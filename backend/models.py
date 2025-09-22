@@ -281,5 +281,27 @@ class TicketHistory(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     actor_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
 
+
+class DashboardView(db.Model):
+    __tablename__ = 'dashboard_views'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=False)
+    scope = db.Column(db.String(50), nullable=False)  # 'personal', 'team', 'global'
+    target = db.Column(db.String(50), nullable=False)  # 'my-tickets', 'department-tickets', etc.
+    filters = db.Column(JSON)  # JSON object with filter criteria
+    sort = db.Column(JSON)     # JSON object with sort configuration
+    is_default = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    owner = db.relationship('Agent', backref='dashboard_views')
+    
+    # Constraints
+    __table_args__ = (
+        db.UniqueConstraint('owner_id', 'name', 'target', name='ux_dashboard_views_owner_name_target'),
+    )
+
 # KBDraft model removed - unused drafting feature
     

@@ -18,7 +18,7 @@ from utils import _can_view, extract_json
 from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
-from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary, TicketHistory
+from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary, TicketHistory, DashboardView
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -5890,46 +5890,234 @@ def get_my_dashboard():
         return jsonify({"error": f"Failed to load dashboard: {str(e)}"}), 500
     
 @urls.route("/dashboard/views", methods=["GET", "POST", "OPTIONS"])
+@require_role("L1", "L2", "L3", "MANAGER")
 def dashboard_views():
     if request.method == "OPTIONS":
-        # Flask-CORS will add headers; just return OK
         return ("", 204)
+
+    # Get current agent from JWT token
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return jsonify({"error": "unauthorized"}), 401
+    
+    token = auth_header.split(' ')[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        current_agent_id = payload.get('agent_id')
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "invalid_token"}), 401
 
     if request.method == "GET":
         scope = request.args.get("scope", "personal")
         target = request.args.get("for", "my-tickets")
-        # TODO: return actual views for scope/target
-        return jsonify({"views": [], "scope": scope, "for": target})
+        
+        try:
+            # Get views for the current user and target
+            views_query = DashboardView.query.filter_by(
+                owner_id=current_agent_id,
+                scope=scope,
+                target=target
+            ).order_by(DashboardView.name)
+            
+            views = []
+            for view in views_query.all():
+                views.append({
+                    "id": view.id,
+                    "name": view.name,
+                    "scope": view.scope,
+                    "target": view.target,
+                    "filters": view.filters or {},
+                    "sort": view.sort or {},
+                    "is_default": view.is_default,
+                    "created_at": view.created_at.isoformat() if view.created_at else None,
+                    "updated_at": view.updated_at.isoformat() if view.updated_at else None
+                })
+            
+            return jsonify({"views": views, "scope": scope, "for": target})
+            
+        except Exception as e:
+            current_app.logger.error(f"Error loading dashboard views: {str(e)}")
+            return jsonify({"error": f"Failed to load views: {str(e)}"}), 500
 
     if request.method == "POST":
         payload = request.get_json(silent=True) or {}
-        # TODO: create a view
-        return jsonify({"ok": True, "view": payload}), 201
+        
+        # Validate required fields
+        name = payload.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "name_required"}), 400
+            
+        scope = payload.get("scope", "personal")
+        target = payload.get("target", "my-tickets")
+        filters = payload.get("filters", {})
+        sort = payload.get("sort", {})
+        is_default = payload.get("is_default", False)
+        
+        try:
+            # Check if view with same name already exists for this user/target
+            existing = DashboardView.query.filter_by(
+                owner_id=current_agent_id,
+                name=name,
+                target=target
+            ).first()
+            
+            if existing:
+                return jsonify({"error": "view_name_exists"}), 409
+            
+            # If setting as default, unset other defaults for this user/target
+            if is_default:
+                DashboardView.query.filter_by(
+                    owner_id=current_agent_id,
+                    target=target,
+                    is_default=True
+                ).update({"is_default": False})
+            
+            # Create new view
+            new_view = DashboardView(
+                name=name,
+                owner_id=current_agent_id,
+                scope=scope,
+                target=target,
+                filters=filters,
+                sort=sort,
+                is_default=is_default
+            )
+            
+            db.session.add(new_view)
+            db.session.commit()
+            
+            return jsonify({
+                "ok": True,
+                "view": {
+                    "id": new_view.id,
+                    "name": new_view.name,
+                    "scope": new_view.scope,
+                    "target": new_view.target,
+                    "filters": new_view.filters or {},
+                    "sort": new_view.sort or {},
+                    "is_default": new_view.is_default,
+                    "created_at": new_view.created_at.isoformat() if new_view.created_at else None
+                }
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error creating dashboard view: {str(e)}")
+            return jsonify({"error": f"Failed to create view: {str(e)}"}), 500
 
-@urls.route("/dashboard/views/<int:view_id>", methods=["DELETE", "OPTIONS"])
-def dashboard_view_delete(view_id):
+
+@urls.route("/dashboard/views/<int:view_id>", methods=["GET", "PUT", "DELETE", "OPTIONS"])
+@require_role("L1", "L2", "L3", "MANAGER")
+def dashboard_view_detail(view_id):
     if request.method == "OPTIONS":
         return "", 204
 
-    # 🔐 authn/authz — adapt to your app
-    user_id = getattr(g, "user_id", None)
-    if not user_id:
+    # Get current agent from JWT token
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
         return jsonify({"error": "unauthorized"}), 401
+    
+    token = auth_header.split(' ')[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        current_agent_id = payload.get('agent_id')
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "invalid_token"}), 401
 
+    # Get the view and check ownership
     view = DashboardView.query.filter_by(id=view_id).first()
     if not view:
         return jsonify({"error": "not_found"}), 404
 
-    if view.owner_id != user_id and not getattr(g, "is_admin", False):
+    if view.owner_id != current_agent_id:
         return jsonify({"error": "forbidden"}), 403
 
-    try:
-        db.session.delete(view)
-        db.session.commit()
-        return "", 204  # ✅ clean REST response
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": "server_error", "detail": str(e)}), 500
+    if request.method == "GET":
+        return jsonify({
+            "view": {
+                "id": view.id,
+                "name": view.name,
+                "scope": view.scope,
+                "target": view.target,
+                "filters": view.filters or {},
+                "sort": view.sort or {},
+                "is_default": view.is_default,
+                "created_at": view.created_at.isoformat() if view.created_at else None,
+                "updated_at": view.updated_at.isoformat() if view.updated_at else None
+            }
+        })
+
+    if request.method == "PUT":
+        payload = request.get_json(silent=True) or {}
+        
+        try:
+            # Update fields if provided
+            if "name" in payload:
+                name = payload["name"].strip()
+                if not name:
+                    return jsonify({"error": "name_required"}), 400
+                
+                # Check if another view with same name exists
+                existing = DashboardView.query.filter_by(
+                    owner_id=current_agent_id,
+                    name=name,
+                    target=view.target
+                ).filter(DashboardView.id != view_id).first()
+                
+                if existing:
+                    return jsonify({"error": "view_name_exists"}), 409
+                
+                view.name = name
+            
+            if "filters" in payload:
+                view.filters = payload["filters"]
+            
+            if "sort" in payload:
+                view.sort = payload["sort"]
+            
+            if "is_default" in payload:
+                is_default = payload["is_default"]
+                if is_default and not view.is_default:
+                    # Unset other defaults for this user/target
+                    DashboardView.query.filter_by(
+                        owner_id=current_agent_id,
+                        target=view.target,
+                        is_default=True
+                    ).filter(DashboardView.id != view_id).update({"is_default": False})
+                
+                view.is_default = is_default
+            
+            view.updated_at = func.now()
+            db.session.commit()
+            
+            return jsonify({
+                "ok": True,
+                "view": {
+                    "id": view.id,
+                    "name": view.name,
+                    "scope": view.scope,
+                    "target": view.target,
+                    "filters": view.filters or {},
+                    "sort": view.sort or {},
+                    "is_default": view.is_default,
+                    "updated_at": view.updated_at.isoformat() if view.updated_at else None
+                }
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error updating dashboard view: {str(e)}")
+            return jsonify({"error": f"Failed to update view: {str(e)}"}), 500
+
+    if request.method == "DELETE":
+        try:
+            db.session.delete(view)
+            db.session.commit()
+            return "", 204
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error deleting dashboard view: {str(e)}")
+            return jsonify({"error": f"Failed to delete view: {str(e)}"}), 500
 
 
 @urls.route("/kb/analytics/agents", methods=["GET"])
