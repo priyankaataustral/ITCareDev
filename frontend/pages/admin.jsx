@@ -101,7 +101,7 @@ export default function AdminPage() {
               
               {/* Title Section */}
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">🚀 AI Automation Control Panel</h1>
+                <h1 className="text-3xl font-bold text-gray-900">AI Automation Control Panel</h1>
                 <p className="text-gray-600 mt-2">Manage AI-powered ticket triage and solution generation</p>
               </div>
             </div>
