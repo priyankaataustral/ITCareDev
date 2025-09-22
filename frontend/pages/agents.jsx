@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { apiGet, apiPost, apiPut, apiDelete } from '../lib/apiClient';
 
-export default function AgentsPage() {
+export default function AgentsPage({ open, onClose }) {
   const { agent } = useAuth();
   const [agents, setAgents] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -13,6 +13,7 @@ export default function AgentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [winState, setWinState] = useState('normal'); // 'normal' | 'max' | 'min'
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,6 +21,13 @@ export default function AgentsPage() {
     role: 'L1',
     department_id: ''
   });
+
+  // Reset to normal when component reopens
+  useEffect(() => {
+    if (open) {
+      setWinState('normal');
+    }
+  }, [open]);
 
   // Role options
   const roleOptions = [
@@ -32,6 +40,26 @@ export default function AgentsPage() {
   // Check permissions
   const canManageAgents = agent && ['L2', 'L3', 'MANAGER'].includes(agent.role);
   const canCreateDelete = agent && ['L3', 'MANAGER'].includes(agent.role);
+
+  // Closed: nothing
+  if (!open) return null;
+
+  // Minimized: dock pill
+  if (winState === 'min') {
+    return (
+      <button
+        onClick={() => setWinState('normal')}
+        className="fixed bottom-4 left-20 z-[1000] px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-lg flex items-center gap-2 hover:shadow-xl transition"
+        aria-label="Restore Agents Management"
+      >
+        <span className="w-6 h-6 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center">
+          <i className="bi bi-people text-white text-sm" />
+        </span>
+        <span className="text-sm font-medium text-gray-800">Agents</span>
+        <i className="bi bi-chevron-up text-gray-500" />
+      </button>
+    );
+  }
 
   useEffect(() => {
     loadData();
@@ -120,10 +148,16 @@ export default function AgentsPage() {
 
   if (!canManageAgents) {
     return (
-      <div className="h-full bg-gray-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to manage agents.</p>
+          <p className="text-gray-600 mb-6">You don't have permission to manage agents.</p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Close
+          </button>
         </div>
       </div>
     );
@@ -131,43 +165,102 @@ export default function AgentsPage() {
 
   if (loading) {
     return (
-      <div className="h-full bg-gray-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading agents...</div>
+      <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div className="bg-white p-8 rounded-xl shadow-lg text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-lg text-gray-600">Loading agents...</div>
+        </div>
       </div>
     );
   }
 
+  const frameSizing =
+    winState === 'max'
+      ? 'w-[95vw] h-[96vh] max-w-[95vw] max-h-[96vh]'
+      : 'w-full max-w-7xl h-full max-h-[90vh]';
+
   return (
-    <div className="h-full bg-gray-50 overflow-auto">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-6">
-              <div>
-                <p className="text-gray-600">Manage support team members</p>
-              </div>
-              
-              {/* Department Filter */}
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700">Filter by Department:</label>
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="all">All Departments</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+    <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className={`bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col ${frameSizing}`}>
+        {/* Header with window controls */}
+        <div
+          className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 select-none"
+          onDoubleClick={() => setWinState(s => (s === 'max' ? 'normal' : 'max'))}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
+              <i className="bi bi-people text-white text-xl"></i>
             </div>
-            {canCreateDelete && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Agents Management</h2>
+              <p className="text-gray-600">Manage support team members</p>
+            </div>
+          </div>
+
+          {/* Window control buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWinState('min')}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Minimize"
+            >
+              <i className="bi bi-dash-lg text-xl" />
+            </button>
+            {winState !== 'max' ? (
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => setWinState('max')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Maximize"
+              >
+                <i className="bi bi-fullscreen text-xl" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setWinState('normal')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Restore"
+              >
+                <i className="bi bi-fullscreen-exit text-xl" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg text-xl" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content area with scroll */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="bg-gray-50 h-full">
+            {/* Filter and Actions Bar */}
+            <div className="bg-white shadow-sm border-b sticky top-0 z-10">
+              <div className="px-6 py-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-6">
+                    {/* Department Filter */}
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-gray-700">Filter by Department:</label>
+                      <select
+                        value={departmentFilter}
+                        onChange={(e) => setDepartmentFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      >
+                        <option value="all">All Departments</option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {canCreateDelete && (
+                    <button
+                      onClick={() => setShowAddModal(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <span>+</span>
@@ -375,6 +468,9 @@ export default function AgentsPage() {
           </div>
         </div>
       )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

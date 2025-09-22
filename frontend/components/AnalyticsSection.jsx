@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 // Enhanced KPI component with trend indicators
 export function KPI({ title, value, subtitle, change, positive }) {
@@ -221,9 +221,98 @@ export function AgentPerformance({ data, loading }) {
 }
 
 // Comprehensive Analytics Dashboard Component
-export function ComprehensiveAnalytics({ analytics, analyticsTab, setAnalyticsTab }) {
+export function ComprehensiveAnalytics({ analytics, analyticsTab, setAnalyticsTab, open, onClose }) {
+  const [winState, setWinState] = useState('normal'); // 'normal' | 'max' | 'min'
+
+  // Reset to normal when component reopens
+  React.useEffect(() => {
+    if (open) {
+      setWinState('normal');
+    }
+  }, [open]);
+
+  // Closed: nothing
+  if (!open) return null;
+
+  // Minimized: dock pill
+  if (winState === 'min') {
+    return (
+      <button
+        onClick={() => setWinState('normal')}
+        className="fixed bottom-4 left-4 z-[1000] px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-lg flex items-center gap-2 hover:shadow-xl transition"
+        aria-label="Restore Analytics Dashboard"
+      >
+        <span className="w-6 h-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+          <i className="bi bi-graph-up text-white text-sm" />
+        </span>
+        <span className="text-sm font-medium text-gray-800">Analytics</span>
+        <i className="bi bi-chevron-up text-gray-500" />
+      </button>
+    );
+  }
+
+  const frameSizing =
+    winState === 'max'
+      ? 'w-[95vw] h-[96vh] max-w-[95vw] max-h-[96vh]'
+      : 'w-full max-w-7xl h-full max-h-[90vh]';
+
   return (
-    <section className="space-y-6">
+    <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className={`bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col ${frameSizing}`}>
+        {/* Header with window controls */}
+        <div
+          className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50 select-none"
+          onDoubleClick={() => setWinState(s => (s === 'max' ? 'normal' : 'max'))}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
+              <i className="bi bi-graph-up text-white text-xl"></i>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+              <p className="text-gray-600">Comprehensive performance insights</p>
+            </div>
+          </div>
+
+          {/* Window control buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWinState('min')}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Minimize"
+            >
+              <i className="bi bi-dash-lg text-xl" />
+            </button>
+            {winState !== 'max' ? (
+              <button
+                onClick={() => setWinState('max')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Maximize"
+              >
+                <i className="bi bi-fullscreen text-xl" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setWinState('normal')}
+                className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="Restore"
+              >
+                <i className="bi bi-fullscreen-exit text-xl" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg text-xl" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content area with scroll */}
+        <div className="flex-1 overflow-y-auto">
+          <section className="space-y-6 p-6">
       {/* Analytics Header with Date Range Selector */}
       <div className="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl">
         <div>
@@ -321,6 +410,9 @@ export function ComprehensiveAnalytics({ analytics, analyticsTab, setAnalyticsTa
           </div>
         )}
       </div>
-    </section>
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }
