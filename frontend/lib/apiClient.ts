@@ -76,3 +76,24 @@ export async function apiPatch<T>(path: string, body?: unknown, init?: RequestIn
   } as RequestInit);
   return handle<T>(res);
 }
+
+export async function apiPut<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    credentials: "include",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: withAuthHeaders({ "Content-Type": "application/json", ...(init?.headers || {}) }),
+    ...(init || {}),
+  } as RequestInit);
+  return handle<T>(res);
+}
+
+export async function apiDelete<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    credentials: "include",
+    ...(init || {}),
+    headers: withAuthHeaders(init?.headers),
+  } as RequestInit);
+  return handle<T>(res);
+}
