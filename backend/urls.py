@@ -5902,7 +5902,9 @@ def dashboard_views():
     token = auth_header.split(' ')[1]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        current_agent_id = payload.get('agent_id')
+        current_agent_id = payload.get('id')
+        if not current_agent_id:
+            return jsonify({"error": "invalid_token_payload"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"error": "invalid_token"}), 401
 
@@ -6019,7 +6021,9 @@ def dashboard_view_detail(view_id):
     token = auth_header.split(' ')[1]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        current_agent_id = payload.get('agent_id')
+        current_agent_id = payload.get('id')
+        if not current_agent_id:
+            return jsonify({"error": "invalid_token_payload"}), 401
     except jwt.InvalidTokenError:
         return jsonify({"error": "invalid_token"}), 401
 
