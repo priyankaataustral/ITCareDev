@@ -5894,19 +5894,10 @@ def dashboard_views():
     if request.method == "OPTIONS":
         return ("", 204)
 
-    # Get current agent from JWT token
-    auth_header = request.headers.get('Authorization', '')
-    if not auth_header.startswith('Bearer '):
-        return jsonify({"error": "unauthorized"}), 401
-    
-    token = auth_header.split(' ')[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        current_agent_id = payload.get('id')
-        if not current_agent_id:
-            return jsonify({"error": "invalid_token_payload"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "invalid_token"}), 401
+    # Get current agent from the decorator's context
+    current_agent_id = request.agent_ctx.get('id')
+    if not current_agent_id:
+        return jsonify({"error": "invalid_agent_context"}), 401
 
     if request.method == "GET":
         scope = request.args.get("scope", "personal")
@@ -6013,19 +6004,10 @@ def dashboard_view_detail(view_id):
     if request.method == "OPTIONS":
         return "", 204
 
-    # Get current agent from JWT token
-    auth_header = request.headers.get('Authorization', '')
-    if not auth_header.startswith('Bearer '):
-        return jsonify({"error": "unauthorized"}), 401
-    
-    token = auth_header.split(' ')[1]
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        current_agent_id = payload.get('id')
-        if not current_agent_id:
-            return jsonify({"error": "invalid_token_payload"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "invalid_token"}), 401
+    # Get current agent from the decorator's context
+    current_agent_id = request.agent_ctx.get('id')
+    if not current_agent_id:
+        return jsonify({"error": "invalid_agent_context"}), 401
 
     # Get the view and check ownership
     view = DashboardView.query.filter_by(id=view_id).first()
