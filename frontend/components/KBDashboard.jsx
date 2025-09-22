@@ -679,6 +679,8 @@ export default function KBDashboard({ open, onClose }) {
               analytics={analytics}
               analyticsTab={analyticsTab}
               setAnalyticsTab={setAnalyticsTab}
+              open={open}
+              onClose={onClose}
             />
           )}
                 </div>
