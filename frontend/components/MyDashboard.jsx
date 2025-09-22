@@ -385,8 +385,10 @@ function Chip({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-1 rounded-full text-xs border transition ${
-        active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+      className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-lg border transition-all duration-200 ${
+        active 
+          ? 'bg-blue-600 text-white border-blue-600 shadow-sm hover:bg-blue-700' 
+          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
       }`}
     >
       {children}
@@ -403,6 +405,8 @@ function ViewToolbar({
 }) {
   const [saving, setSaving] = useState(false);
   const [newName, setNewName] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load saved views (personal)
   useEffect(() => {
@@ -446,6 +450,7 @@ function ViewToolbar({
       setSavedViews(prev => [...prev, view]);
       setSelectedViewId(view.id);
       setNewName('');
+      setShowSaveDialog(false);
     } catch (e) {
       alert('Failed to save view.');
     } finally {
@@ -471,7 +476,7 @@ function ViewToolbar({
 
   const deleteExisting = async () => {
     if (!selectedViewId) return;
-    if (!confirm('Delete this view?')) return;
+    if (!confirm('Delete this view? This action cannot be undone.')) return;
     setSaving(true);
     try {
       await apiDelete(`/dashboard/views/${selectedViewId}`);
@@ -500,178 +505,312 @@ function ViewToolbar({
     setSort(DEFAULT_SORT);
   };
 
+  const hasActiveFilters = () => {
+    return filters.statuses.length > 0 || 
+           filters.priorities.length > 0 || 
+           filters.levels.length > 0 || 
+           filters.query.trim() || 
+           filters.mineOnly ||
+           filters.dateFrom ||
+           filters.dateTo;
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.statuses.length > 0) count += filters.statuses.length;
+    if (filters.priorities.length > 0) count += filters.priorities.length;
+    if (filters.levels.length > 0) count += filters.levels.length;
+    if (filters.query.trim()) count += 1;
+    if (filters.mineOnly) count += 1;
+    if (filters.dateFrom || filters.dateTo) count += 1;
+    return count;
+  };
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* My Views dropdown */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500">My Views</label>
-          <select
-            value={selectedViewId || ''}
-            onChange={(e) => applyView(e.target.value || null)}
-            className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
-          >
-            <option value="">— Select —</option>
-            {savedViews.map(v => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
-          <button
-            onClick={reset}
-            className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
-          >
-            Reset
-          </button>
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-slate-50 to-gray-50 border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            {/* Saved Views */}
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <i className="bi bi-bookmark text-slate-600"></i>
+                <label className="text-sm font-medium text-gray-700">Saved Views</label>
+              </div>
+              <select
+                value={selectedViewId || ''}
+                onChange={(e) => applyView(e.target.value || null)}
+                className="min-w-[160px] text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">— All Views —</option>
+                {savedViews.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} {v.is_default && '★'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={reset}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              >
+                <i className="bi bi-arrow-clockwise mr-1"></i>
+                Reset
+              </button>
+              
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border transition-colors focus:ring-2 focus:ring-blue-500 ${
+                  showFilters || hasActiveFilters()
+                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <i className="bi bi-funnel mr-1"></i>
+                Filters
+                {hasActiveFilters() && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    {getActiveFilterCount()}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Search and Save Actions */}
+          <div className="flex items-center space-x-4">
+            {/* Global Search */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i className="bi bi-search text-gray-400"></i>
+              </div>
+              <input
+                value={filters.query}
+                onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
+                placeholder="Search tickets, requesters, departments..."
+                className="w-80 pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              {filters.query && (
+                <button
+                  onClick={() => setFilters(f => ({ ...f, query: '' }))}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  <i className="bi bi-x text-gray-400 hover:text-gray-600"></i>
+                </button>
+              )}
+            </div>
+
+            {/* View Management */}
+            <div className="flex items-center space-x-2">
+              {selectedViewId && (
+                <>
+                  <button
+                    onClick={updateExisting}
+                    disabled={saving}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                  >
+                    <i className="bi bi-arrow-up-circle mr-1"></i>
+                    Update
+                  </button>
+                  <button
+                    onClick={deleteExisting}
+                    disabled={saving}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 focus:ring-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
+                  >
+                    <i className="bi bi-trash mr-1"></i>
+                    Delete
+                  </button>
+                </>
+              )}
+              
+              <button
+                onClick={() => setShowSaveDialog(!showSaveDialog)}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                <i className="bi bi-plus-circle mr-1"></i>
+                Save View
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-2 ml-auto">
-          <input
-            value={filters.query}
-            onChange={e => setFilters(f => ({ ...f, query: e.target.value }))}
-            placeholder="Search id / subject / requester / dept…"
-            className="text-sm px-2 py-1 border border-gray-300 rounded-md w-64"
-          />
-        </div>
+        {/* Save Dialog */}
+        {showSaveDialog && (
+          <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <div className="flex items-center space-x-3">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter view name (e.g., 'High Priority Open')"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onKeyPress={(e) => e.key === 'Enter' && saveAsNew()}
+              />
+              <button
+                onClick={saveAsNew}
+                disabled={saving || !newName.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {setShowSaveDialog(false); setNewName('');}}
+                className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="mt-3 grid grid-cols-1 lg:grid-cols-4 gap-3">
-        {/* Status */}
-        <div>
-          <div className="text-xs text-gray-500 mb-1">Status</div>
-          <div className="flex flex-wrap gap-1">
-            {statuses.map(s => (
-              <Chip
-                key={s}
-                active={filters.statuses.includes(s)}
-                onClick={() =>
-                  setFilters(f => ({ ...f, statuses: toggleArr(f.statuses, s) }))
-                }
-              >
-                {s}
-              </Chip>
-            ))}
+      {/* Filters Section */}
+      {showFilters && (
+        <div className="p-6 bg-gray-50 border-b border-gray-200">
+          <div className="space-y-6">
+            {/* Filter Categories */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Status Filters */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  <i className="bi bi-circle-fill mr-2"></i>
+                  Status
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {statuses.map(s => (
+                    <Chip
+                      key={s}
+                      active={filters.statuses.includes(s)}
+                      onClick={() =>
+                        setFilters(f => ({ ...f, statuses: toggleArr(f.statuses, s) }))
+                      }
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              {/* Priority Filters */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  <i className="bi bi-exclamation-triangle mr-2"></i>
+                  Priority
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {priorities.map(p => (
+                    <Chip
+                      key={p}
+                      active={filters.priorities.includes(p)}
+                      onClick={() =>
+                        setFilters(f => ({ ...f, priorities: toggleArr(f.priorities, p) }))
+                      }
+                    >
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              {/* Level Filters */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  <i className="bi bi-layers mr-2"></i>
+                  Support Level
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {levels.map(l => (
+                    <Chip
+                      key={l}
+                      active={filters.levels.includes(l)}
+                      onClick={() =>
+                        setFilters(f => ({ ...f, levels: toggleArr(f.levels, l) }))
+                      }
+                    >
+                      Level {l}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Advanced Filters */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
+              {/* Assignment & Date */}
+              <div className="space-y-4">
+                <label className="inline-flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={filters.mineOnly}
+                    onChange={e => setFilters(f => ({ ...f, mineOnly: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    <i className="bi bi-person-check mr-2"></i>
+                    Only tickets assigned to me
+                  </span>
+                </label>
+              </div>
+
+              {/* Date Range */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">
+                  <i className="bi bi-calendar-range mr-2"></i>
+                  Date Range
+                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <span className="text-gray-400">to</span>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sort Options */}
+            <div className="pt-4 border-t border-gray-200">
+              <div className="flex items-center space-x-6">
+                <label className="text-sm font-medium text-gray-700">
+                  <i className="bi bi-sort-down mr-2"></i>
+                  Sort Options
+                </label>
+                <div className="flex items-center space-x-3">
+                  <select
+                    value={sort.by}
+                    onChange={(e) => setSort(s => ({ ...s, by: e.target.value }))}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="created_at">Date Created</option>
+                    <option value="priority">Priority Level</option>
+                    <option value="level">Support Level</option>
+                    <option value="status">Status</option>
+                  </select>
+                  <select
+                    value={sort.dir}
+                    onChange={(e) => setSort(s => ({ ...s, dir: e.target.value }))}
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="desc">Newest First</option>
+                    <option value="asc">Oldest First</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Priority */}
-        <div>
-          <div className="text-xs text-gray-500 mb-1">Priority</div>
-          <div className="flex flex-wrap gap-1">
-            {priorities.map(p => (
-              <Chip
-                key={p}
-                active={filters.priorities.includes(p)}
-                onClick={() =>
-                  setFilters(f => ({ ...f, priorities: toggleArr(f.priorities, p) }))
-                }
-              >
-                {p}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        {/* Level */}
-        <div>
-          <div className="text-xs text-gray-500 mb-1">Level</div>
-          <div className="flex flex-wrap gap-1">
-            {levels.map(l => (
-              <Chip
-                key={l}
-                active={filters.levels.includes(l)}
-                onClick={() =>
-                  setFilters(f => ({ ...f, levels: toggleArr(f.levels, l) }))
-                }
-              >
-                L{l}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        {/* Mine + Date range */}
-        <div className="flex flex-col gap-2">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={filters.mineOnly}
-              onChange={e => setFilters(f => ({ ...f, mineOnly: e.target.checked }))}
-            />
-            Only assigned to me
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
-              className="text-sm px-2 py-1 border border-gray-300 rounded-md"
-            />
-            <span className="text-xs text-gray-500">to</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))}
-              className="text-sm px-2 py-1 border border-gray-300 rounded-md"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Sort + Save actions */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500">Sort by</label>
-          <select
-            value={sort.by}
-            onChange={(e) => setSort(s => ({ ...s, by: e.target.value }))}
-            className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
-          >
-            <option value="created_at">Created</option>
-            <option value="priority">Priority</option>
-            <option value="level">Level</option>
-            <option value="status">Status</option>
-          </select>
-          <select
-            value={sort.dir}
-            onChange={(e) => setSort(s => ({ ...s, dir: e.target.value }))}
-            className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white"
-          >
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
-          </select>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New view name"
-            className="text-sm px-2 py-1 border border-gray-300 rounded-md"
-          />
-          <button
-            onClick={saveAsNew}
-            disabled={saving}
-            className="text-xs px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            Save as New
-          </button>
-          <button
-            onClick={updateExisting}
-            disabled={!selectedViewId || saving}
-            className="text-xs px-3 py-1 rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-          >
-            Update View
-          </button>
-          <button
-            onClick={deleteExisting}
-            disabled={!selectedViewId || saving}
-            className="text-xs px-3 py-1 rounded-md border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
