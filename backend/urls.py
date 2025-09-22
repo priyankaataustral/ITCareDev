@@ -305,8 +305,11 @@ def list_threads():
 @require_role("MANAGER")
 def get_ai_automation_settings():
     """Get AI automation settings"""
-    if not request.agent_ctx.role in ['MANAGER']:
-        return jsonify({'error': 'Insufficient permissions'}), 403
+    # CORRECT usage (from your existing code):
+    agent_id = request.agent_ctx.get('id')
+    agent_role = request.agent_ctx.get('role')
+    if not agent_role in ['MANAGER']:
+        return jsonify({'error': 'Insufficient permissions'}), 403  
         
     settings = AIAutomationSettings.query.first()
     if not settings:
@@ -331,7 +334,9 @@ def get_ai_automation_settings():
 @require_role("MANAGER")
 def update_ai_automation_settings():
     """Update AI automation settings"""
-    if not request.agent_ctx.role in ['MANAGER']:
+    agent_id = request.agent_ctx.get('id')
+    agent_role = request.agent_ctx.get('role')
+    if not agent_role in ['MANAGER']:
         return jsonify({'error': 'Insuffi cient permissions'}), 403
     
     data = request.get_json()
@@ -346,7 +351,7 @@ def update_ai_automation_settings():
         if hasattr(settings, key):
             setattr(settings, key, value)
     
-    settings.updated_by = request.agent_ctx.id
+    settings.updated_by = agent_id
     db.session.commit()
     
     return jsonify({'success': True})
@@ -355,7 +360,9 @@ def update_ai_automation_settings():
 @require_role("MANAGER")
 def get_ai_actions():
     """Get pending AI actions for review"""
-    if not request.agent_ctx.role in ['MANAGER']:
+    agent_id = request.agent_ctx.get('id')
+    agent_role = request.agent_ctx.get('role')
+    if not agent_role in ['MANAGER']:
         return jsonify({'error': 'Insufficient permissions'}), 403
         
     page = request.args.get('page', 1, type=int)
@@ -388,7 +395,9 @@ def get_ai_actions():
 @require_role("MANAGER")
 def apply_ai_action(action_id):
     """Apply a pending AI action"""
-    if not request.agent_ctx.role in ['MANAGER']:
+    agent_id = request.agent_ctx.get('id')
+    agent_role = request.agent_ctx.get('role')
+    if not agent_role in ['MANAGER']:
         return jsonify({'error': 'Insufficient permissions'}), 403
     
     action = AIAction.query.get_or_404(action_id)
@@ -404,7 +413,7 @@ def apply_ai_action(action_id):
         elif action.action_type == 'auto_solution':
             ai_automation._apply_solution_action(action, action.ticket)
         
-        action.applied_by = request.agent_ctx.id
+        action.applied_by = agent_id
         db.session.commit()
         
         return jsonify({'success': True})
@@ -416,12 +425,14 @@ def apply_ai_action(action_id):
 @require_role("MANAGER")
 def reject_ai_action(action_id):
     """Reject a pending AI action"""
-    if not request.agent_ctx.role in ['MANAGER']:
+    agent_id = request.agent_ctx.get('id')
+    agent_role = request.agent_ctx.get('role')
+    if not agent_role in ['MANAGER']:
         return jsonify({'error': 'Insufficient permissions'}), 403
     
     action = AIAction.query.get_or_404(action_id)
     action.status = 'rejected'
-    action.applied_by = request.agent_ctx.id
+    action.applied_by = agent_id
     db.session.commit()
     
     return jsonify({'success': True})
