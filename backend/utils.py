@@ -67,6 +67,10 @@ def require_role(*allowed):
     def deco(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
+            # Allow OPTIONS requests to pass through without authentication (for CORS preflight)
+            if request.method == "OPTIONS":
+                return fn(*args, **kwargs)
+                
             authToken = (request.headers.get("Authorization","").replace("Bearer ","")
                      or request.cookies.get("token"))
             if not authToken:

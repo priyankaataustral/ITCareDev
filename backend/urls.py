@@ -303,7 +303,6 @@ def list_threads():
         
 
 
-
 @urls.route("/threads/<thread_id>/download-summary", methods=["OPTIONS"])
 def download_summary_options(thread_id):
     response = current_app.make_response("")
