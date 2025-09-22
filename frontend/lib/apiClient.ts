@@ -1,4 +1,4 @@
-export const API_BASE: string = process.env.NEXT_PUBLIC_API_BASE ?? "";
+export const API_BASE: string = process.env.NEXT_PUBLIC_API_BASE ?? "https://itcaredev-hkeyh9cheucmbfbf.australiaeast-01.azurewebsites.net";
 
 export function getToken(): string {
   if (typeof window === "undefined") return "";
