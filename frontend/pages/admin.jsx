@@ -1,270 +1,324 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../components/AuthContext';
-import { useRouter } from 'next/router';
+import React, { useState, useEffect } from 'react';
+import { apiGet, apiPut, apiPost } from '../lib/apiClient';
 
-export default function AdminPanel() {
-  const { agent, loading } = useAuth();
-  const router = useRouter();
-  const [accessDenied, setAccessDenied] = useState(false);
+export default function AdminPage() {
+  const [settings, setSettings] = useState(null);
+  const [pendingActions, setPendingActions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Wait for auth to load
-    if (loading) return;
+    loadSettings();
+    loadPendingActions();
+  }, []);
 
-    // Check if user is logged in
-    if (!agent) {
-      router.push('/login');
-      return;
+  const loadSettings = async () => {
+    try {
+      const response = await apiGet('/admin/ai-automation/settings');
+      setSettings(response);
+    } catch (error) {
+      console.error('Failed to load AI settings:', error);
     }
+  };
 
-    // Check if user has manager role
-    if (agent.role !== 'MANAGER') {
-      setAccessDenied(true);
-      // Optionally redirect after showing error
-      setTimeout(() => {
-        router.push('/');
-      }, 3000);
-      return;
+  const loadPendingActions = async () => {
+    try {
+      const response = await apiGet('/admin/ai-automation/actions?status=pending');
+      setPendingActions(response.actions);
+    } catch (error) {
+      console.error('Failed to load pending actions:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [agent, loading, router]);
+  };
 
-  // Show loading while auth is being determined
-  if (loading) {
+  const saveSettings = async () => {
+    setSaving(true);
+    try {
+      await apiPut('/admin/ai-automation/settings', settings);
+      alert('Settings saved successfully!');
+    } catch (error) {
+      alert('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyAction = async (actionId) => {
+    try {
+      await apiPost(`/admin/ai-automation/actions/${actionId}/apply`);
+      loadPendingActions(); // Refresh list
+      alert('Action applied successfully!');
+    } catch (error) {
+      alert('Failed to apply action');
+    }
+  };
+
+  const rejectAction = async (actionId) => {
+    try {
+      await apiPost(`/admin/ai-automation/actions/${actionId}/reject`);
+      loadPendingActions(); // Refresh list
+    } catch (error) {
+      alert('Failed to reject action');
+    }
+  };
+
+  if (loading || !settings) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading AI Automation Panel...</p>
         </div>
       </div>
     );
   }
 
-  // Show access denied for non-managers
-  if (accessDenied || (agent && agent.role !== 'MANAGER')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-            <i className="bi bi-shield-exclamation text-red-600 text-xl"></i>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">
-            You don't have permission to access the admin panel. This area is restricted to managers only.
-          </p>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-500">
-              Current role: <span className="font-medium">{agent?.role || 'Unknown'}</span>
-            </p>
-            <p className="text-sm text-gray-500">
-              Required role: <span className="font-medium">MANAGER</span>
-            </p>
-          </div>
-          <button
-            onClick={() => router.push('/')}
-            className="mt-6 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Return to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Main admin panel for managers
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">🚀 AI Automation Control Panel</h1>
+          <p className="text-gray-600 mt-2">Manage AI-powered ticket triage and solution generation</p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Settings Panel */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">🤖 AI Automation Settings</h2>
+            
+            {/* Auto-Triage Settings */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Auto-Triage</h3>
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.auto_triage_enabled}
+                    onChange={(e) => setSettings({...settings, auto_triage_enabled: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Enable AI Auto-Triage</span>
+                </label>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confidence Threshold: {(settings.triage_confidence_threshold * 100).toFixed(0)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1"
+                    step="0.05"
+                    value={settings.triage_confidence_threshold}
+                    onChange={(e) => setSettings({...settings, triage_confidence_threshold: parseFloat(e.target.value)})}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Auto-Solution Settings */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Auto-Solution</h3>
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.auto_solution_enabled}
+                    onChange={(e) => setSettings({...settings, auto_solution_enabled: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Enable AI Auto-Solution</span>
+                </label>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confidence Threshold: {(settings.solution_confidence_threshold * 100).toFixed(0)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="1"
+                    step="0.05"
+                    value={settings.solution_confidence_threshold}
+                    onChange={(e) => setSettings({...settings, solution_confidence_threshold: parseFloat(e.target.value)})}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cooldown (hours)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="168"
+                      value={settings.solution_cooldown_hours}
+                      onChange={(e) => setSettings({...settings, solution_cooldown_hours: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Daily Limit</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="500"
+                      value={settings.max_daily_auto_solutions}
+                      onChange={(e) => setSettings({...settings, max_daily_auto_solutions: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Exclusion Rules */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Safety Exclusions</h3>
+              <div className="space-y-3">
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.exclude_high_priority}
+                    onChange={(e) => setSettings({...settings, exclude_high_priority: e.target.checked})}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="text-sm text-gray-700">Exclude High Priority tickets</span>
+                </label>
+                
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.exclude_l3_tickets}
+                    onChange={(e) => setSettings({...settings, exclude_l3_tickets: e.target.checked})}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="text-sm text-gray-700">Exclude L3+ tickets</span>
+                </label>
+                
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.exclude_escalated}
+                    onChange={(e) => setSettings({...settings, exclude_escalated: e.target.checked})}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="text-sm text-gray-700">Exclude Escalated tickets</span>
+                </label>
+                
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.require_manager_approval}
+                    onChange={(e) => setSettings({...settings, require_manager_approval: e.target.checked})}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Require Manager Approval</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              onClick={saveSettings}
+              disabled={saving}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+
+          {/* Pending Actions */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">⏳ Pending AI Actions</h2>
               <button
-                onClick={() => router.push('/')}
-                className="mr-4 text-gray-600 hover:text-gray-900"
+                onClick={loadPendingActions}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                <i className="bi bi-arrow-left text-xl"></i>
+                🔄 Refresh
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-                <p className="text-sm text-gray-600">System administration and management</p>
-              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                Welcome, <span className="font-medium">{agent.name || agent.email}</span>
-              </div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <i className="bi bi-shield-check mr-1"></i>
-                Manager
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Card */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex items-center justify-center h-12 w-12 rounded-lg bg-blue-100">
-                <i className="bi bi-gear text-blue-600 text-xl"></i>
-              </div>
-            </div>
-            <div className="ml-4">
-              <h2 className="text-lg font-medium text-gray-900">Welcome to the Admin Panel</h2>
-              <p className="text-gray-600">
-                Manage users, system settings, and monitor application performance from this central hub.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Admin Sections Placeholder */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* User Management */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-purple-100">
-                  <i className="bi bi-people text-purple-600"></i>
+            
+            {pendingActions.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">✅</span>
                 </div>
+                <p className="text-gray-600">No pending actions</p>
+                <p className="text-sm text-gray-500 mt-1">All AI suggestions have been processed</p>
               </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">User Management</h3>
+            ) : (
+              <div className="space-y-4">
+                {pendingActions.map((action) => (
+                  <div key={action.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                          {action.action_type === 'auto_triage' ? '🎯 Auto-Triage' : '💡 Auto-Solution'}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            action.risk_level === 'high' ? 'bg-red-100 text-red-800' :
+                            action.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {action.risk_level} risk
+                          </span>
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          Ticket #{action.ticket_id}: {action.ticket_subject}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Confidence: {(action.confidence_score * 100).toFixed(1)}% | 
+                          Created: {new Date(action.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => applyAction(action.id)}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+                        >
+                          ✅ Apply
+                        </button>
+                        <button
+                          onClick={() => rejectAction(action.id)}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                        >
+                          ❌ Reject
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="text-sm text-gray-700">
+                      <p><strong>Reasoning:</strong> {action.reasoning}</p>
+                      {action.generated_content && (
+                        <div className="mt-3">
+                          <strong>Generated Solution:</strong>
+                          <div className="bg-gray-50 p-3 rounded mt-1 text-xs font-mono border-l-4 border-blue-500">
+                            {action.generated_content}
+                          </div>
+                        </div>
+                      )}
+                      {action.kb_references && action.kb_references.length > 0 && (
+                        <div className="mt-2">
+                          <strong>Knowledge Base References:</strong>
+                          <div className="text-xs text-gray-600">
+                            {action.kb_references.map((ref, idx) => (
+                              <span key={idx} className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2 mt-1">
+                                📖 {ref.title}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Manage user accounts, roles, and permissions across the system.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-
-          {/* System Settings */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
-                  <i className="bi bi-sliders text-green-600"></i>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">System Settings</h3>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Configure application settings, email templates, and system parameters.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-
-          {/* Analytics & Reports */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-orange-100">
-                  <i className="bi bi-graph-up text-orange-600"></i>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">Analytics & Reports</h3>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              View system analytics, performance metrics, and generate reports.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-
-          {/* Knowledge Base Management */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
-                  <i className="bi bi-book text-blue-600"></i>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">Knowledge Base</h3>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Manage knowledge base articles, categories, and content organization.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-
-          {/* System Logs */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100">
-                  <i className="bi bi-file-text text-gray-600"></i>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">System Logs</h3>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Monitor system activity, error logs, and audit trails.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-
-          {/* Backup & Maintenance */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-red-100">
-                  <i className="bi bi-shield-check text-red-600"></i>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">Backup & Maintenance</h3>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm mb-4">
-              Manage system backups, maintenance schedules, and security updates.
-            </p>
-            <div className="text-xs text-gray-500">
-              Coming soon...
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">System Overview</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">-</div>
-              <div className="text-sm text-gray-600">Total Users</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">-</div>
-              <div className="text-sm text-gray-600">Active Tickets</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">-</div>
-              <div className="text-sm text-gray-600">Knowledge Articles</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">Online</div>
-              <div className="text-sm text-gray-600">System Status</div>
-            </div>
+            )}
           </div>
         </div>
       </div>

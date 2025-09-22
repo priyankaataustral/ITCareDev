@@ -18,7 +18,7 @@ from utils import _can_view, extract_json
 from openai_helpers import build_prompt_from_intent
 from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_REDIRECT_URL_SUCCESS, SECRET_KEY, CHAT_MODEL, ASSISTANT_STYLE, EMB_MODEL
 import jwt
-from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary, TicketHistory, DashboardView
+from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary, TicketHistory, DashboardView, AIAutomationSettings, AIAction
 from utils import require_role
 from sqlalchemy import text as _sql_text
 from config import FRONTEND_ORIGINS
@@ -301,7 +301,130 @@ def list_threads():
         threads=threads
     ), 200
         
+@urls.route('/admin/ai-automation/settings', methods=['GET'])
+@require_role("MANAGER")
+def get_ai_automation_settings():
+    """Get AI automation settings"""
+    if not request.agent_ctx.role in ['MANAGER']:
+        return jsonify({'error': 'Insufficient permissions'}), 403
+        
+    settings = AIAutomationSettings.query.first()
+    if not settings:
+        settings = AIAutomationSettings()
+        db.session.add(settings)
+        db.session.commit()
+    
+    return jsonify({
+        'auto_triage_enabled': settings.auto_triage_enabled,
+        'triage_confidence_threshold': settings.triage_confidence_threshold,
+        'auto_solution_enabled': settings.auto_solution_enabled,
+        'solution_confidence_threshold': settings.solution_confidence_threshold,
+        'solution_cooldown_hours': settings.solution_cooldown_hours,
+        'exclude_high_priority': settings.exclude_high_priority,
+        'exclude_l3_tickets': settings.exclude_l3_tickets,
+        'exclude_escalated': settings.exclude_escalated,
+        'max_daily_auto_solutions': settings.max_daily_auto_solutions,
+        'require_manager_approval': settings.require_manager_approval
+    })
 
+@urls.route('/admin/ai-automation/settings', methods=['PUT'])
+@require_role("MANAGER")
+def update_ai_automation_settings():
+    """Update AI automation settings"""
+    if not request.agent_ctx.role in ['MANAGER']:
+        return jsonify({'error': 'Insuffi cient permissions'}), 403
+    
+    data = request.get_json()
+    settings = AIAutomationSettings.query.first()
+    
+    if not settings:
+        settings = AIAutomationSettings()
+        db.session.add(settings)
+    
+    # Update settings
+    for key, value in data.items():
+        if hasattr(settings, key):
+            setattr(settings, key, value)
+    
+    settings.updated_by = request.agent_ctx.id
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@urls.route('/admin/ai-automation/actions', methods=['GET'])
+@require_role("MANAGER")
+def get_ai_actions():
+    """Get pending AI actions for review"""
+    if not request.agent_ctx.role in ['MANAGER']:
+        return jsonify({'error': 'Insufficient permissions'}), 403
+        
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    status = request.args.get('status', 'pending')
+    
+    actions = AIAction.query.filter_by(status=status)\
+        .order_by(AIAction.created_at.desc())\
+        .paginate(page=page, per_page=per_page)
+    
+    return jsonify({
+        'actions': [{
+            'id': action.id,
+            'ticket_id': action.ticket_id,
+            'action_type': action.action_type,
+            'confidence_score': action.confidence_score,
+            'reasoning': action.reasoning,
+            'generated_content': action.generated_content,
+            'kb_references': action.kb_references,
+            'risk_level': action.risk_level,
+            'created_at': action.created_at.isoformat(),
+            'ticket_subject': action.ticket.subject if action.ticket else None
+        } for action in actions.items],
+        'total': actions.total,
+        'pages': actions.pages,
+        'current_page': actions.page
+    })
+
+@urls.route('/admin/ai-automation/actions/<int:action_id>/apply', methods=['POST'])
+@require_role("MANAGER")
+def apply_ai_action(action_id):
+    """Apply a pending AI action"""
+    if not request.agent_ctx.role in ['MANAGER']:
+        return jsonify({'error': 'Insufficient permissions'}), 403
+    
+    action = AIAction.query.get_or_404(action_id)
+    
+    if action.status != 'pending':
+        return jsonify({'error': 'Action already processed'}), 400
+    
+    try:
+        from services.ai_automation_service import ai_automation
+        
+        if action.action_type == 'auto_triage':
+            ai_automation._apply_triage_action(action, action.ticket, int(action.new_value))
+        elif action.action_type == 'auto_solution':
+            ai_automation._apply_solution_action(action, action.ticket)
+        
+        action.applied_by = request.agent_ctx.id
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@urls.route('/admin/ai-automation/actions/<int:action_id>/reject', methods=['POST'])
+@require_role("MANAGER")
+def reject_ai_action(action_id):
+    """Reject a pending AI action"""
+    if not request.agent_ctx.role in ['MANAGER']:
+        return jsonify({'error': 'Insufficient permissions'}), 403
+    
+    action = AIAction.query.get_or_404(action_id)
+    action.status = 'rejected'
+    action.applied_by = request.agent_ctx.id
+    db.session.commit()
+    
+    return jsonify({'success': True})
 
 @urls.route("/threads/<thread_id>/download-summary", methods=["OPTIONS"])
 def download_summary_options(thread_id):

@@ -281,6 +281,64 @@ class TicketHistory(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     actor_agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
 
+# Add to backend/models.py
+
+class AIAutomationSettings(db.Model):
+    __tablename__ = 'ai_automation_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # AI Auto-Triage Settings
+    auto_triage_enabled = db.Column(db.Boolean, default=False)
+    triage_confidence_threshold = db.Column(db.Float, default=0.8)  # 80% confidence
+    
+    # AI Auto-Solution Settings  
+    auto_solution_enabled = db.Column(db.Boolean, default=False)
+    solution_confidence_threshold = db.Column(db.Float, default=0.85)  # 85% confidence
+    solution_cooldown_hours = db.Column(db.Integer, default=24)  # 24 hours between auto-solutions
+    
+    # Exclusion Rules
+    exclude_high_priority = db.Column(db.Boolean, default=True)
+    exclude_l3_tickets = db.Column(db.Boolean, default=True)
+    exclude_escalated = db.Column(db.Boolean, default=True)
+    
+    # Other Settings
+    max_daily_auto_solutions = db.Column(db.Integer, default=50)
+    require_manager_approval = db.Column(db.Boolean, default=True)
+    
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), onupdate=func.now())
+    updated_by = db.Column(db.Integer, db.ForeignKey('agents.id'))
+
+
+class AIAction(db.Model):
+    __tablename__ = 'ai_actions'
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id'), nullable=False)
+    action_type = db.Column(db.String(50), nullable=False)  # 'auto_triage', 'auto_solution'
+    
+    # AI Decision Details
+    confidence_score = db.Column(db.Float, nullable=False)
+    reasoning = db.Column(db.Text)  # AI's reasoning/explanation
+    kb_references = db.Column(db.JSON)  # KB articles referenced
+    
+    # Action Results
+    old_value = db.Column(db.String(500))  # Previous state
+    new_value = db.Column(db.String(500))  # New state after AI action
+    generated_content = db.Column(db.Text)  # Generated solution email, etc.
+    
+    # Status & Control
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'applied', 'rejected', 'undone'
+    applied_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    applied_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
+    
+    # Audit Trail
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    risk_level = db.Column(db.String(10), default='low')  # 'low', 'medium', 'high'
+    
+    # Relationships
+    ticket = db.relationship('Ticket', backref='ai_actions')
+    applied_by_agent = db.relationship('Agent', foreign_keys=[applied_by])
+
 
 class DashboardView(db.Model):
     __tablename__ = 'dashboard_views'
