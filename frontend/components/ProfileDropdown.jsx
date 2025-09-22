@@ -1,10 +1,12 @@
 import React, { useState, useRef } from "react";
 import { useAuth } from "./AuthContext";
+import { useRouter } from "next/router";
 
 export default function ProfileDropdown() {
   const { agent, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef();
+  const router = useRouter();
 
   // Close dropdown on outside click
   React.useEffect(() => {
@@ -15,7 +17,14 @@ export default function ProfileDropdown() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const navigateToAdmin = () => {
+    setOpen(false);
+    router.push('/admin');
+  };
+
   if (!agent) return null;
+
+  const isManager = agent.role === 'MANAGER';
 
   return (
     <div className="relative ml-2" ref={ref}>
@@ -34,6 +43,18 @@ export default function ProfileDropdown() {
             <div className="font-semibold">{agent.name || agent.email}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400">{agent.role}</div>
           </div>
+          
+          {/* Admin Panel - Only for Managers */}
+          {isManager && (
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700"
+              onClick={navigateToAdmin}
+            >
+              <span className="bi bi-gear mr-2" />Admin Panel
+            </button>
+          )}
+          
+          {/* Sign Out */}
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800"
             onClick={logout}
