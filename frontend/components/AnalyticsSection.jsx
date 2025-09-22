@@ -312,105 +312,103 @@ export function ComprehensiveAnalytics({ analytics, analyticsTab, setAnalyticsTa
 
         {/* Content area with scroll */}
         <div className="flex-1 overflow-y-auto">
-          <section className="space-y-6 p-6">
-      {/* Analytics Header with Date Range Selector */}
-      <div className="flex justify-between items-center px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Comprehensive performance insights</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select 
-            value={analytics.dateRange} 
-            onChange={(e) => analytics.changeDateRange(e.target.value)}
-            className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm"
-          >
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="1y">Last year</option>
-          </select>
-          {analytics.lastUpdate && (
-            <span className="text-xs text-gray-500">
-              Updated: {analytics.lastUpdate.toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-      </div>
+          <div className="space-y-6 p-6">
+            {/* Analytics Header with Date Range Selector */}
+            <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Comprehensive performance insights</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <select 
+                  value={analytics.dateRange} 
+                  onChange={(e) => analytics.changeDateRange(e.target.value)}
+                  className="px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm"
+                >
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                  <option value="1y">Last year</option>
+                </select>
+                {analytics.lastUpdate && (
+                  <span className="text-xs text-gray-500">
+                    Updated: {analytics.lastUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+            </div>
 
-      {/* Analytics Sub-navigation */}
-      <div className="px-6">
-        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 w-fit">
-          {[
-            { id: 'overview', label: '🏢 Overview' },
-            { id: 'agents', label: '👥 Agents' },
-            { id: 'tickets', label: '🎫 Tickets' },
-            { id: 'escalations', label: '⬆️ Escalations' },
-            { id: 'ai', label: '🤖 AI Insights' },
-          ].map(t => (
-            <button key={t.id} onClick={() => setAnalyticsTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                analyticsTab === t.id 
-                  ? 'bg-white dark:bg-gray-700 shadow text-blue-600 dark:text-blue-400' 
-                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+            {/* Analytics Sub-navigation */}
+            <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 w-fit">
+              {[
+                { id: 'overview', label: '🏢 Overview' },
+                { id: 'agents', label: '👥 Agents' },
+                { id: 'tickets', label: '🎫 Tickets' },
+                { id: 'escalations', label: '⬆️ Escalations' },
+                { id: 'ai', label: '🤖 AI Insights' },
+              ].map(t => (
+                <button key={t.id} onClick={() => setAnalyticsTab(t.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    analyticsTab === t.id 
+                      ? 'bg-white dark:bg-gray-700 shadow text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-      {/* Analytics Content */}
-      <div className="px-6">
-        {analytics.loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            {/* Analytics Content */}
+            <div>
+              {analytics.loading && (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              )}
+
+              {analytics.error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
+                  <p className="text-red-800 dark:text-red-200">Error: {analytics.error}</p>
+                </div>
+              )}
+
+              {/* Overview Tab */}
+              {analyticsTab === 'overview' && !analytics.loading && (
+                <AnalyticsOverview data={analytics.data} loading={analytics.loading} />
+              )}
+
+              {/* Agent Performance Tab */}
+              {analyticsTab === 'agents' && !analytics.loading && (
+                <AgentPerformance data={analytics.data} loading={analytics.loading} />
+              )}
+
+              {/* Other tabs can be added here with similar pattern */}
+              {analyticsTab === 'tickets' && !analytics.loading && (
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
+                  <div className="text-4xl mb-4">🎫</div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Ticket Analytics</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Advanced ticket trend analysis coming soon</p>
+                </div>
+              )}
+
+              {analyticsTab === 'escalations' && !analytics.loading && (
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
+                  <div className="text-4xl mb-4">⬆️</div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Escalation Analytics</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Escalation pattern analysis coming soon</p>
+                </div>
+              )}
+
+              {analyticsTab === 'ai' && !analytics.loading && (
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
+                  <div className="text-4xl mb-4">🤖</div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">AI Insights</h3>
+                  <p className="text-gray-600 dark:text-gray-400">AI performance analytics coming soon</p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-
-        {analytics.error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
-            <p className="text-red-800 dark:text-red-200">Error: {analytics.error}</p>
-          </div>
-        )}
-
-        {/* Overview Tab */}
-        {analyticsTab === 'overview' && !analytics.loading && (
-          <AnalyticsOverview data={analytics.data} loading={analytics.loading} />
-        )}
-
-        {/* Agent Performance Tab */}
-        {analyticsTab === 'agents' && !analytics.loading && (
-          <AgentPerformance data={analytics.data} loading={analytics.loading} />
-        )}
-
-        {/* Other tabs can be added here with similar pattern */}
-        {analyticsTab === 'tickets' && !analytics.loading && (
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
-            <div className="text-4xl mb-4">🎫</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Ticket Analytics</h3>
-            <p className="text-gray-600 dark:text-gray-400">Advanced ticket trend analysis coming soon</p>
-          </div>
-        )}
-
-        {analyticsTab === 'escalations' && !analytics.loading && (
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
-            <div className="text-4xl mb-4">⬆️</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Escalation Analytics</h3>
-            <p className="text-gray-600 dark:text-gray-400">Escalation pattern analysis coming soon</p>
-          </div>
-        )}
-
-        {analyticsTab === 'ai' && !analytics.loading && (
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-12 text-center">
-            <div className="text-4xl mb-4">🤖</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">AI Insights</h3>
-            <p className="text-gray-600 dark:text-gray-400">AI performance analytics coming soon</p>
-          </div>
-        )}
-      </div>
-          </section>
         </div>
       </div>
     </div>
