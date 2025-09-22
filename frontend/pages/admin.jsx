@@ -123,7 +123,7 @@ export default function AdminPage() {
         <div className="space-y-8">
           {/* Settings Panel */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">🤖 AI Automation Settings</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">AI Automation Settings</h2>
             
             {/* Auto-Triage Settings */}
             <div className="mb-8">
@@ -271,7 +271,7 @@ export default function AdminPage() {
           {/* Pending Actions */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">⏳ Pending AI Actions</h2>
+              <h2 className="text-xl font-bold text-gray-900">Pending AI Actions</h2>
               <button
                 onClick={loadPendingActions}
                 className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
