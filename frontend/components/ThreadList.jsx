@@ -621,14 +621,14 @@ export default function ThreadList({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded-md">#{t.id}</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  {/* <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                     t.status === 'open' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
                     t.status === 'closed' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' :
                     t.status === 'escalated' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
                     'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                   }`}>
                     {String(t.status || 'open').toUpperCase()}
-                </span>
+                </span> */}
               </div>
                 <h3 className={`font-semibold text-sm leading-tight ${
                   isSelected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-gray-100'
