@@ -22,6 +22,7 @@ export default function SupportInboxPlugin() {
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showKnowledgeManager, setShowKnowledgeManager] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAgents, setShowAgents] = useState(false);
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
@@ -157,12 +158,21 @@ export default function SupportInboxPlugin() {
             </button>
             
             <button
-              onClick={() => setShowAnalytics(true)}
+              onClick={() => setShowKnowledgeManager(true)}
               className="flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-xs lg:text-sm font-medium shadow-sm"
-              aria-label="Open Analytics Dashboard"
+              aria-label="Open Knowledge Manager"
+            >
+              <i className="bi bi-book mr-1 lg:mr-2"></i>
+              <span className="hidden sm:inline">Knowledge Manager</span>
+            </button>
+
+            <button
+              onClick={() => setShowAnalytics(true)}
+              className="flex items-center px-2 lg:px-3 py-1.5 lg:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-xs lg:text-sm font-medium shadow-sm"
+              aria-label="Open Knowledge Analytics"
             >
               <i className="bi bi-graph-up mr-1 lg:mr-2"></i>
-              <span className="hidden sm:inline">Analytics</span>
+              <span className="hidden sm:inline">Knowledge Analytics</span>
             </button>
             
             {/* Agents Management - Only for L2, L3, MANAGER */}
@@ -241,11 +251,21 @@ export default function SupportInboxPlugin() {
         />
       )}
 
-      {/* Analytics Dashboard Modal */}
+      {/* Knowledge Manager Modal */}
+      {showKnowledgeManager && (
+        <KBDashboard 
+          open={showKnowledgeManager} 
+          onClose={() => setShowKnowledgeManager(false)}
+          mode="manager"
+        />
+      )}
+
+      {/* Knowledge Analytics Modal */}
       {showAnalytics && (
         <KBDashboard 
           open={showAnalytics} 
-          onClose={() => setShowAnalytics(false)} 
+          onClose={() => setShowAnalytics(false)}
+          mode="analytics"
         />
       )}
 

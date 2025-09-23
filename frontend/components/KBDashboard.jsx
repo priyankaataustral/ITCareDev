@@ -15,8 +15,8 @@ import { ComprehensiveAnalytics } from "./AnalyticsSection";
  * - Handle feedback (resolve, triage)
  * - Light analytics (counts & trends)
  */
-export default function KBDashboard({ open, onClose }) {
-  const [tab, setTab] = useState("review");
+export default function KBDashboard({ open, onClose, mode = "manager" }) {
+  const [tab, setTab] = useState(mode === "analytics" ? "analytics" : "review");
   const [analyticsTab, setAnalyticsTab] = useState("overview");
 
   // --- State ---
@@ -277,15 +277,19 @@ export default function KBDashboard({ open, onClose }) {
         {/* Navigation Tabs */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-            {[
+            {mode === "manager" && [
               { id: 'review', label: 'Review' },
               { id: 'articles', label: 'Articles' },
               { id: 'feedback', label: 'Feedback' },
-              { id: 'analytics', label: '📊 Analytics' },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-3 py-1 rounded-lg text-sm ${tab===t.id? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100':'text-gray-600 dark:text-gray-300'}`}>{t.label}</button>
             ))}
+            
+            {mode === "analytics" && (
+              <button onClick={() => setTab('analytics')}
+                className="px-3 py-1 rounded-lg text-sm bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100">📊 Analytics</button>
+            )}
           </div>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search…" className="flex-1 min-w-[120px] px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm" />
         </div>
