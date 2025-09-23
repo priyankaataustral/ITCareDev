@@ -153,7 +153,7 @@ export default function SupportInboxPlugin() {
               aria-label="Open My Dashboard"
             >
               <i className="bi bi-speedometer2 mr-1 lg:mr-2"></i>
-              <span className="hidden sm:inline">Dashboard</span>
+              <span className="hidden sm:inline">My Dashboard</span>
             </button>
             
             <button

@@ -395,30 +395,47 @@ def get_ai_actions():
 @require_role("MANAGER")
 def apply_ai_action(action_id):
     """Apply a pending AI action"""
-    agent_id = request.agent_ctx.get('id')
-    agent_role = request.agent_ctx.get('role')
-    if not agent_role in ['MANAGER']:
-        return jsonify({'error': 'Insufficient permissions'}), 403
-    
-    action = AIAction.query.get_or_404(action_id)
-    
-    if action.status != 'pending':
-        return jsonify({'error': 'Action already processed'}), 400
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
     
     try:
+        logger.info(f"Starting apply_ai_action for action_id: {action_id}")
+        
+        agent_id = request.agent_ctx.get('id')
+        agent_role = request.agent_ctx.get('role')
+        if not agent_role in ['MANAGER']:
+            return jsonify({'error': 'Insufficient permissions'}), 403
+        
+        logger.info(f"Permission check passed for agent {agent_id}")
+        
+        action = AIAction.query.get_or_404(action_id)
+        logger.info(f"Found action: {action.id}, type: {action.action_type}, status: {action.status}")
+        
+        if action.status != 'pending':
+            return jsonify({'error': 'Action already processed'}), 400
+        
+        logger.info(f"Importing ai_automation service...")
         from services.ai_automation_service import ai_automation
+        logger.info(f"Successfully imported ai_automation service")
         
         if action.action_type == 'auto_triage':
+            logger.info(f"Applying auto_triage action...")
             ai_automation._apply_triage_action(action, action.ticket, int(action.new_value))
         elif action.action_type == 'auto_solution':
+            logger.info(f"Applying auto_solution action...")
             ai_automation._apply_solution_action(action, action.ticket)
         
         action.applied_by = agent_id
         db.session.commit()
         
+        logger.info(f"Successfully applied action {action_id}")
         return jsonify({'success': True})
         
     except Exception as e:
+        error_details = traceback.format_exc()
+        logger.error(f"Error in apply_ai_action for action_id {action_id}: {e}")
+        logger.error(f"Full traceback: {error_details}")
         return jsonify({'error': str(e)}), 500
 
 @urls.route('/admin/ai-automation/actions/<int:action_id>/reject', methods=['POST'])
