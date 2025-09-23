@@ -308,17 +308,23 @@ Guidelines:
     
     def _apply_solution_action(self, ai_action: AIAction, ticket: Ticket):
         """Apply the solution action (send email, update ticket)"""
-        from models import Message, EmailQueue, TicketCC
+        from models import Message, TicketCC
+        from email_helpers import send_via_gmail
         import json
         
-        # 1. Queue the AI solution email to customer
-        self._enqueue_ai_solution_email(ticket, ai_action.generated_content)
+        # 1. Send AI solution email immediately to customer
+        try:
+            self._send_ai_solution_email_now(ticket, ai_action.generated_content)
+            email_status = "📧 AI solution email sent successfully"
+        except Exception as e:
+            logger.error(f"Failed to send AI solution email for ticket {ticket.id}: {e}")
+            email_status = f"❌ AI solution email failed: {str(e)}"
         
         # 2. Add internal message for tracking
         message = Message(
             ticket_id=ticket.id,
             sender='AI Assistant',
-            content=f"📧 AI solution email sent to customer\n\n{ai_action.generated_content}",
+            content=f"{email_status}\n\n{ai_action.generated_content}",
             created_at=datetime.now(),
             type='event'
         )
@@ -332,16 +338,15 @@ Guidelines:
         if ticket.status == 'open':
             ticket.status = 'pending_user_response'
     
-    def _enqueue_ai_solution_email(self, ticket: Ticket, solution_content: str):
-        """Queue AI-generated solution email for sending"""
-        from models import EmailQueue, TicketCC
-        import json
+    def _send_ai_solution_email_now(self, ticket: Ticket, solution_content: str):
+        """Send AI-generated solution email immediately"""
+        from models import TicketCC
+        from email_helpers import send_via_gmail
         
         # Get recipient email
         to_email = ticket.requester_email
         if not to_email:
-            logger.warning(f"No email found for ticket {ticket.id}")
-            return
+            raise Exception(f"No email found for ticket {ticket.id}")
         
         # Get CC list
         cc_rows = TicketCC.query.filter_by(ticket_id=ticket.id).all()
@@ -364,31 +369,19 @@ Best regards,
 AI Support Assistant
 Technical Support Team"""
         
-        # Check for duplicates
-        existing = EmailQueue.query.filter_by(
-            ticket_id=ticket.id, 
-            to_email=to_email, 
-            subject=subject, 
-            status='PENDING'
-        ).first()
+        # Send email immediately using existing SMTP function
+        send_via_gmail(to_email, subject, body, cc_list=cc_list)
+        logger.info(f"✅ Sent AI solution email for ticket {ticket.id} to {to_email}")
         
-        if existing:
-            logger.info(f"Email already queued for ticket {ticket.id}")
-            return
-        
-        # Queue the email
-        email_queue = EmailQueue(
-            ticket_id=ticket.id,
-            to_email=to_email,
-            cc=json.dumps(cc_list),
-            subject=subject,
-            body=body,
-            status='PENDING',
-            created_at=datetime.now()
-        )
-        
-        db.session.add(email_queue)
-        logger.info(f"✅ Queued AI solution email for ticket {ticket.id} to {to_email}")
+        # Log email event for tracking
+        from db_helpers import log_event
+        log_event(ticket.id, 'EMAIL_SENT', {
+            "subject": subject, 
+            "manual": False,
+            "to": to_email, 
+            "cc": cc_list,
+            "type": "ai_solution"
+        })
 
 
 # Service instance
