@@ -308,24 +308,87 @@ Guidelines:
     
     def _apply_solution_action(self, ai_action: AIAction, ticket: Ticket):
         """Apply the solution action (send email, update ticket)"""
-        # Here you would integrate with your email system
-        # For now, just mark as applied and add to messages
+        from models import Message, EmailQueue, TicketCC
+        import json
         
-        from models import Message
+        # 1. Queue the AI solution email to customer
+        self._enqueue_ai_solution_email(ticket, ai_action.generated_content)
+        
+        # 2. Add internal message for tracking
         message = Message(
             ticket_id=ticket.id,
             sender='AI Assistant',
-            content=ai_action.generated_content,
-            created_at=datetime.now()
+            content=f"📧 AI solution email sent to customer\n\n{ai_action.generated_content}",
+            created_at=datetime.now(),
+            type='event'
         )
         db.session.add(message)
         
+        # 3. Update AI action status
         ai_action.status = 'applied'
         ai_action.applied_at = datetime.now()
         
-        # Optionally update ticket status
+        # 4. Update ticket status
         if ticket.status == 'open':
             ticket.status = 'pending_user_response'
+    
+    def _enqueue_ai_solution_email(self, ticket: Ticket, solution_content: str):
+        """Queue AI-generated solution email for sending"""
+        from models import EmailQueue, TicketCC
+        import json
+        
+        # Get recipient email
+        to_email = ticket.requester_email
+        if not to_email:
+            logger.warning(f"No email found for ticket {ticket.id}")
+            return
+        
+        # Get CC list
+        cc_rows = TicketCC.query.filter_by(ticket_id=ticket.id).all()
+        cc_list = [r.email for r in cc_rows]
+        
+        # Create email subject and body
+        subject = f"[Ticket {ticket.id}] Solution - {ticket.subject}"
+        
+        # Format the solution as a proper email
+        requester_name = ticket.requester_name or "there"
+        body = f"""Hello {requester_name},
+
+Thank you for contacting our support team regarding your ticket {ticket.id}.
+
+{solution_content}
+
+If this solution resolves your issue, great! If you need further assistance, please reply to this email and we'll be happy to help.
+
+Best regards,
+AI Support Assistant
+Technical Support Team"""
+        
+        # Check for duplicates
+        existing = EmailQueue.query.filter_by(
+            ticket_id=ticket.id, 
+            to_email=to_email, 
+            subject=subject, 
+            status='PENDING'
+        ).first()
+        
+        if existing:
+            logger.info(f"Email already queued for ticket {ticket.id}")
+            return
+        
+        # Queue the email
+        email_queue = EmailQueue(
+            ticket_id=ticket.id,
+            to_email=to_email,
+            cc=json.dumps(cc_list),
+            subject=subject,
+            body=body,
+            status='PENDING',
+            created_at=datetime.now()
+        )
+        
+        db.session.add(email_queue)
+        logger.info(f"✅ Queued AI solution email for ticket {ticket.id} to {to_email}")
 
 
 # Service instance
