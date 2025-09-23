@@ -10,11 +10,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
 from models import Ticket, AIAutomationSettings, AIAction, Department, KBArticle, Agent, db, Message
-
-from models import (
-    Ticket, AIAutomationSettings, AIAction, Department, 
-    KBArticle, Agent, db
-)
 from openai_helpers import categorize_department_with_gpt, client, CHAT_MODEL
 from config import OPENAI_KEY
 
@@ -288,7 +283,7 @@ Guidelines:
             KBArticle.status == 'published',
             db.or_(
                 KBArticle.title.ilike(f'%{search_text}%'),
-                KBArticle.content.ilike(f'%{search_text}%')
+                KBArticle.content_md.ilike(f'%{search_text}%')
             )
         ).limit(5).all()
         
