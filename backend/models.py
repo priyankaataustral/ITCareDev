@@ -82,7 +82,7 @@ class Solution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(64))
     proposed_by = db.Column(db.String(64))
-    generated_by = db.Column(db.String(5))
+    generated_by = db.Column(db.String(20))
     text = db.Column(db.Text)
     sent_for_confirmation_at = db.Column(db.DateTime)
     status = db.Column(db.String(17))
