@@ -429,24 +429,32 @@ Guidelines:
         requester_name = ticket.requester_name or "there"
         subject = f"Support Ticket #{ticket.id} Update"
         
-        # Personalize and format email body
+        # Format the solution content with proper spacing
+        formatted_solution = self._format_solution_content(solution_content)
+
+        # Personalize and format email body with proper structure
         personalized_body = f"""Hello {requester_name},
 
-Thank you for contacting our support team regarding your ticket {ticket.id}.
+        Thank you for contacting our support team regarding your ticket {ticket.id}.
 
-{solution_content}
+        {formatted_solution}
 
-Best regards,
-AI Support Assistant
-Technical Support Team"""
+        If this solution resolves your issue, great! If you need further assistance, please reply to this email and we'll be happy to help.
+
+        Best regards,
+        AI Support Assistant
+        Technical Support Team"""
         
         # Append confirmation links (exact same format as manual emails)
         final_body = (
             f"{personalized_body}\n\n"
-            f"---\n"
-            f"Please let us know if this solved your issue:\n"
-            f"Confirm: {confirm_url}\n"
-            f"Not fixed: {reject_url}\n"
+            f"{'='*50}\n"
+            f"FEEDBACK REQUIRED\n"
+            f"{'='*50}\n\n"
+            f"Please let us know if this solved your issue:\n\n"
+            f"✅ SOLVED: {confirm_url}\n\n"
+            f"❌ NOT FIXED: {reject_url}\n\n"
+            f"Your feedback helps us improve our support quality.\n"
         )
         
         # --- STEP 6: Send email (following manual email pattern) ---
@@ -470,6 +478,38 @@ Technical Support Team"""
         
         logger.info(f"✅ Sent AI solution email with confirmation flow for ticket {ticket.id} to {to_email}")
 
+def _format_solution_content(self, solution_content: str) -> str:
+    """Format AI solution content with proper spacing and structure"""
+    
+    # Clean up the content and add proper spacing
+    lines = solution_content.strip().split('. ')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Add period back if it doesn't end with punctuation
+        if not line.endswith(('.', '!', '?', ':')):
+            line += '.'
+            
+        # Format bullet points and steps
+        if line.startswith('-') or line.startswith('•'):
+            formatted_lines.append(f"  {line}")
+        elif any(keyword in line.lower() for keyword in ['step', 'first', 'second', 'then', 'next', 'finally']):
+            formatted_lines.append(f"\n{line}")
+        else:
+            formatted_lines.append(line)
+    
+    # Join with proper spacing
+    formatted_content = '\n'.join(formatted_lines)
+    
+    # Add extra spacing around sections
+    formatted_content = formatted_content.replace(' - ', '\n  • ')
+    formatted_content = formatted_content.replace(':', ':\n')
+    
+    return formatted_content
 
 # Service instance
 ai_automation = AIAutomationService()
