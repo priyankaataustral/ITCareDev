@@ -377,8 +377,8 @@ Guidelines:
                 ticket_id=ticket.id,
                 text=solution_content,
                 proposed_by="AI Assistant",
-                generated_by=SolutionGeneratedBy.ai,  # Mark as AI-generated
-                status=SolutionStatus.draft,  # Will update to sent_for_confirm after sending
+                generated_by=SolutionGeneratedBy.ai.value,  # Store just the string value 'ai'
+                status=SolutionStatus.draft.value,  # Store just the string value 'draft'
                 created_at=_utcnow(),
                 updated_at=_utcnow(),
             )
@@ -396,7 +396,7 @@ Guidelines:
             raise Exception("A previous solution is still pending user confirmation.")
         
         last_rejected = (Solution.query
-                        .filter_by(ticket_id=ticket.id, status=SolutionStatus.rejected)
+                        .filter_by(ticket_id=ticket.id, status=SolutionStatus.rejected.value)
                         .order_by(Solution.id.desc())
                         .first())
         if last_rejected and not is_materially_different(solution_content, last_rejected.text or ""):
@@ -453,7 +453,7 @@ Technical Support Team"""
         send_via_gmail(to_email, subject, final_body, cc_list=cc_list)
         
         # --- STEP 7: Update solution status (following manual email pattern) ---
-        s.status = SolutionStatus.sent_for_confirm
+        s.status = SolutionStatus.sent_for_confirm.value
         s.sent_for_confirmation_at = _utcnow()
         s.updated_at = _utcnow()
         db.session.commit()
