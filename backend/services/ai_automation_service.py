@@ -371,17 +371,25 @@ Guidelines:
         logger.info(f"CC list found: {cc_list}")
         
         # --- STEP 1: Create Solution record (following manual email pattern) ---
-        s = Solution(
-            ticket_id=ticket.id,
-            text=solution_content,
-            proposed_by="AI Assistant",
-            generated_by=SolutionGeneratedBy.ai,  # Mark as AI-generated
-            status=SolutionStatus.draft,  # Will update to sent_for_confirm after sending
-            created_at=_utcnow(),
-            updated_at=_utcnow(),
-        )
-        db.session.add(s)
-        db.session.flush()  # Get s.id
+        logger.info(f"Creating Solution record for ticket {ticket.id}")
+        try:
+            s = Solution(
+                ticket_id=ticket.id,
+                text=solution_content,
+                proposed_by="AI Assistant",
+                generated_by=SolutionGeneratedBy.ai,  # Mark as AI-generated
+                status=SolutionStatus.draft,  # Will update to sent_for_confirm after sending
+                created_at=_utcnow(),
+                updated_at=_utcnow(),
+            )
+            logger.info(f"Solution object created successfully")
+            db.session.add(s)
+            logger.info(f"Solution added to session")
+            db.session.flush()  # Get s.id
+            logger.info(f"Solution flushed successfully, got ID: {s.id}")
+        except Exception as e:
+            logger.error(f"Error creating/flushing Solution record: {e}")
+            raise
         
         # --- STEP 2: Gate checks (following manual email pattern) ---
         if has_pending_attempt(ticket.id):
