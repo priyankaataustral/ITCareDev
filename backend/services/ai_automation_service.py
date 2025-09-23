@@ -309,14 +309,21 @@ Guidelines:
     def _apply_solution_action(self, ai_action: AIAction, ticket: Ticket):
         """Apply the solution action using the exact same flow as manual emails"""
         import json
+        import traceback
         
         try:
             # 1. Follow exact same flow as manual send_email function
+            logger.info(f"Starting AI solution application for ticket {ticket.id}")
             self._send_ai_solution_with_confirmation_flow(ticket, ai_action.generated_content)
             email_status = "📧 AI solution email sent with confirmation links"
+            logger.info(f"Successfully sent AI solution email for ticket {ticket.id}")
         except Exception as e:
+            error_details = traceback.format_exc()
             logger.error(f"Failed to send AI solution email for ticket {ticket.id}: {e}")
+            logger.error(f"Full error traceback: {error_details}")
             email_status = f"❌ AI solution email failed: {str(e)}"
+            # Re-raise the exception so the calling code can handle it properly
+            raise
         
         # 2. Add internal message for tracking
         message = Message(
@@ -338,20 +345,30 @@ Guidelines:
     
     def _send_ai_solution_with_confirmation_flow(self, ticket: Ticket, solution_content: str):
         """Send AI solution using exact same flow as manual emails with confirm/reject links"""
-        from models import TicketCC
-        from email_helpers import send_via_gmail, _utcnow
-        from db_helpers import has_pending_attempt, get_next_attempt_no, log_event
-        from openai_helpers import is_materially_different
-        from itsdangerous import URLSafeTimedSerializer
-        from config import SECRET_KEY, FRONTEND_ORIGINS
+        logger.info(f"_send_ai_solution_with_confirmation_flow called for ticket {ticket.id}")
+        
+        try:
+            from models import TicketCC
+            from email_helpers import send_via_gmail, _utcnow
+            from db_helpers import has_pending_attempt, get_next_attempt_no, log_event
+            from openai_helpers import is_materially_different
+            from itsdangerous import URLSafeTimedSerializer
+            from config import SECRET_KEY, FRONTEND_ORIGINS
+            logger.info(f"All imports successful for ticket {ticket.id}")
+        except Exception as e:
+            logger.error(f"Import error in _send_ai_solution_with_confirmation_flow: {e}")
+            raise
         
         # Get recipient email and CC list
+        logger.info(f"Getting recipient email for ticket {ticket.id}")
         to_email = ticket.requester_email
         if not to_email:
             raise Exception(f"No email found for ticket {ticket.id}")
+        logger.info(f"Recipient email found: {to_email}")
         
         cc_rows = TicketCC.query.filter_by(ticket_id=ticket.id).all()
         cc_list = [r.email for r in cc_rows]
+        logger.info(f"CC list found: {cc_list}")
         
         # --- STEP 1: Create Solution record (following manual email pattern) ---
         s = Solution(
