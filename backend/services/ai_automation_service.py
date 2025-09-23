@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
-from models import Ticket, AIAutomationSettings, AIAction, Department, KBArticle, Agent, db, Message
+from models import Ticket, AIAutomationSettings, AIAction, Department, KBArticle, Agent, db, Message, Solution, ResolutionAttempt, SolutionStatus, SolutionGeneratedBy
 from openai_helpers import categorize_department_with_gpt, client, CHAT_MODEL
 from config import OPENAI_KEY
 
@@ -307,15 +307,13 @@ Guidelines:
         db.session.add(history)
     
     def _apply_solution_action(self, ai_action: AIAction, ticket: Ticket):
-        """Apply the solution action (send email, update ticket)"""
-        from models import Message, TicketCC
-        from email_helpers import send_via_gmail
+        """Apply the solution action using the exact same flow as manual emails"""
         import json
         
-        # 1. Send AI solution email immediately to customer
         try:
-            self._send_ai_solution_email_now(ticket, ai_action.generated_content)
-            email_status = "📧 AI solution email sent successfully"
+            # 1. Follow exact same flow as manual send_email function
+            self._send_ai_solution_with_confirmation_flow(ticket, ai_action.generated_content)
+            email_status = "📧 AI solution email sent with confirmation links"
         except Exception as e:
             logger.error(f"Failed to send AI solution email for ticket {ticket.id}: {e}")
             email_status = f"❌ AI solution email failed: {str(e)}"
@@ -338,50 +336,114 @@ Guidelines:
         if ticket.status == 'open':
             ticket.status = 'pending_user_response'
     
-    def _send_ai_solution_email_now(self, ticket: Ticket, solution_content: str):
-        """Send AI-generated solution email immediately"""
+    def _send_ai_solution_with_confirmation_flow(self, ticket: Ticket, solution_content: str):
+        """Send AI solution using exact same flow as manual emails with confirm/reject links"""
         from models import TicketCC
-        from email_helpers import send_via_gmail
+        from email_helpers import send_via_gmail, _utcnow
+        from db_helpers import has_pending_attempt, get_next_attempt_no, log_event
+        from openai_helpers import is_materially_different
+        from itsdangerous import URLSafeTimedSerializer
+        from config import SECRET_KEY, FRONTEND_ORIGINS
         
-        # Get recipient email
+        # Get recipient email and CC list
         to_email = ticket.requester_email
         if not to_email:
             raise Exception(f"No email found for ticket {ticket.id}")
         
-        # Get CC list
         cc_rows = TicketCC.query.filter_by(ticket_id=ticket.id).all()
         cc_list = [r.email for r in cc_rows]
         
-        # Create email subject and body
-        subject = f"[Ticket {ticket.id}] Solution - {ticket.subject}"
+        # --- STEP 1: Create Solution record (following manual email pattern) ---
+        s = Solution(
+            ticket_id=ticket.id,
+            text=solution_content,
+            proposed_by="AI Assistant",
+            generated_by=SolutionGeneratedBy.ai,  # Mark as AI-generated
+            status=SolutionStatus.draft,  # Will update to sent_for_confirm after sending
+            created_at=_utcnow(),
+            updated_at=_utcnow(),
+        )
+        db.session.add(s)
+        db.session.flush()  # Get s.id
         
-        # Format the solution as a proper email
+        # --- STEP 2: Gate checks (following manual email pattern) ---
+        if has_pending_attempt(ticket.id):
+            raise Exception("A previous solution is still pending user confirmation.")
+        
+        last_rejected = (Solution.query
+                        .filter_by(ticket_id=ticket.id, status=SolutionStatus.rejected)
+                        .order_by(Solution.id.desc())
+                        .first())
+        if last_rejected and not is_materially_different(solution_content, last_rejected.text or ""):
+            raise Exception("New solution is too similar to the last rejected fix.")
+        
+        # --- STEP 3: Create ResolutionAttempt (following manual email pattern) ---
+        att_no = get_next_attempt_no(ticket.id)
+        att = ResolutionAttempt(
+            ticket_id=ticket.id, 
+            solution_id=s.id, 
+            attempt_no=att_no,
+            sent_at=_utcnow()
+        )
+        db.session.add(att)
+        db.session.flush()  # Get att.id
+        
+        # --- STEP 4: Generate token and confirmation URLs (following manual email pattern) ---
+        ts = URLSafeTimedSerializer(SECRET_KEY, salt="solution-links-v1")
+        token_payload = {
+            "solution_id": s.id, 
+            "ticket_id": ticket.id, 
+            "attempt_id": att.id
+        }
+        authToken = ts.dumps(token_payload)
+        
+        confirm_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=confirm"
+        reject_url = f"{FRONTEND_ORIGINS}/confirm?token={authToken}&a=not_confirm"
+        
+        # --- STEP 5: Build email with confirmation links (following manual email pattern) ---
         requester_name = ticket.requester_name or "there"
-        body = f"""Hello {requester_name},
+        subject = f"Support Ticket #{ticket.id} Update"
+        
+        # Personalize and format email body
+        personalized_body = f"""Hello {requester_name},
 
 Thank you for contacting our support team regarding your ticket {ticket.id}.
 
 {solution_content}
 
-If this solution resolves your issue, great! If you need further assistance, please reply to this email and we'll be happy to help.
-
 Best regards,
 AI Support Assistant
 Technical Support Team"""
         
-        # Send email immediately using existing SMTP function
-        send_via_gmail(to_email, subject, body, cc_list=cc_list)
-        logger.info(f"✅ Sent AI solution email for ticket {ticket.id} to {to_email}")
+        # Append confirmation links (exact same format as manual emails)
+        final_body = (
+            f"{personalized_body}\n\n"
+            f"---\n"
+            f"Please let us know if this solved your issue:\n"
+            f"Confirm: {confirm_url}\n"
+            f"Not fixed: {reject_url}\n"
+        )
         
-        # Log email event for tracking
-        from db_helpers import log_event
+        # --- STEP 6: Send email (following manual email pattern) ---
+        send_via_gmail(to_email, subject, final_body, cc_list=cc_list)
+        
+        # --- STEP 7: Update solution status (following manual email pattern) ---
+        s.status = SolutionStatus.sent_for_confirm
+        s.sent_for_confirmation_at = _utcnow()
+        s.updated_at = _utcnow()
+        db.session.commit()
+        
+        # --- STEP 8: Log event (following manual email pattern) ---
         log_event(ticket.id, 'EMAIL_SENT', {
             "subject": subject, 
-            "manual": False,
+            "manual": False,  # Mark as automated
             "to": to_email, 
             "cc": cc_list,
-            "type": "ai_solution"
+            "solution_id": s.id,
+            "attempt_id": att.id
         })
+        
+        logger.info(f"✅ Sent AI solution email with confirmation flow for ticket {ticket.id} to {to_email}")
 
 
 # Service instance
