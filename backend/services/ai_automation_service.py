@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
+from models import Ticket, AIAutomationSettings, AIAction, Department, KBArticle, Agent, db, Message
 
 from models import (
     Ticket, AIAutomationSettings, AIAction, Department, 

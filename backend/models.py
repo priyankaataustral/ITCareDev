@@ -157,12 +157,15 @@ class Ticket(db.Model):
     resolved_by = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
     assigned_to = db.Column(db.Integer, db.ForeignKey('agents.id'), nullable=True)
     archived = db.Column(db.Boolean, nullable=False, default=False)
+    
+    # Relationships
+    messages = db.relationship('Message', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
 
 
 class Message(db.Model):
     __tablename__ = 'messages'
     id        = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String(45),  nullable=False)
+    ticket_id = db.Column(db.String(45), db.ForeignKey('tickets.id'), nullable=False)
     sender    = db.Column(db.String(100),  nullable=False)
     content   = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

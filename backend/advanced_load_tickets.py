@@ -17,6 +17,9 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from typing import List, Dict, Set
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add the backend directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
