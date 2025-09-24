@@ -107,7 +107,7 @@ export default function AdminPage() {
             </div>
             
             {/* Optional: Add a home button as alternative */}
-            <button
+            {/* <button
               onClick={() => window.location.href = '/'}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               aria-label="Go to home"
@@ -116,7 +116,7 @@ export default function AdminPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
               Home
-            </button>
+            </button> */}
           </div>
         </div>
 
