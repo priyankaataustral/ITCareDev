@@ -127,7 +127,17 @@ export default function AdminPage() {
             
             {/* Auto-Triage Settings */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Auto-Triage</h3>
+              <div className="flex items-center space-x-2 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Auto-Triage</h3>
+                <div className="group relative">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                    Automatically assigns tickets to appropriate departments using AI
+                  </div>
+                </div>
+              </div>
               <div className="space-y-4">
                 <label className="flex items-center space-x-3">
                   <input
@@ -158,7 +168,17 @@ export default function AdminPage() {
 
             {/* Auto-Solution Settings */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Auto-Solution</h3>
+              <div className="flex items-center space-x-2 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Auto-Solution</h3>
+                <div className="group relative">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                  </svg>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                    Automatically generates and sends AI-powered solutions to users
+                  </div>
+                </div>
+              </div>
               <div className="space-y-4">
                 <label className="flex items-center space-x-3">
                   <input
@@ -187,7 +207,17 @@ export default function AdminPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cooldown (hours)</label>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Cooldown (hours)</label>
+                      <div className="group relative">
+                        <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                        </svg>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                          Time interval between auto-solution attempts for the same user
+                        </div>
+                      </div>
+                    </div>
                     <input
                       type="number"
                       min="1"
@@ -199,7 +229,17 @@ export default function AdminPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Daily Limit</label>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Daily Limit</label>
+                      <div className="group relative">
+                        <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                        </svg>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                          Maximum number of auto-solutions sent per day across all tickets
+                        </div>
+                      </div>
+                    </div>
                     <input
                       type="number"
                       min="1"
