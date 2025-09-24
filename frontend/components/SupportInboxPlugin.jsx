@@ -31,6 +31,7 @@ export default function SupportInboxPlugin() {
   const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' or specific department ID
   const [searchTerm, setSearchTerm] = useState(''); // Search term for ticket numbers
   const [analyticsTab, setAnalyticsTab] = useState("overview");
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc' for ticket number sorting
   const { agent } = useAuth();
 
   // Analytics hook
@@ -94,38 +95,54 @@ export default function SupportInboxPlugin() {
     console.log('DEPARTMENTS', departments);
   }, [departments]);
 
-  // Filter threads based on search term
+  // Filter and sort threads based on search term and sort order
   const filteredThreads = React.useMemo(() => {
-    if (!searchTerm.trim()) {
-      return threads;
+    let filtered = threads;
+    
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = threads.filter(thread => {
+        // Search by ticket ID
+        const ticketId = String(thread.id || '').toLowerCase();
+        if (ticketId.includes(searchLower)) {
+          return true;
+        }
+        
+        // Search by subject/text
+        const subject = String(thread.subject || thread.text || '').toLowerCase();
+        if (subject.includes(searchLower)) {
+          return true;
+        }
+        
+        // Search by requester name
+        const requesterName = String(thread.requester_name || '').toLowerCase();
+        if (requesterName.includes(searchLower)) {
+          return true;
+        }
+        
+        return false;
+      });
     }
     
-    const searchLower = searchTerm.toLowerCase().trim();
-    return threads.filter(thread => {
-      // Search by ticket ID
-      const ticketId = String(thread.id || '').toLowerCase();
-      if (ticketId.includes(searchLower)) {
-        return true;
-      }
+    // Sort by ticket number (ID)
+    return filtered.sort((a, b) => {
+      const aId = parseInt(a.id) || 0;
+      const bId = parseInt(b.id) || 0;
       
-      // Search by subject/text
-      const subject = String(thread.subject || thread.text || '').toLowerCase();
-      if (subject.includes(searchLower)) {
-        return true;
+      if (sortOrder === 'asc') {
+        return aId - bId;
+      } else {
+        return bId - aId;
       }
-      
-      // Search by requester name
-      const requesterName = String(thread.requester_name || '').toLowerCase();
-      if (requesterName.includes(searchLower)) {
-        return true;
-      }
-      
-      return false;
     });
-  }, [threads, searchTerm]);
+  }, [threads, searchTerm, sortOrder]);
 
   const handleSearchChange = (term) => {
     setSearchTerm(term);
+  };
+
+  const handleSortChange = (newSortOrder) => {
+    setSortOrder(newSortOrder);
   };
 
   const handleDepartmentFilterChange = (deptId) => {
@@ -226,6 +243,7 @@ export default function SupportInboxPlugin() {
             }}
             departmentFilter={departmentFilter}
             onSearchChange={handleSearchChange}
+            onSortChange={handleSortChange}
           />
         </div>
 
