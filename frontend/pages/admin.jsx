@@ -7,6 +7,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState(null); // Track which tooltip is active
   const [warningConfig, setWarningConfig] = useState({
     type: '',
     value: 0,
@@ -108,6 +109,32 @@ export default function AdminPage() {
     }
   };
 
+  // Tooltip component with precise hover detection
+  const TooltipIcon = ({ id, text, size = "w-5 h-5" }) => {
+    return (
+      <div className="relative inline-block">
+        <svg 
+          className={`${size} text-gray-400 hover:text-gray-600 cursor-help`} 
+          aria-hidden="true" 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="24" 
+          height="24" 
+          fill="none" 
+          viewBox="0 0 24 24"
+          onMouseEnter={() => setActiveTooltip(id)}
+          onMouseLeave={() => setActiveTooltip(null)}
+        >
+          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+        </svg>
+        {activeTooltip === id && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-10 pointer-events-none">
+            {text}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading || !settings) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -162,14 +189,10 @@ export default function AdminPage() {
             <div className="mb-8">
               <div className="flex items-center space-x-2 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Auto-Triage</h3>
-                <div className="group relative">
-                  <svg className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                  </svg>
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                    Automatically assigns tickets to appropriate departments using AI
-                  </div>
-                </div>
+                <TooltipIcon 
+                  id="auto-triage" 
+                  text="Automatically assigns tickets to appropriate departments using AI" 
+                />
               </div>
               <div className="space-y-4">
                 <label className="flex items-center space-x-3">
@@ -203,14 +226,10 @@ export default function AdminPage() {
             <div className="mb-8">
               <div className="flex items-center space-x-2 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Auto-Solution</h3>
-                <div className="group relative">
-                  <svg className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                  </svg>
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                    Automatically generates and sends AI-powered solutions to users
-                  </div>
-                </div>
+                <TooltipIcon 
+                  id="auto-solution" 
+                  text="Automatically generates and sends AI-powered solutions to users" 
+                />
               </div>
               <div className="space-y-4">
                 <label className="flex items-center space-x-3">
@@ -242,14 +261,11 @@ export default function AdminPage() {
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
                       <label className="block text-sm font-medium text-gray-700">Cooldown (hours)</label>
-                      <div className="group relative">
-                        <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                        </svg>
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                          Time interval between auto-solution attempts for the same user
-                        </div>
-                      </div>
+                      <TooltipIcon 
+                        id="cooldown" 
+                        text="Time interval between auto-solution attempts for the same user" 
+                        size="w-4 h-4"
+                      />
                     </div>
                     <input
                       type="number"
@@ -264,14 +280,11 @@ export default function AdminPage() {
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
                       <label className="block text-sm font-medium text-gray-700">Daily Limit</label>
-                      <div className="group relative">
-                        <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 11h2v5m-2 0h4m-2.592-8.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                        </svg>
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                          Maximum number of auto-solutions sent per day across all tickets
-                        </div>
-                      </div>
+                      <TooltipIcon 
+                        id="daily-limit" 
+                        text="Maximum number of auto-solutions sent per day across all tickets" 
+                        size="w-4 h-4"
+                      />
                     </div>
                     <input
                       type="number"
@@ -299,27 +312,7 @@ export default function AdminPage() {
                   />
                   <span className="text-sm text-gray-700">Exclude High Priority tickets</span>
                 </label>
-                
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={settings.exclude_l3_tickets}
-                    onChange={(e) => setSettings({...settings, exclude_l3_tickets: e.target.checked})}
-                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <span className="text-sm text-gray-700">Exclude L3+ tickets</span>
-                </label>
-                
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={settings.exclude_escalated}
-                    onChange={(e) => setSettings({...settings, exclude_escalated: e.target.checked})}
-                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <span className="text-sm text-gray-700">Exclude Escalated tickets</span>
-                </label>
-                
+                              
                 <label className="flex items-center space-x-3">
                   <input
                     type="checkbox"
