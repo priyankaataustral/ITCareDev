@@ -3,7 +3,6 @@
 AI Automation Service for Support Tickets
 Handles auto-triage and auto-solution generation
 """
-
 import json
 import logging
 import re
@@ -272,9 +271,28 @@ Guidelines:
             max_tokens=500
         )
         
-        result = json.loads(response.choices[0].message.content)
+        # Clean and parse the JSON response
+        content = response.choices[0].message.content
+
+        # Remove control characters that cause JSON parsing issues
+        content = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', content)
+
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response JSON: {e}")
+            logger.error(f"Raw content: {content}")
+            # Return a fallback response
+            result = {
+                "solution_email": content,  # Use raw content as fallback
+                "confidence": 0.5,  # Low confidence due to parsing issue
+                "reasoning": "JSON parsing failed, using raw content",
+                "risk_level": "medium",
+                "kb_articles_used": []
+            }
+
         result['kb_refs'] = [{'id': art.id, 'title': art.title} for art in kb_articles[:3]]
-        
+
         return result
     
     def _get_relevant_kb_articles(self, ticket: Ticket) -> List[KBArticle]:
