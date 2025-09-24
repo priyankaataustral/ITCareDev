@@ -16,12 +16,14 @@ export default function Sidebar({
   onFilterChange,
   onDepartmentFilterChange,
   departmentFilter = 'all',
-  onSearchChange
+  onSearchChange,
+  onSortChange
 }) {
   const [view, setView] = useState('all');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [escalationCount, setEscalationCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
   const filterPanelRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
@@ -55,6 +57,15 @@ export default function Sidebar({
     setSearchTerm(value);
     if (onSearchChange) {
       onSearchChange(value);
+    }
+  };
+
+  // Handle sort order changes
+  const handleSortChange = () => {
+    const newSortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newSortOrder);
+    if (onSortChange) {
+      onSortChange(newSortOrder);
     }
   };
 
@@ -223,6 +234,17 @@ export default function Sidebar({
               </div>
             )}
           </div>
+          
+          {/* Sort Button */}
+          <button
+            onClick={handleSortChange}
+            className="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+            title={`Sort by ticket number ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+          >
+            <svg className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 20V7m0 13-4-4m4 4 4-4m4-12v13m0-13 4 4m-4-4-4 4"/>
+            </svg>
+          </button>
           
           {/* Search Input */}
           <div className="flex-1 relative">
