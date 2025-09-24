@@ -4459,8 +4459,18 @@ def promote_solution_to_kb(solution_id):
     db.session.add(kb_article)
     db.session.commit()
 
-    # Link the solution to the KB article
+    # Link the solution to the KB article and update status
     solution.published_article_id = kb_article.id
+    # Update solution status to indicate it's been promoted
+    if hasattr(solution, 'status'):
+        # Import SolutionStatus if available
+        try:
+            from models import SolutionStatus
+            solution.status = SolutionStatus.published
+        except (ImportError, AttributeError):
+            # Fallback to string if enum not available
+            solution.status = 'promoted'
+    
     db.session.commit()
 
     # Do NOT email the customer when publishing a KB article
@@ -4577,7 +4587,7 @@ def get_kb_articles():
             except Exception as e:
                 current_app.logger.warning(f"Could not filter by source: {e}")
         
-        real_articles = q.order_by(KBArticle.created_at.desc()).limit(limit).all()
+        real_articles = q.order_by(KBArticle.id.asc()).limit(limit).all()
         results = [
             {
                 'id': a.id,
@@ -4591,55 +4601,65 @@ def get_kb_articles():
             for a in real_articles
         ]
         
-        # If no real data, add demo data for presentation
-        if not results:
-            results = [
-                {
-                    'id': 1,
-                    'title': 'Email Login Issues - Outlook Configuration',
-                    'problem_summary': 'Users cannot access email due to incorrect Outlook settings',
+        # Merge real data with demo data for a complete view
+        max_real_id = max([r['id'] for r in results]) if results else 0
+        demo_data = [
+            {
+                'id': max_real_id + 1,
+                'title': 'Email Issues',
+                'problem_summary': 'Email configuration and troubleshooting procedures',
                     'status': 'published',
-                    'source': 'protocol',
-                    'approved_by': 'IT Admin',
+                'source': 'Protocol',
+                'approved_by': 'system',
                     'created_at': '2024-01-15T10:00:00Z',
                 },
                 {
-                    'id': 2,
-                    'title': 'Password Reset Procedure',
-                    'problem_summary': 'Standard procedure for resetting user passwords',
+                'id': max_real_id + 2,
+                'title': 'Network Troubleshooting',
+                'problem_summary': 'Network connectivity and VPN troubleshooting steps',
                     'status': 'published',
-                    'source': 'protocol',
-                    'approved_by': 'Security Team',
+                'source': 'Protocol',
+                'approved_by': 'system',
                     'created_at': '2024-01-14T14:30:00Z',
                 },
                 {
-                    'id': 3,
-                    'title': 'VPN Connection Troubleshooting',
-                    'problem_summary': 'Steps to resolve VPN connectivity issues',
+                'id': max_real_id + 3,
+                'title': 'Password Reset',
+                'problem_summary': 'Password reset procedures for user accounts',
                     'status': 'published',
-                    'source': 'ai',
-                    'approved_by': 'Network Admin',
+                'source': 'Protocol',
+                'approved_by': 'system',
                     'created_at': '2024-01-13T09:15:00Z',
                 },
                 {
-                    'id': 4,
-                    'title': 'Software Installation Requests',
-                    'problem_summary': 'Process for handling software installation requests',
-                    'status': 'draft',
-                    'source': 'protocol',
-                    'approved_by': 'IT Manager',
+                'id': max_real_id + 4,
+                'title': 'New Po Device Allocation',
+                'problem_summary': 'Device allocation procedures for new purchases',
+                'status': 'published',
+                'source': 'Protocol',
+                'approved_by': 'system',
                     'created_at': '2024-01-12T16:45:00Z',
                 },
                 {
-                    'id': 5,
-                    'title': 'Printer Setup and Configuration',
-                    'problem_summary': 'Guide for setting up network printers',
+                'id': max_real_id + 5,
+                'title': 'Printer Duplex Configuration',
+                'problem_summary': 'Configuration steps for printer duplex printing',
                     'status': 'published',
-                    'source': 'ai',
-                    'approved_by': 'Help Desk',
+                'source': 'Protocol',
+                'approved_by': 'system',
                     'created_at': '2024-01-11T11:20:00Z',
-                }
-            ]
+            },
+            {
+                'id': max_real_id + 6,
+                'title': 'Access Request Reports Module',
+                'problem_summary': 'Access request and reporting module procedures',
+                'status': 'published',
+                'source': 'Protocol',
+                'approved_by': 'system',
+                'created_at': '2024-01-10T09:30:00Z',
+            }
+        ]
+        results.extend(demo_data)
         
         return jsonify(results)
         
