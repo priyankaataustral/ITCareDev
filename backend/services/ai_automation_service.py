@@ -6,6 +6,7 @@ Handles auto-triage and auto-solution generation
 
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
@@ -244,7 +245,7 @@ Relevant Knowledge Base Articles:
 
 Generate a response in JSON format:
 {{
-    "solution_email": "Professional email content with solution steps",
+    "solution_email": "Clear solution steps and instructions only (no greeting or signature)",
     "confidence": 0.85,
     "reasoning": "Why you're confident in this solution",
     "risk_level": "low|medium|high",
@@ -252,11 +253,13 @@ Generate a response in JSON format:
 }}
 
 Guidelines:
-- Keep email under 200 words
+- Keep content under 200 words
 - Use bullet points for steps
 - Be professional and friendly
 - Only suggest solutions you're confident about
 - Mark as high risk if unsure or potentially dangerous
+- DO NOT include greetings, salutations, or signatures
+- Focus only on the solution steps and instructions
 """
         
         response = self.client.chat.completions.create(
@@ -435,15 +438,15 @@ Guidelines:
         # Personalize and format email body with proper structure
         personalized_body = f"""Hello {requester_name},
 
-        Thank you for contacting our support team regarding your ticket {ticket.id}.
+Thank you for contacting our support team regarding your ticket {ticket.id}.
 
-        {formatted_solution}
+{formatted_solution}
 
-        If this solution resolves your issue, great! If you need further assistance, please reply to this email and we'll be happy to help.
+If this solution resolves your issue, great! If you need further assistance, please reply to this email and we'll be happy to help.
 
-        Best regards,
-        AI Support Assistant
-        Technical Support Team"""
+Best regards,
+AI Support Assistant
+Technical Support Team"""
         
         # Append confirmation links (exact same format as manual emails)
         final_body = (
@@ -481,33 +484,61 @@ Guidelines:
     def _format_solution_content(self, solution_content: str) -> str:
         """Format AI solution content with proper spacing and structure"""
         
-        # Clean up the content and add proper spacing
-        lines = solution_content.strip().split('. ')
+        content = solution_content.strip()
+        
+        # Remove common AI greeting patterns that would duplicate our wrapper
+        greeting_patterns = [
+            r"Dear [^,]+,?\s*",
+            r"Hello [^,]+,?\s*",
+            r"Hi [^,]+,?\s*",
+            r"Thank you for reaching out.*?\.\s*",
+            r"Thank you for contacting.*?\.\s*"
+        ]
+        
+        for pattern in greeting_patterns:
+            content = re.sub(pattern, "", content, flags=re.IGNORECASE)
+        
+        # Remove signature patterns that would duplicate our wrapper
+        signature_patterns = [
+            r"Best regards,?\s*\[?Your Name\]?.*?Technical Support Team\.?",
+            r"Best regards,?\s*.*?Support Team\.?",
+            r"Sincerely,?\s*.*?Team\.?",
+            r"Kind regards,?\s*.*?"
+        ]
+        
+        for pattern in signature_patterns:
+            content = re.sub(pattern, "", content, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Clean up multiple whitespace and newlines
+        content = re.sub(r'\n\s*\n', '\n\n', content)
+        content = re.sub(r' {2,}', ' ', content)
+        content = content.strip()
+        
+        # Format bullet points consistently
+        lines = content.split('\n')
         formatted_lines = []
         
         for line in lines:
             line = line.strip()
             if not line:
+                formatted_lines.append('')
                 continue
                 
-            # Add period back if it doesn't end with punctuation
-            if not line.endswith(('.', '!', '?', ':')):
-                line += '.'
-                
-            # Format bullet points and steps
-            if line.startswith('-') or line.startswith('•'):
+            # Format bullet points
+            if line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                # Clean up bullet point
+                line = re.sub(r'^[•\-\*]\s*', '• ', line)
                 formatted_lines.append(f"  {line}")
-            elif any(keyword in line.lower() for keyword in ['step', 'first', 'second', 'then', 'next', 'finally']):
-                formatted_lines.append(f"\n{line}")
+            # Check for step numbering
+            elif re.match(r'^\d+[\.\)]\s+', line):
+                formatted_lines.append(f"  {line}")
             else:
                 formatted_lines.append(line)
         
-        # Join with proper spacing
         formatted_content = '\n'.join(formatted_lines)
         
-        # Add extra spacing around sections
-        formatted_content = formatted_content.replace(' - ', '\n  • ')
-        formatted_content = formatted_content.replace(':', ':\n')
+        # Final cleanup
+        formatted_content = formatted_content.strip()
         
         return formatted_content
 
