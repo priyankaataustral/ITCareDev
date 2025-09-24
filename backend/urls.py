@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from time import time, sleep
 from flask import Blueprint, redirect, request, jsonify, abort, make_response, send_file, current_app
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import func, text
+from sqlalchemy import func, text, case
 import re
 import os
 from extensions import db
@@ -20,7 +20,7 @@ from config import CONFIRM_REDIRECT_URL, CONFIRM_REDIRECT_URL_REJECT, CONFIRM_RE
 import jwt
 from models import EmailQueue, KBArticle, KBArticleSource, KBArticleStatus, KBFeedback, KBFeedbackType, SolutionConfirmedVia, Ticket, Department, Agent, Message, TicketAssignment, TicketCC, TicketEvent, ResolutionAttempt, Solution, SolutionGeneratedBy, SolutionStatus, TicketFeedback, EscalationSummary, TicketHistory, DashboardView, AIAutomationSettings, AIAction
 from utils import require_role
-from sqlalchemy import text as _sql_text
+from sqlalchemy import text as _sql_text, case
 from config import FRONTEND_ORIGINS
 import pandas as pd
 
@@ -6348,18 +6348,57 @@ def analytics_overview():
         
         # Resolution metrics
         resolved_tickets = Ticket.query.filter(Ticket.status.in_(['closed', 'resolved'])).count()
-        avg_resolution_time = 2.5  # hours (demo data - calculate from ticket events)
+        
+        # Calculate real average resolution time from ticket data
+        resolution_times = db.session.query(
+            func.timestampdiff(text('HOUR'), Ticket.created_at, Ticket.updated_at)
+        ).filter(
+            Ticket.status.in_(['closed', 'resolved']),
+            Ticket.updated_at.isnot(None)
+        ).all()
+        
+        # Filter out invalid/negative values and calculate average
+        valid_times = [t[0] for t in resolution_times if t[0] and t[0] > 0]
+        if valid_times:
+            avg_resolution_time = round(sum(valid_times) / len(valid_times), 1)
+        else:
+            avg_resolution_time = 0.0
         
         # Agent performance
         active_agents = Agent.query.count()
         total_messages = Message.query.count()
         
-        # Customer satisfaction (demo data - could come from feedback)
-        csat_score = 4.2
+        # Customer satisfaction from real feedback data
+        kb_feedback_avg = db.session.query(func.avg(KBFeedback.rating)).filter(
+            KBFeedback.rating.isnot(None)
+        ).scalar() or 0
         
-        # AI effectiveness
-        ai_solutions = Solution.query.count()
-        ai_success_rate = 0.78
+        ticket_feedback_avg = db.session.query(func.avg(TicketFeedback.rating)).filter(
+            TicketFeedback.rating.isnot(None)
+        ).scalar() or 0
+        
+        # Combine both feedback sources for overall CSAT
+        if kb_feedback_avg > 0 and ticket_feedback_avg > 0:
+            csat_score = round((kb_feedback_avg + ticket_feedback_avg) / 2, 1)
+        elif kb_feedback_avg > 0:
+            csat_score = round(kb_feedback_avg, 1)
+        elif ticket_feedback_avg > 0:
+            csat_score = round(ticket_feedback_avg, 1)
+        else:
+            csat_score = 0.0
+        
+        # AI effectiveness from real solution data
+        ai_solutions = Solution.query.filter(Solution.generated_by == 'ai').count()
+        total_solutions = Solution.query.count()
+        confirmed_solutions = Solution.query.filter(
+            Solution.status.in_(['confirmed_by_user', 'published'])
+        ).count()
+        
+        # Calculate AI success rate based on confirmations
+        if ai_solutions > 0:
+            ai_success_rate = round(confirmed_solutions / ai_solutions, 2)
+        else:
+            ai_success_rate = 0.0
         
         return jsonify({
             "overview": {
@@ -6417,11 +6456,35 @@ def analytics_agent_performance():
             # Messages sent
             messages_sent = Message.query.filter_by(sender_agent_id=agent.id).count()
             
-            # Response time (demo calculation)
-            avg_response_time = max(0.5, 3.0 - (agent.id * 0.3))  # Demo data
+            # Real response time calculation from messages
+            agent_messages = Message.query.filter_by(sender_agent_id=agent.id).filter(
+                Message.created_at >= since
+            ).count()
             
-            # Customer satisfaction (demo)
-            agent_csat = max(3.8, 4.5 - (agent.id * 0.1))
+            # Calculate response time based on ticket assignment to first message
+            response_times = db.session.query(
+                func.timestampdiff(text('HOUR'), Ticket.created_at, Message.created_at)
+            ).join(Message, Ticket.id == Message.ticket_id).filter(
+                Ticket.assigned_to == agent.id,
+                Message.sender_agent_id == agent.id,
+                Message.created_at >= since
+            ).filter(
+                func.timestampdiff(text('HOUR'), Ticket.created_at, Message.created_at) > 0
+            ).all()
+            
+            valid_response_times = [t[0] for t in response_times if t[0] and t[0] > 0 and t[0] < 168]  # Less than a week
+            avg_response_time = round(sum(valid_response_times) / len(valid_response_times), 1) if valid_response_times else 0.0
+            
+            # Real customer satisfaction from feedback
+            agent_feedback = db.session.query(func.avg(TicketFeedback.rating)).join(
+                Ticket, TicketFeedback.ticket_id == Ticket.id
+            ).filter(
+                Ticket.resolved_by == agent.id,
+                TicketFeedback.rating.isnot(None),
+                TicketFeedback.submitted_at >= since
+            ).scalar()
+            
+            agent_csat = round(agent_feedback, 1) if agent_feedback else 0.0
             
             performance_data.append({
                 "agent_id": agent.id,
@@ -6500,45 +6563,92 @@ def analytics_ticket_trends():
     try:
         days = int(request.args.get('days', 30))
         now = datetime.now(timezone.utc)
+        since = now - timedelta(days=days)
         
-        # Generate daily data for the last N days
+        # Generate daily data for the last N days with real database queries
         daily_data = []
         for i in range(days):
             date = (now - timedelta(days=days-1-i)).date()
             
-            # Real data queries (simplified for demo)
+            # Real tickets created on this date
             created_count = Ticket.query.filter(
                 func.date(Ticket.created_at) == date
-            ).count() if days <= 30 else max(0, 8 - abs(i - days//2))
+            ).count()
             
-            resolved_count = max(0, created_count - 2) if created_count > 2 else created_count
+            # Real tickets resolved on this date (based on updated_at when status changed)
+            resolved_count = Ticket.query.filter(
+                func.date(Ticket.updated_at) == date,
+                Ticket.status.in_(['closed', 'resolved'])
+            ).count()
+            
+            # Real escalations for this date
+            escalated_count = EscalationSummary.query.filter(
+                func.date(EscalationSummary.created_at) == date
+            ).count() if 'EscalationSummary' in globals() else 0
+            
+            # Calculate average priority for tickets created this day
+            priority_map = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+            tickets_today = Ticket.query.filter(func.date(Ticket.created_at) == date).all()
+            
+            if tickets_today:
+                priorities = [priority_map.get(t.priority.lower(), 2) for t in tickets_today if t.priority]
+                avg_priority = round(sum(priorities) / len(priorities), 1) if priorities else 2.0
+            else:
+                avg_priority = 0.0
             
             daily_data.append({
                 "date": date.isoformat(),
                 "tickets_created": created_count,
                 "tickets_resolved": resolved_count,
-                "tickets_escalated": max(0, created_count // 8),
-                "avg_priority": round(2.5 + (i % 3) * 0.5, 1)
+                "tickets_escalated": escalated_count,
+                "avg_priority": avg_priority
             })
         
-        # Category breakdown
-        categories = ['Technical', 'Billing', 'General', 'Hardware', 'Software']
+        # Real category breakdown from actual tickets
+        category_counts = db.session.query(
+            Ticket.category,
+            func.count(Ticket.id).label('count')
+        ).filter(Ticket.created_at >= since).group_by(Ticket.category).all()
+        
+        total_categorized = sum(c[1] for c in category_counts)
         category_data = []
-        for i, cat in enumerate(categories):
-            count = Ticket.query.filter_by(category=cat).count() if cat else 10 + i * 5
+        for cat, count in category_counts:
             category_data.append({
-                "category": cat,
+                "category": cat or "Uncategorized",
                 "count": count,
-                "percentage": round(count / max(sum(c["count"] for c in category_data) + count, 1) * 100, 1)
+                "percentage": round(count / max(total_categorized, 1) * 100, 1)
             })
         
-        # Priority distribution
-        priority_data = [
-            {"priority": "Critical", "count": 5, "avg_resolution_hours": 1.2},
-            {"priority": "High", "count": 23, "avg_resolution_hours": 3.5},
-            {"priority": "Medium", "count": 87, "avg_resolution_hours": 24.0},
-            {"priority": "Low", "count": 41, "avg_resolution_hours": 72.0}
-        ]
+        # Real priority distribution with resolution times
+        priorities = ['Critical', 'High', 'Medium', 'Low']
+        priority_data = []
+        for priority in priorities:
+            priority_tickets = Ticket.query.filter(
+                func.lower(Ticket.priority) == priority.lower(),
+                Ticket.created_at >= since
+            )
+            
+            count = priority_tickets.count()
+            
+            # Calculate average resolution time for this priority
+            resolved_priority = priority_tickets.filter(
+                Ticket.status.in_(['closed', 'resolved']),
+                Ticket.updated_at.isnot(None)
+            )
+            
+            resolution_times = [
+                (t.updated_at - t.created_at).total_seconds() / 3600  # Convert to hours
+                for t in resolved_priority.all() 
+                if t.updated_at and t.created_at
+            ]
+            
+            avg_resolution = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else 0.0
+            
+            priority_data.append({
+                "priority": priority,
+                "count": count,
+                "avg_resolution_hours": avg_resolution
+            })
         
         return jsonify({
             "daily_trends": daily_data,
@@ -6664,18 +6774,50 @@ def analytics_ai_insights():
     """AI performance and effectiveness metrics"""
     try:
         days = int(request.args.get('days', 30))
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=days)
         
         # AI solution metrics
         total_solutions = Solution.query.count()
         confirmed_solutions = Solution.query.filter_by(confirmed_by_user=True).count()
         
+        # Calculate real AI confidence from solution data
+        ai_solutions_with_confidence = Solution.query.filter(
+            Solution.generated_by == 'ai',
+            Solution.ai_confidence.isnot(None)
+        ).all()
+        
+        avg_confidence = 0.0
+        if ai_solutions_with_confidence:
+            confidences = [s.ai_confidence for s in ai_solutions_with_confidence if s.ai_confidence]
+            avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
+        
+        # Calculate human intervention rate (solutions that needed manual modification)
+        human_modified_solutions = Solution.query.filter(
+            Solution.generated_by.in_(['mixed', 'human']),
+            Solution.created_at >= since
+        ).count()
+        
+        recent_ai_solutions = Solution.query.filter(
+            Solution.generated_by == 'ai',
+            Solution.created_at >= since
+        ).count()
+        
+        total_recent = human_modified_solutions + recent_ai_solutions
+        human_intervention_rate = round(human_modified_solutions / max(total_recent, 1), 2)
+        
+        # Real KB articles created by AI
+        ai_kb_articles = KBArticle.query.filter(
+            KBArticle.source == KBArticleSource.ai
+        ).count()
+        
         ai_metrics = {
             "solutions_generated": total_solutions,
             "success_rate": round(confirmed_solutions / max(total_solutions, 1), 2),
-            "avg_confidence": 0.84,
-            "human_intervention_rate": 0.23,
+            "avg_confidence": avg_confidence,
+            "human_intervention_rate": human_intervention_rate,
             "cost_savings_hours": round(total_solutions * 0.75, 1),  # Assuming 45min saved per solution
-            "kb_articles_created": KBArticle.query.filter_by(source='ai').count() if hasattr(KBArticle, 'source') else 8
+            "kb_articles_created": ai_kb_articles
         }
         
         # AI vs Human comparison
@@ -6686,14 +6828,25 @@ def analytics_ai_insights():
             {"metric": "Availability", "ai": "24/7", "human": "Business Hours"}
         ]
         
-        # Top AI solution categories
-        category_performance = [
-            {"category": "Password Reset", "success_rate": 0.95, "volume": 45},
-            {"category": "Software Installation", "success_rate": 0.87, "volume": 32},
-            {"category": "Network Issues", "success_rate": 0.73, "volume": 28},
-            {"category": "Account Setup", "success_rate": 0.91, "volume": 23},
-            {"category": "Billing Questions", "success_rate": 0.68, "volume": 18}
-        ]
+        # Real AI solution performance by ticket category
+        category_performance = []
+        
+        # Get all categories that have AI solutions
+        ai_ticket_categories = db.session.query(
+            Ticket.category,
+            func.count(Solution.id).label('volume'),
+            func.avg(case([(Solution.status.in_(['confirmed_by_user', 'published']), 1.0)], else_=0.0)).label('success_rate')
+        ).join(Solution, Ticket.id == Solution.ticket_id).filter(
+            Solution.generated_by == 'ai',
+            Solution.created_at >= since
+        ).group_by(Ticket.category).order_by(func.count(Solution.id).desc()).limit(5).all()
+        
+        for category, volume, success_rate in ai_ticket_categories:
+            category_performance.append({
+                "category": category or "Uncategorized",
+                "success_rate": round(success_rate or 0.0, 2),
+                "volume": volume
+            })
         
         return jsonify({
             "ai_metrics": ai_metrics,

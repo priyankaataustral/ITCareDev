@@ -75,10 +75,6 @@ export function AnalyticsOverview({ data, loading }) {
               <span className="text-gray-600 dark:text-gray-400">Success Rate</span>
               <span className="font-semibold text-green-600">{Math.round((overview.ai_success_rate || 0.78) * 100)}%</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Cost Savings</span>
-              <span className="font-semibold text-blue-600">$12,450</span>
-            </div>
           </div>
         </div>
 

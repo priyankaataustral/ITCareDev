@@ -963,7 +963,7 @@ export default function MyDashboard({ open, onClose, onSelectTicket }) {
             </div>
           </div>
 
-          {/* Standard icon buttons for accessibility (mirror the dots) */}
+          {/* Standard icon buttons for accessibility */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setWinState('min')}

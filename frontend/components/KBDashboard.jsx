@@ -15,9 +15,10 @@ import { ComprehensiveAnalytics } from "./AnalyticsSection";
  * - Handle feedback (resolve, triage)
  * - Light analytics (counts & trends)
  */
-export default function KBDashboard({ open, onClose, mode = "manager" }) {
-  const [tab, setTab] = useState(mode === "analytics" ? "analytics" : "review");
+export default function KBDashboard({ open, onClose }) {
+  const [tab, setTab] = useState("review");
   const [analyticsTab, setAnalyticsTab] = useState("overview");
+  const [winState, setWinState] = useState('normal'); // 'min', 'normal', 'max'
 
   // --- State ---
   const [loading, setLoading] = useState(false);
@@ -41,6 +42,7 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
 
   // --- Data fetchers (now use apiGet/apiPost which return parsed JSON) ---
   const refresh = useCallback(async () => {
+    if (!open) return;
     setLoading(true); setErr("");
     try {
       const [sol, art, fb, mx] = await Promise.all([
@@ -59,18 +61,6 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
       setLoading(false);
     }
   }, [open]);
-
-  // Auto-load data when component opens or mounts
-  useEffect(() => {
-    if (open) {
-      refresh();
-    }
-  }, [open, refresh]);
-  
-  // Also load data on component mount (fallback if open prop isn't used)
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
 
     // Upload function
     const handleUploadProtocol = async (e) => {
@@ -262,34 +252,95 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
 
   if (!open) return null;
 
+  // Minimized: dock pill
+  if (winState === 'min') {
+    return (
+      <button
+        onClick={() => setWinState('normal')}
+        className="fixed bottom-4 right-16 z-[1000] px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-lg flex items-center gap-2 hover:shadow-xl transition"
+        aria-label="Restore Knowledge Manager"
+      >
+        <span className="w-6 h-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+          <i className="bi bi-book text-white text-sm" />
+        </span>
+        <span className="text-sm font-medium text-gray-800">Knowledge Manager</span>
+        <i className="bi bi-chevron-up text-gray-500" />
+      </button>
+    );
+  }
+
+  const frameSizing =
+    winState === 'max'
+      ? 'w-[95vw] h-[96vh] max-w-[95vw] max-h-[96vh]'
+      : 'w-full max-w-6xl h-full max-h-[90vh]';
+
   return (
     <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-6xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📚</span>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Knowledge Dashboard</h2>
+      <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col ${frameSizing}`}>
+        {/* Header with window controls */}
+        <div
+          className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 select-none"
+          onDoubleClick={() => setWinState(s => (s === 'max' ? 'normal' : 'max'))}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <i className="bi bi-book text-white text-xl"></i>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Knowledge Dashboard</h2>
+              <p className="text-gray-600 dark:text-gray-400">Manage articles, protocols, and feedback</p>
+            </div>
           </div>
-          <button onClick={onClose} className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600">Close</button>
+
+          {/* Window control buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setWinState('min')}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              aria-label="Minimize"
+            >
+              <i className="bi bi-dash-lg text-xl" />
+            </button>
+            {winState !== 'max' ? (
+              <button
+                onClick={() => setWinState('max')}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                aria-label="Maximize"
+              >
+                <i className="bi bi-fullscreen text-xl" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setWinState('normal')}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                aria-label="Restore"
+              >
+                <i className="bi bi-fullscreen-exit text-xl" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              aria-label="Close"
+            >
+              <i className="bi bi-x-lg text-xl" />
+            </button>
+          </div>
         </div>
+
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
-            {mode === "manager" && [
+            {[
               { id: 'review', label: 'Review' },
               { id: 'articles', label: 'Articles' },
               { id: 'feedback', label: 'Feedback' },
+              { id: 'analytics', label: '📊 Analytics' },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-3 py-1 rounded-lg text-sm ${tab===t.id? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100':'text-gray-600 dark:text-gray-300'}`}>{t.label}</button>
             ))}
-            
-            {mode === "analytics" && (
-              <button onClick={() => setTab('analytics')}
-                className="px-3 py-1 rounded-lg text-sm bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100">📊 Analytics</button>
-            )}
           </div>
           <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search…" className="flex-1 min-w-[120px] px-3 py-2 rounded-lg ring-1 ring-gray-300 dark:ring-gray-700 bg-white dark:bg-gray-900 text-sm" />
         </div>
@@ -305,13 +356,13 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
               {tab === 'analytics' && '📊 Performance metrics and insights'}
             </span>
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm">Refresh</button>
-              </div>
+          </div>
         </div>
 
         {err && <div className="px-5 py-2 text-sm text-red-600">{err}</div>}
 
-        {/* Content */}
-        <div className="p-5 max-h-[70vh] overflow-y-auto">
+        {/* Content area with scroll */}
+        <div className="flex-1 p-5 overflow-y-auto">
           {tab === 'review' && (
             <div className="grid grid-cols-1 gap-5">
               {/* Solutions */}
@@ -548,12 +599,12 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
                                 </a>
                               )}
                               {a.source !== 'protocol' && a.source !== 'Protocol' && (
-                              <Gate roles={["L2","L3","MANAGER"]}>
-                                {String(a.status).toLowerCase()==='draft' && (
-                                  <button className="btn-subtle" onClick={()=>publishArticle(a)}>🚀 Publish</button>
-                                )}
+                                <Gate roles={["L2","L3","MANAGER"]}>
+                                  {String(a.status).toLowerCase()==='draft' && (
+                                    <button className="btn-subtle" onClick={()=>publishArticle(a)}>🚀 Publish</button>
+                                  )}
                                 </Gate>
-                                )}
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -683,17 +734,17 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
               analytics={analytics}
               analyticsTab={analyticsTab}
               setAnalyticsTab={setAnalyticsTab}
-              open={open}
-              onClose={onClose}
             />
           )}
-                </div>
-              </div>
+        </div>
+      </div>
 
       {/* Upload Protocol Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-[1100] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+          <div classNa              open={open}
+              onClose={onClose}
+me="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Upload Protocol Document</h3>
             
             <div className="mb-4">
@@ -744,8 +795,8 @@ export default function KBDashboard({ open, onClose, mode = "manager" }) {
               >
                 {uploading ? 'Uploading...' : 'Upload'}
               </button>
-        </div>
-      </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
