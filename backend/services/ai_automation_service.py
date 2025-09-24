@@ -478,38 +478,38 @@ Guidelines:
         
         logger.info(f"✅ Sent AI solution email with confirmation flow for ticket {ticket.id} to {to_email}")
 
-def _format_solution_content(self, solution_content: str) -> str:
-    """Format AI solution content with proper spacing and structure"""
-    
-    # Clean up the content and add proper spacing
-    lines = solution_content.strip().split('. ')
-    formatted_lines = []
-    
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # Add period back if it doesn't end with punctuation
-        if not line.endswith(('.', '!', '?', ':')):
-            line += '.'
-            
-        # Format bullet points and steps
-        if line.startswith('-') or line.startswith('•'):
-            formatted_lines.append(f"  {line}")
-        elif any(keyword in line.lower() for keyword in ['step', 'first', 'second', 'then', 'next', 'finally']):
-            formatted_lines.append(f"\n{line}")
-        else:
-            formatted_lines.append(line)
-    
-    # Join with proper spacing
-    formatted_content = '\n'.join(formatted_lines)
-    
-    # Add extra spacing around sections
-    formatted_content = formatted_content.replace(' - ', '\n  • ')
-    formatted_content = formatted_content.replace(':', ':\n')
-    
-    return formatted_content
+    def _format_solution_content(self, solution_content: str) -> str:
+        """Format AI solution content with proper spacing and structure"""
+        
+        # Clean up the content and add proper spacing
+        lines = solution_content.strip().split('. ')
+        formatted_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Add period back if it doesn't end with punctuation
+            if not line.endswith(('.', '!', '?', ':')):
+                line += '.'
+                
+            # Format bullet points and steps
+            if line.startswith('-') or line.startswith('•'):
+                formatted_lines.append(f"  {line}")
+            elif any(keyword in line.lower() for keyword in ['step', 'first', 'second', 'then', 'next', 'finally']):
+                formatted_lines.append(f"\n{line}")
+            else:
+                formatted_lines.append(line)
+        
+        # Join with proper spacing
+        formatted_content = '\n'.join(formatted_lines)
+        
+        # Add extra spacing around sections
+        formatted_content = formatted_content.replace(' - ', '\n  • ')
+        formatted_content = formatted_content.replace(':', ':\n')
+        
+        return formatted_content
 
 # Service instance
 ai_automation = AIAutomationService()
