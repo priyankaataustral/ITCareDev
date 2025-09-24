@@ -244,6 +244,7 @@ export default function SupportInboxPlugin() {
             departmentFilter={departmentFilter}
             onSearchChange={handleSearchChange}
             onSortChange={handleSortChange}
+            sortOrder={sortOrder}
           />
         </div>
 

@@ -17,13 +17,13 @@ export default function Sidebar({
   onDepartmentFilterChange,
   departmentFilter = 'all',
   onSearchChange,
-  onSortChange
+  onSortChange,
+  sortOrder = 'desc'
 }) {
   const [view, setView] = useState('all');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [escalationCount, setEscalationCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
   const filterPanelRef = useRef(null);
   const { mentions = [], loading, refreshMentions } = useMentions(agentId) || {};
 
@@ -63,7 +63,6 @@ export default function Sidebar({
   // Handle sort order changes
   const handleSortChange = () => {
     const newSortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortOrder(newSortOrder);
     if (onSortChange) {
       onSortChange(newSortOrder);
     }
