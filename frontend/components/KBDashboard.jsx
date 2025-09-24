@@ -5,19 +5,16 @@ import dayjs from "dayjs";
 import { useAuth } from "../components/AuthContext"; // keep if Gate/children rely on context
 import Gate from "./Gate";
 import { apiGet, apiPost } from "../lib/apiClient"; // ← use the centralized client
-import { useDateRangeAnalytics } from "../hooks/useAnalytics";
-import { ComprehensiveAnalytics } from "./AnalyticsSection";
+
 
 /**
  * UI: Agent Knowledge Dashboard
  * - Review solutions (send confirm email, promote to KB)
  * - Manage KB drafts (publish, archive)
  * - Handle feedback (resolve, triage)
- * - Light analytics (counts & trends)
  */
 export default function KBDashboard({ open, onClose }) {
   const [tab, setTab] = useState("review");
-  const [analyticsTab, setAnalyticsTab] = useState("overview");
   const [winState, setWinState] = useState('normal'); // 'min', 'normal', 'max'
 
   // --- State ---
@@ -27,10 +24,6 @@ export default function KBDashboard({ open, onClose }) {
   const [articles, setArticles] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [metrics, setMetrics] = useState(null);
-  const [agentStats, setAgentStats] = useState([]);
-
-  // --- Analytics Hook ---
-  const analytics = useDateRangeAnalytics(30);
 
   const [q, setQ] = useState(""); // search
   const [statusFilter, setStatusFilter] = useState("all");
@@ -45,16 +38,15 @@ export default function KBDashboard({ open, onClose }) {
     if (!open) return;
     setLoading(true); setErr("");
     try {
-      const [sol, art, fb, mx] = await Promise.all([
+      const [sol, art, fb] = await Promise.all([
         apiGet('/solutions?status=draft,sent,confirmed,published&limit=50'),
         apiGet('/kb/articles?status=draft,published,archived&limit=100'), // Increased limit to show more articles
         apiGet('/kb/feedback?limit=50'),
-        apiGet('/kb/analytics').catch(() => null),
       ]);
       setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
       setArticles(Array.isArray(art) ? art : (art.items || []));
       setFeedback(Array.isArray(fb) ? fb : (fb.items || fb.feedback || []));
-      setMetrics(mx);
+      setMetrics(null);
     } catch (e) {
       setErr(`Failed to load: ${e.message || e}`);
     } finally {
@@ -106,18 +98,6 @@ export default function KBDashboard({ open, onClose }) {
       }
     };
 
-  // Fetch agent analytics when analytics tab is loaded
-  useEffect(() => {
-    if (tab !== 'analytics' || !open) return;
-    (async () => {
-      try {
-        const data = await apiGet('/kb/analytics/agents');
-        setAgentStats(Array.isArray(data?.agents) ? data.agents : []);
-      } catch {
-        setAgentStats([]);
-      }
-    })();
-  }, [tab, open]);
 
   // --- Actions ---
   const sendConfirmEmail = async (solution) => {
@@ -169,14 +149,13 @@ export default function KBDashboard({ open, onClose }) {
       // Only refresh other data, not articles (to preserve protocol display)
       setLoading(true);
       try {
-        const [sol, fb, mx] = await Promise.all([
+        const [sol, fb] = await Promise.all([
           apiGet('/solutions?status=draft,sent,confirmed,published&limit=50'),
           apiGet('/kb/feedback?limit=50'),
-          apiGet('/kb/analytics').catch(() => null),
         ]);
         setSolutions(Array.isArray(sol) ? sol : (sol.items || []));
         setFeedback(Array.isArray(fb) ? fb : (fb.items || fb.feedback || []));
-        setMetrics(mx);
+        setMetrics(null);
       } catch (e) {
         console.error('Error refreshing data:', e);
         setErr(e.message || 'Failed to refresh data');
@@ -336,7 +315,6 @@ export default function KBDashboard({ open, onClose }) {
               { id: 'review', label: 'Review' },
               { id: 'articles', label: 'Articles' },
               { id: 'feedback', label: 'Feedback' },
-              { id: 'analytics', label: '📊 Analytics' },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`px-3 py-1 rounded-lg text-sm ${tab===t.id? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-100':'text-gray-600 dark:text-gray-300'}`}>{t.label}</button>
@@ -353,7 +331,6 @@ export default function KBDashboard({ open, onClose }) {
               {tab === 'review' && '📝 Review pending solutions and drafts'}
               {tab === 'articles' && '📚 Knowledge base articles and protocols'}
               {tab === 'feedback' && '💬 User feedback and ratings'}
-              {tab === 'analytics' && '📊 Performance metrics and insights'}
             </span>
           <button onClick={refresh} disabled={loading} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm">Refresh</button>
           </div>
@@ -729,13 +706,6 @@ export default function KBDashboard({ open, onClose }) {
             </section>
           )}
 
-          {tab === 'analytics' && (
-            <ComprehensiveAnalytics 
-              analytics={analytics}
-              analyticsTab={analyticsTab}
-              setAnalyticsTab={setAnalyticsTab}
-            />
-          )}
         </div>
       </div>
 

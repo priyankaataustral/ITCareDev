@@ -8,10 +8,12 @@ import GroupedTickets from './GroupedTickets';
 import ChatHistory from './ChatHistory';
 import KBDashboard from './KBDashboard';
 import MyDashboard from './MyDashboard';
+import { ComprehensiveAnalytics } from './AnalyticsSection';
 import AgentsPage from '../pages/agents';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { useAuth } from './AuthContext';
 import { apiGet } from '../lib/apiClient'; // only import what we use
+import { useDateRangeAnalytics } from '../hooks/useAnalytics';
 
 export default function SupportInboxPlugin() {
   const [selectedId, setSelectedId] = useState(null);
@@ -28,7 +30,11 @@ export default function SupportInboxPlugin() {
   const [ticketFilter, setTicketFilter] = useState('open'); // 'open', 'closed', 'archived', etc.
   const [departmentFilter, setDepartmentFilter] = useState('all'); // 'all' or specific department ID
   const [searchTerm, setSearchTerm] = useState(''); // Search term for ticket numbers
+  const [analyticsTab, setAnalyticsTab] = useState("overview");
   const { agent } = useAuth();
+
+  // Analytics hook
+  const analytics = useDateRangeAnalytics(30);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -262,10 +268,12 @@ export default function SupportInboxPlugin() {
 
       {/* Knowledge Analytics Modal */}
       {showAnalytics && (
-        <KBDashboard 
+        <ComprehensiveAnalytics 
           open={showAnalytics} 
           onClose={() => setShowAnalytics(false)}
-          mode="analytics"
+          analytics={analytics}
+          analyticsTab={analyticsTab}
+          setAnalyticsTab={setAnalyticsTab}
         />
       )}
 
