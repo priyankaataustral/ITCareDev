@@ -3,7 +3,7 @@ import { apiGet, apiPut, apiPost } from '../lib/apiClient';
 
 export default function AdminPage() {
   const [settings, setSettings] = useState(null);
-  const [pendingActions, setPendingActions] = useState([]);
+  const [completedActions, setCompletedActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -16,7 +16,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     loadSettings();
-    loadPendingActions();
+    loadCompletedActions();
   }, []);
 
   const loadSettings = async () => {
@@ -28,12 +28,12 @@ export default function AdminPage() {
     }
   };
 
-  const loadPendingActions = async () => {
+  const loadCompletedActions = async () => {
     try {
-      const response = await apiGet('/admin/ai-automation/actions?status=pending');
-      setPendingActions(response.actions);
+      const response = await apiGet('/admin/ai-automation/actions?status=completed&limit=20');
+      setCompletedActions(response.actions);
     } catch (error) {
-      console.error('Failed to load pending actions:', error);
+      console.error('Failed to load completed actions:', error);
     } finally {
       setLoading(false);
     }
@@ -51,22 +51,12 @@ export default function AdminPage() {
     }
   };
 
-  const applyAction = async (actionId) => {
+  const dismissAction = async (actionId) => {
     try {
-      await apiPost(`/admin/ai-automation/actions/${actionId}/apply`);
-      loadPendingActions(); // Refresh list
-      alert('Action applied successfully!');
+      // Remove the action from the local state to dismiss it from view
+      setCompletedActions(prev => prev.filter(action => action.id !== actionId));
     } catch (error) {
-      alert('Failed to apply action');
-    }
-  };
-
-  const rejectAction = async (actionId) => {
-    try {
-      await apiPost(`/admin/ai-automation/actions/${actionId}/reject`);
-      loadPendingActions(); // Refresh list
-    } catch (error) {
-      alert('Failed to reject action');
+      console.error('Failed to dismiss action:', error);
     }
   };
 
@@ -334,40 +324,36 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Pending Actions */}
+          {/* Recent AI Activity */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Pending AI Actions</h2>
+              <h2 className="text-xl font-bold text-gray-900">Recent AI Activity</h2>
               <button
-                onClick={loadPendingActions}
+                onClick={loadCompletedActions}
                 className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 🔄 Refresh
               </button>
             </div>
             
-            {pendingActions.length === 0 ? (
+            {completedActions.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">✅</span>
+                  <span className="text-2xl">📊</span>
                 </div>
-                <p className="text-gray-600">No pending actions</p>
-                <p className="text-sm text-gray-500 mt-1">All AI suggestions have been processed</p>
+                <p className="text-gray-600">No recent AI activity</p>
+                <p className="text-sm text-gray-500 mt-1">AI actions will appear here once automation is active</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {pendingActions.map((action) => (
+                {completedActions.map((action) => (
                   <div key={action.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                          {action.action_type === 'auto_triage' ? '🎯 Auto-Triage' : '💡 Auto-Solution'}
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            action.risk_level === 'high' ? 'bg-red-100 text-red-800' :
-                            action.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {action.risk_level} risk
+                          {action.action_type === 'auto_triage' ? '🎯 Auto-Triage Completed' : '💡 Auto-Solution Sent'}
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✅ Applied
                           </span>
                         </h4>
                         <p className="text-sm text-gray-600">
@@ -375,31 +361,26 @@ export default function AdminPage() {
                         </p>
                         <p className="text-sm text-gray-500">
                           Confidence: {(action.confidence_score * 100).toFixed(1)}% | 
-                          Created: {new Date(action.created_at).toLocaleString()}
+                          Applied: {new Date(action.applied_at || action.created_at).toLocaleString()}
                         </p>
                       </div>
                       
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => applyAction(action.id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+                          onClick={() => dismissAction(action.id)}
+                          className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors"
+                          title="Dismiss this notification"
                         >
-                          ✅ Apply
-                        </button>
-                        <button
-                          onClick={() => rejectAction(action.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
-                        >
-                          ❌ Reject
+                          ✕ Close
                         </button>
                       </div>
                     </div>
                     
                     <div className="text-sm text-gray-700">
-                      <p><strong>Reasoning:</strong> {action.reasoning}</p>
+                      <p><strong>AI Decision:</strong> {action.reasoning}</p>
                       {action.generated_content && (
                         <div className="mt-3">
-                          <strong>Generated Solution:</strong>
+                          <strong>Solution Sent to User:</strong>
                           <div className="bg-gray-50 p-3 rounded mt-1 text-xs font-mono border-l-4 border-blue-500">
                             {action.generated_content}
                           </div>
