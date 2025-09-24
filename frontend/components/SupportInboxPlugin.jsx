@@ -124,17 +124,26 @@ export default function SupportInboxPlugin() {
       });
     }
     
-    // Sort by ticket number (ID)
-    return filtered.sort((a, b) => {
-      const aId = parseInt(a.id) || 0;
-      const bId = parseInt(b.id) || 0;
+    // Sort by ticket number (ID) with improved logic
+    const sorted = filtered.sort((a, b) => {
+      // Extract numeric part from ticket ID (handle TICKET0001, TICKET0002, etc.)
+      const extractNumber = (id) => {
+        const str = String(id || '');
+        const match = str.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+      
+      const aId = extractNumber(a.id);
+      const bId = extractNumber(b.id);
       
       if (sortOrder === 'asc') {
-        return aId - bId;
+        return aId - bId; // 1, 2, 3, 4...
       } else {
-        return bId - aId;
+        return bId - aId; // 4, 3, 2, 1...
       }
     });
+    
+    return sorted;
   }, [threads, searchTerm, sortOrder]);
 
   const handleSearchChange = (term) => {

@@ -237,12 +237,24 @@ export default function Sidebar({
           {/* Sort Button */}
           <button
             onClick={handleSortChange}
-            className="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
-            title={`Sort by ticket number ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 border border-gray-200 hover:bg-gray-200 ${
+              sortOrder === 'asc' 
+                ? 'bg-blue-100 text-blue-600 border-blue-300' 
+                : 'bg-gray-100 text-gray-600'
+            }`}
+            title={`Sort by ticket number ${sortOrder === 'asc' ? 'descending' : 'ascending'} (Currently: ${sortOrder === 'asc' ? 'Low to High' : 'High to Low'})`}
           >
-            <svg className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 20V7m0 13-4-4m4 4 4-4m4-12v13m0-13 4 4m-4-4-4 4"/>
-            </svg>
+            {sortOrder === 'asc' ? (
+              // Ascending: Low to High (1,2,3,4...)
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>
+              </svg>
+            ) : (
+              // Descending: High to Low (4,3,2,1...)
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"/>
+              </svg>
+            )}
           </button>
           
           {/* Search Input */}
