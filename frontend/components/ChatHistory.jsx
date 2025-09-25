@@ -2523,42 +2523,32 @@ function TicketHistoryCollapsible({
   // =========================
   return (
     <>
+      <div className={`h-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+        <TicketHeader
+          ticket={ticket}
+          onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
+          onClose={() => handleAction('close')}
+          actionLoading={actionLoading}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
 
-      <div className={`flex flex-col h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
-        {/* Ticket Header - Fixed at top */}
-        <div className="flex-shrink-0">
-          <TicketHeader
-            ticket={ticket}
-            onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
-            onClose={() => handleAction('close')}
-            actionLoading={actionLoading}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-          />
-        </div>
-
-        {/* Ticket Info Card - Below header */}
         {ticket && (
-          <div className="flex-shrink-0">
-            <TicketInfoCard 
-              ticket={ticket} 
-              showSavedFixModal={showSavedFixModal} 
-              setShowSavedFixModal={setShowSavedFixModal} 
-              savedFixData={savedFixData} 
-              setSavedFixData={setSavedFixData} 
-            />
-          </div>
+          <TicketInfoCard 
+            ticket={ticket} 
+            showSavedFixModal={showSavedFixModal} 
+            setShowSavedFixModal={setShowSavedFixModal} 
+            savedFixData={savedFixData} 
+            setSavedFixData={setSavedFixData} 
+          />
         )}
 
-        {/* Main Content Area - Chat + Right Sidebar */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Chat Area */}
-          <div className="flex-1 flex flex-col relative bg-[#F9FAFB] dark:bg-black">
-            {/* Messages */}
+        <div className="flex h-full">
+          <div className="flex-1 relative">
             <div
               ref={scrollRef}
-              className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3"
-              style={{ paddingBottom: '120px' }}
+              className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
+              style={{ height: 'calc(100vh - 250px)', overflowY: 'auto', paddingBottom: '120px' }}
             >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2730,9 +2720,8 @@ function TicketHistoryCollapsible({
 
             </div>
 
-            {/* Composer - Fixed at bottom of chat area */}
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 z-10">
+              <div className="absolute bottom-6 left-0 right-0 z-50">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
@@ -2748,10 +2737,8 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          {/* RIGHT: Activity Sidebar */}
-          <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
-               style={{width: '320px'}}>
-          <div className="p-4 space-y-4">
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto" style={{maxWidth: '320px', height: '100%'}}>
+            <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
                 loading={timelineLoading}
@@ -2779,7 +2766,6 @@ function TicketHistoryCollapsible({
             </div>
           </div>
         </div>
-      {/* </div> */}
       
       {/* Escalation Popup */}
       <EscalationPopup
