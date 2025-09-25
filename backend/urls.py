@@ -375,9 +375,9 @@ def get_ai_actions():
             .order_by(AIAction.created_at.desc())\
             .paginate(page=page, per_page=per_page)
     else:
-    actions = AIAction.query.filter_by(status=status)\
-        .order_by(AIAction.created_at.desc())\
-        .paginate(page=page, per_page=per_page)
+        actions = AIAction.query.filter_by(status=status)\
+            .order_by(AIAction.created_at.desc())\
+            .paginate(page=page, per_page=per_page)
     
     return jsonify({
         'actions': [{
