@@ -16,11 +16,9 @@ dayjs.extend(relativeTime);
 // =========================
 
 // Save Proposed Fix Button Component
-const SaveProposedFixButton = ({ ticket }) => {
+const SaveProposedFixButton = ({ ticket, showModal, setShowModal, savedFix, setSavedFix }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [savedFix, setSavedFix] = useState(null);
   
   // Check if this ticket has a saved fix
   useEffect(() => {
@@ -30,6 +28,18 @@ const SaveProposedFixButton = ({ ticket }) => {
     } catch (error) {
       console.error('Error checking saved fixes:', error);
     }
+  }, [ticket.id]);
+
+  // Listen for when a saved fix is removed from the modal
+  useEffect(() => {
+    const handleSavedFixRemoved = (event) => {
+      if (event.detail.ticketId === ticket.id) {
+        setIsSaved(false);
+      }
+    };
+
+    window.addEventListener('savedFixRemoved', handleSavedFixRemoved);
+    return () => window.removeEventListener('savedFixRemoved', handleSavedFixRemoved);
   }, [ticket.id]);
   
   const handleSaveProposedFix = async (e) => {
@@ -85,37 +95,6 @@ const SaveProposedFixButton = ({ ticket }) => {
     }
   };
   
-  const handleCopyToClipboard = async () => {
-    if (!savedFix) return;
-    
-    const fixText = `Proposed Fix for Ticket #${ticket.id}: ${ticket.subject}\n\n` +
-                   `Confidence: ${savedFix.confidence}%\n` +
-                   `Risk Level: ${savedFix.risk_level}\n\n` +
-                   `AI Analysis:\n${savedFix.reasoning}\n\n` +
-                   `Solution:\n${savedFix.content}`;
-    
-    try {
-      await navigator.clipboard.writeText(fixText);
-      alert('Solution copied to clipboard!');
-    } catch (error) {
-      console.error('Failed to copy:', error);
-      alert('Failed to copy to clipboard');
-    }
-  };
-  
-  const handleRemoveSaved = (e) => {
-    e.stopPropagation();
-    
-    try {
-      const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
-      delete savedFixes[ticket.id];
-      localStorage.setItem('savedProposedFixes', JSON.stringify(savedFixes));
-      setIsSaved(false);
-      setShowModal(false);
-    } catch (error) {
-      console.error('Error removing saved fix:', error);
-    }
-  };
   
   if (isSaved) {
     return (
@@ -127,96 +106,6 @@ const SaveProposedFixButton = ({ ticket }) => {
         >
           🔖 View Saved Fix
         </button>
-        
-        {/* Saved Fix Modal */}
-        {showModal && savedFix && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]" onClick={() => setShowModal(false)}>
-            <div className="bg-white rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  💡 Saved Fix for Ticket #{ticket.id}
-                </h3>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium text-gray-700">Ticket Subject:</h4>
-                  <p className="text-gray-600">{ticket.subject}</p>
-                </div>
-                
-                <div className="flex gap-4">
-                  <div>
-                    <span className="text-sm font-medium">Confidence: </span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      (savedFix.confidence >= 0.8 || savedFix.confidence >= 80) ? 'bg-green-100 text-green-700' :
-                      (savedFix.confidence >= 0.6 || savedFix.confidence >= 60) ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {savedFix.confidence <= 1 ? Math.round(savedFix.confidence * 100) : Math.round(savedFix.confidence)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium">Risk Level: </span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      savedFix.risk_level === 'low' ? 'bg-green-100 text-green-700' :
-                      savedFix.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {savedFix.risk_level}
-                    </span>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">AI Analysis:</h4>
-                  <div className="bg-blue-50 p-3 rounded-md">
-                    <p className="text-gray-700 text-sm">{savedFix.reasoning}</p>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Proposed Solution:</h4>
-                  <div className="bg-gray-50 p-3 rounded-md">
-                    <div className="text-gray-700 text-sm">
-                      {typeof savedFix.content === 'string' ? renderListOrText(savedFix.content) : savedFix.content}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="text-xs text-gray-500">
-                  Saved on: {new Date(savedFix.saved_at).toLocaleString()}
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={handleCopyToClipboard}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  📋 Copy Solution
-                </button>
-                <button
-                  onClick={handleRemoveSaved}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
-                >
-                  🗑️ Remove
-                </button>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </>
     );
   }
@@ -400,7 +289,13 @@ function TicketInfoCard({ ticket }) {
         <div className="flex items-center justify-between mb-1">
           <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm">Ticket Summary</div>
           {!['closed', 'resolved', 'archived'].includes((ticket?.status || '').toLowerCase()) && (
-            <SaveProposedFixButton ticket={ticket} />
+            <SaveProposedFixButton 
+              ticket={ticket} 
+              showModal={showSavedFixModal} 
+              setShowModal={setShowSavedFixModal} 
+              savedFix={savedFixData} 
+              setSavedFix={setSavedFixData} 
+            />
           )}
         </div>
         <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line text-sm">
@@ -949,6 +844,10 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [draftEditorBody, setDraftEditorBody] = useState('');
   const [aiDraft, setAiDraft] = useState(false); // Track if draft is AI-generated
   const [showAIDisclaimer, setShowAIDisclaimer] = useState(true); // Toggle for disclaimer
+
+  // Saved Fix Modal state (moved from SaveProposedFixButton)
+  const [showSavedFixModal, setShowSavedFixModal] = useState(false);
+  const [savedFixData, setSavedFixData] = useState(null);
 
   // Allow common typos/synonyms
   const DRAFT_WORD = '(?:draft|drat|draf|darft|drfat|daft|compose|write|prepare|create)';
@@ -2868,7 +2767,7 @@ function TicketHistoryCollapsible({
               />
 
               {/* Composer - Fixed at bottom with absolute positioning - Hidden when modals/popups are open */}
-              {!showModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
                 <div className="absolute bottom-0 left-0 right-0 z-50">
                   <ChatComposer
                     value={newMsg}
@@ -3154,6 +3053,124 @@ function TicketHistoryCollapsible({
                   Copy Solution
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Fix Modal */}
+      {showSavedFixModal && savedFixData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]" onClick={() => setShowSavedFixModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                💡 Saved Fix for Ticket #{ticket?.id}
+              </h3>
+              <button
+                onClick={() => setShowSavedFixModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-gray-700">Ticket Subject:</h4>
+                <p className="text-gray-600">{ticket?.subject}</p>
+              </div>
+              
+              <div className="flex gap-4">
+                <div>
+                  <span className="text-sm font-medium">Confidence: </span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    (savedFixData.confidence >= 0.8 || savedFixData.confidence >= 80) ? 'bg-green-100 text-green-700' :
+                    (savedFixData.confidence >= 0.6 || savedFixData.confidence >= 60) ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {savedFixData.confidence <= 1 ? Math.round(savedFixData.confidence * 100) : Math.round(savedFixData.confidence)}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm font-medium">Risk Level: </span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    savedFixData.risk_level === 'low' ? 'bg-green-100 text-green-700' :
+                    savedFixData.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {savedFixData.risk_level}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-700 mb-2">AI Analysis:</h4>
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <p className="text-gray-700 text-sm">{savedFixData.reasoning}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-700 mb-2">Proposed Solution:</h4>
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="text-gray-700 text-sm">
+                    {typeof savedFixData.content === 'string' ? renderListOrText(savedFixData.content) : savedFixData.content}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                Saved on: {savedFixData.saved_at ? new Date(savedFixData.saved_at).toLocaleString() : 'Unknown'}
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => {
+                  if (!savedFixData) return;
+                  
+                  const fixText = `Proposed Fix for Ticket #${ticket?.id}: ${ticket?.subject}\n\n` +
+                                 `Confidence: ${savedFixData.confidence}%\n` +
+                                 `Risk Level: ${savedFixData.risk_level}\n\n` +
+                                 `AI Analysis:\n${savedFixData.reasoning}\n\n` +
+                                 `Solution:\n${savedFixData.content}`;
+                  
+                  navigator.clipboard.writeText(fixText).then(() => {
+                    alert('Solution copied to clipboard!');
+                  }).catch((error) => {
+                    console.error('Failed to copy to clipboard:', error);
+                    alert('Failed to copy to clipboard.');
+                  });
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                📋 Copy Solution
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
+                    delete savedFixes[ticket?.id];
+                    localStorage.setItem('savedProposedFixes', JSON.stringify(savedFixes));
+                    setShowSavedFixModal(false);
+                    setSavedFixData(null);
+                    // Notify the SaveProposedFixButton to update its isSaved state
+                    window.dispatchEvent(new CustomEvent('savedFixRemoved', { detail: { ticketId: ticket?.id } }));
+                  } catch (error) {
+                    console.error('Error removing saved fix:', error);
+                    alert('Error removing saved fix.');
+                  }
+                }}
+                className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
+              >
+                🗑️ Remove
+              </button>
+              <button
+                onClick={() => setShowSavedFixModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
