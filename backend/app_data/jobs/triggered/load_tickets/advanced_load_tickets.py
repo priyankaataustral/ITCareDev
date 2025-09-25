@@ -106,7 +106,8 @@ class TicketLoader:
     def get_department_id(self, department_name: str) -> int:
         """Get or create department ID for a department name."""
         if not department_name:
-            return 1  # Default department
+            # Return Help Desk department as default
+            return self.get_help_desk_department_id()
             
         try:
             with self.engine.connect() as conn:
@@ -140,7 +141,42 @@ class TicketLoader:
         except Exception as e:
             logger.error(f"Error handling department '{department_name}': {e}")
             
-        return 1  # Fallback to default department
+        return self.get_help_desk_department_id()  # Fallback to Help Desk
+    
+    def get_help_desk_department_id(self) -> int:
+        """Get or create Help Desk department and return its ID."""
+        try:
+            with self.engine.connect() as conn:
+                # Try to find Help Desk department (case-insensitive)
+                result = conn.execute(
+                    text("SELECT id FROM departments WHERE LOWER(name) LIKE '%help%desk%' OR LOWER(name) LIKE '%helpdesk%' OR name = 'General Support'")
+                )
+                row = result.fetchone()
+                
+                if row:
+                    return row[0]
+                
+                # Create Help Desk department if it doesn't exist
+                result = conn.execute(
+                    text("INSERT INTO departments (name) VALUES (:name)"),
+                    {"name": "Help Desk"}
+                )
+                conn.commit()
+                
+                # Get the new ID
+                result = conn.execute(
+                    text("SELECT id FROM departments WHERE name = :name"),
+                    {"name": "Help Desk"}
+                )
+                row = result.fetchone()
+                if row:
+                    logger.info(f"Created Help Desk department (ID: {row[0]})")
+                    return row[0]
+                    
+        except Exception as e:
+            logger.error(f"Error handling Help Desk department: {e}")
+            
+        return 1  # Ultimate fallback
 
     def normalize_dataframe(self, df: pd.DataFrame, filename: str) -> pd.DataFrame:
         """Normalize DataFrame columns and add missing required fields."""
@@ -165,6 +201,14 @@ class TicketLoader:
         for field, default_value in self.default_values.items():
             if field not in normalized_df.columns:
                 normalized_df[field] = default_value
+        
+        # Ensure department_id defaults to Help Desk if not set
+        if 'department_id' not in normalized_df.columns or normalized_df['department_id'].isna().any():
+            help_desk_id = self.get_help_desk_department_id()
+            if 'department_id' not in normalized_df.columns:
+                normalized_df['department_id'] = help_desk_id
+            else:
+                normalized_df['department_id'] = normalized_df['department_id'].fillna(help_desk_id)
         
         # Ensure required fields are present
         required_fields = ['id', 'subject', 'requester_name']

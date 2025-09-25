@@ -2332,6 +2332,18 @@ def claim_ticket(thread_id):
                 email = row.get("email", "")
                 requester_name = email.split("@")[0].title() if email else "Customer"
         
+        # Get Help Desk department ID as default
+        help_desk_dept = Department.query.filter(
+            (Department.name.ilike('%help%desk%')) | 
+            (Department.name.ilike('%helpdesk%')) |
+            (Department.name == 'General Support')
+        ).first()
+        
+        if not help_desk_dept:
+            help_desk_dept = Department(name='Help Desk')
+            db.session.add(help_desk_dept)
+            db.session.flush()  # Get ID without committing
+        
         ticket = Ticket(
             id=thread_id, 
             status="open",
@@ -2341,7 +2353,8 @@ def claim_ticket(thread_id):
             priority="Medium",
             impact_level="Medium", 
             urgency_level="Medium",
-            requester_email=""  # Will be populated from CSV if available
+            requester_email="",  # Will be populated from CSV if available
+            department_id=help_desk_dept.id  # Default to Help Desk
         )
         db.session.add(ticket)
         
@@ -3891,6 +3904,79 @@ def auto_assign_departments():
     return jsonify({'updated': count, 'still_unassigned': still_unassigned}), 200
 
 #testing purpose
+@urls.route('/tickets/<ticket_id>/ai-department-suggestion', methods=['GET'])
+@require_role("L1","L2","L3","MANAGER")
+def get_ai_department_suggestion(ticket_id):
+    """Get AI suggestion for which department this ticket should belong to"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        ticket = Ticket.query.get_or_404(ticket_id)
+        
+        # Import AI automation service
+        from services.ai_automation_service import ai_automation
+        
+        # Get AI department prediction
+        department_info = ai_automation._predict_department_with_confidence(ticket)
+        
+        # Get department name
+        suggested_dept = Department.query.get(department_info['department_id'])
+        current_dept = ticket.department
+        
+        return jsonify({
+            'success': True,
+            'ticket_id': ticket_id,
+            'current_department': {
+                'id': current_dept.id if current_dept else None,
+                'name': current_dept.name if current_dept else 'Unassigned'
+            },
+            'suggested_department': {
+                'id': suggested_dept.id if suggested_dept else None,
+                'name': suggested_dept.name if suggested_dept else 'Unknown'
+            },
+            'confidence': department_info['confidence'],
+            'reasoning': department_info['reasoning'],
+            'should_change': current_dept.id != suggested_dept.id if (current_dept and suggested_dept) else True
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting AI department suggestion for ticket {ticket_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@urls.route('/tickets/<ticket_id>/ai-proposed-fix', methods=['GET'])
+@require_role("L1","L2","L3","MANAGER")
+def get_ai_proposed_fix(ticket_id):
+    """Get AI proposed fix/solution for this ticket"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        ticket = Ticket.query.get_or_404(ticket_id)
+        
+        # Import AI automation service
+        from services.ai_automation_service import ai_automation
+        
+        # Generate solution with confidence scoring
+        solution_info = ai_automation._generate_solution_with_confidence(ticket)
+        
+        return jsonify({
+            'success': True,
+            'ticket_id': ticket_id,
+            'proposed_fix': {
+                'title': f"Proposed Solution for {ticket.subject}",
+                'content': solution_info['solution_email'],
+                'confidence': solution_info['confidence'],
+                'reasoning': solution_info['reasoning'],
+                'risk_level': solution_info['risk_level'],
+                'kb_references': solution_info.get('kb_refs', [])
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating AI proposed fix for ticket {ticket_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @urls.route('/tickets/unassigned', methods=['GET'])
 @require_role("L2","L3","MANAGER")
 def count_unassigned_tickets():

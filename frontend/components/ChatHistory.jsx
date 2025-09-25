@@ -580,6 +580,11 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [confirmLinks, setConfirmLinks] = useState({ confirm: '', notConfirm: '' });
   const [panelOpen, setPanelOpen] = useState(true);
   
+  // AI suggestions state
+  const [aiSuggestionsLoaded, setAiSuggestionsLoaded] = useState(new Set());
+  const [showProposedFix, setShowProposedFix] = useState(false);
+  const [proposedFixData, setProposedFixData] = useState(null);
+  
   // Escalation popup state
   const [showEscalationPopup, setShowEscalationPopup] = useState(false);
   const [showDeescalationPopup, setShowDeescalationPopup] = useState(false);
@@ -1175,6 +1180,58 @@ const openDraftEditor = (prefill) => {
     return () => clearTimeout(id);
   }, [showDeescalationPopup, showEscalationPopup]);
 
+  // Load AI suggestions (department and proposed fix)
+  const loadAiSuggestions = async (ticketId, ticketData) => {
+    try {
+      // Parallel fetch of department suggestion and proposed fix
+      const [deptResponse, fixResponse] = await Promise.all([
+        apiGet(`/tickets/${ticketId}/ai-department-suggestion`).catch(e => ({ error: e.message })),
+        apiGet(`/tickets/${ticketId}/ai-proposed-fix`).catch(e => ({ error: e.message }))
+      ]);
+
+      const aiMessages = [];
+      const timestamp = new Date().toISOString();
+
+      // Add department suggestion bot message
+      if (deptResponse.success && deptResponse.should_change) {
+        const deptMsg = {
+          id: `ai-dept-${ticketId}-${Date.now()}`,
+          sender: 'assistant',
+          content: `🏢 **Department Suggestion**\n\nBased on my analysis of this ticket, I recommend assigning it to the **${deptResponse.suggested_department.name}** department.\n\n**Reasoning:** ${deptResponse.reasoning}\n\n**Confidence:** ${(deptResponse.confidence * 100).toFixed(1)}%\n\nCurrently assigned to: ${deptResponse.current_department.name}`,
+          timestamp,
+          type: 'ai_suggestion'
+        };
+        aiMessages.push(deptMsg);
+      }
+
+      // Add proposed fix bot message and store data
+      if (fixResponse.success) {
+        const fixMsg = {
+          id: `ai-fix-${ticketId}-${Date.now()}`,
+          sender: 'assistant', 
+          content: `💡 **Proposed Solution**\n\nI've analyzed this ticket and generated a potential solution. Click the "View Proposed Fix" button below to review it.\n\n**Confidence:** ${(fixResponse.proposed_fix.confidence * 100).toFixed(1)}%\n**Risk Level:** ${fixResponse.proposed_fix.risk_level}`,
+          timestamp,
+          type: 'ai_suggestion'
+        };
+        aiMessages.push(fixMsg);
+        
+        // Store proposed fix data for the modal
+        setProposedFixData(fixResponse.proposed_fix);
+      }
+
+      // Add AI messages to the chat
+      if (aiMessages.length > 0) {
+        setMessages(prev => [...prev, ...aiMessages]);
+      }
+
+      // Mark this ticket as having AI suggestions loaded
+      setAiSuggestionsLoaded(prev => new Set([...prev, ticketId]));
+
+    } catch (error) {
+      console.error('Failed to load AI suggestions:', error);
+    }
+  };
+
   // Initial thread load
   useEffect(() => {
     if (!activeThreadId) return;
@@ -1192,6 +1249,11 @@ const openDraftEditor = (prefill) => {
           };
         });
         setMessages(normalized);
+        
+        // Load AI suggestions if not already loaded for this ticket
+        if (!aiSuggestionsLoaded.has(activeThreadId)) {
+          loadAiSuggestions(activeThreadId, data);
+        }
       })
       .catch(() => setError('Failed to load thread'))
       .finally(() => setLoading(false));
@@ -2295,6 +2357,19 @@ function TicketHistoryCollapsible({
                               : displayContent}
                           </span>
                         </div>
+                        
+                        {/* Add "View Proposed Fix" button for AI fix suggestions */}
+                        {msg.type === 'ai_suggestion' && msg.id?.includes('ai-fix-') && proposedFixData && (
+                          <div className="mt-3">
+                            <button
+                              onClick={() => setShowProposedFix(true)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                              💡 View Proposed Fix
+                            </button>
+                          </div>
+                        )}
+                        
                         <div className="text-[10px] text-gray-400 dark:text-gray-300 text-right mt-2">
                           {msg.timestamp ? dayjs(msg.timestamp).format('HH:mm') : ''}
                         </div>
@@ -2554,6 +2629,116 @@ function TicketHistoryCollapsible({
               >
                 {actionLoading ? 'Archiving...' : 'Archive Ticket'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proposed Fix Modal */}
+      {showProposedFix && proposedFixData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 dark:text-blue-400 text-xl">💡</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {proposedFixData.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    AI-Generated Solution Proposal
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowProposedFix(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Confidence and Risk Level */}
+              <div className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Confidence:</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    proposedFixData.confidence >= 0.8 ? 'bg-green-100 text-green-800' :
+                    proposedFixData.confidence >= 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {(proposedFixData.confidence * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Risk Level:</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    proposedFixData.risk_level === 'low' ? 'bg-green-100 text-green-800' :
+                    proposedFixData.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {proposedFixData.risk_level}
+                  </span>
+                </div>
+              </div>
+
+              {/* AI Reasoning */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">AI Analysis:</h4>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{proposedFixData.reasoning}</p>
+              </div>
+
+              {/* Proposed Solution Content */}
+              <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-3">Proposed Solution:</h4>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200 font-mono">
+                    {proposedFixData.content}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Knowledge Base References */}
+              {proposedFixData.kb_references && proposedFixData.kb_references.length > 0 && (
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">Knowledge Base References:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {proposedFixData.kb_references.map((ref, idx) => (
+                      <span key={idx} className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
+                        📖 {ref.title || `Reference ${idx + 1}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                ⚠️ This is an AI-generated suggestion. Please review carefully before implementing.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowProposedFix(false)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    // Copy content to clipboard
+                    navigator.clipboard.writeText(proposedFixData.content);
+                    // Could add a toast notification here
+                    setShowProposedFix(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  Copy Solution
+                </button>
+              </div>
             </div>
           </div>
         </div>
