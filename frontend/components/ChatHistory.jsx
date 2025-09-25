@@ -2543,7 +2543,7 @@ function TicketHistoryCollapsible({
           />
         )}
 
-        <div className="flex h-full">
+        <div className="flex" style={{ height: 'calc(100vh - 180px)' }}>
           <div className="flex-1 relative">
             <div
               ref={scrollRef}
@@ -2721,7 +2721,7 @@ function TicketHistoryCollapsible({
             </div>
 
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-6 left-3 right-3 lg:left-4 lg:right-4 z-50 max-w-4xl mx-auto">
+              <div className="absolute bottom-6 left-4 right-4 z-50">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
@@ -2737,7 +2737,7 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 250px)'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: '100%'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
