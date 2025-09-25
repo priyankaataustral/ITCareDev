@@ -2524,7 +2524,7 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors pb-8`}>
+      <div className={`w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
         {/* Ticket Header - At top of document */}
         <TicketHeader
           ticket={ticket}
@@ -2551,11 +2551,11 @@ function TicketHistoryCollapsible({
         <div className="flex">
             {/* Main Chat Area */}
             <div className="flex-1 min-w-0">
-              {/* Messages - Natural flow, no fixed height */}
+              {/* Messages - Natural flow with proper height */}
                <div
                  ref={scrollRef}
                  className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
-                 style={{ minHeight: '400px' }}
+                 style={{ minHeight: '100vh', paddingBottom: '120px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
