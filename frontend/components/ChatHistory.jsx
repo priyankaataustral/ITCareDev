@@ -154,11 +154,11 @@ const SaveProposedFixButton = ({ ticket }) => {
                   <div>
                     <span className="text-sm font-medium">Confidence: </span>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      savedFix.confidence >= 80 ? 'bg-green-100 text-green-700' :
-                      savedFix.confidence >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                      (savedFix.confidence >= 0.8 || savedFix.confidence >= 80) ? 'bg-green-100 text-green-700' :
+                      (savedFix.confidence >= 0.6 || savedFix.confidence >= 60) ? 'bg-yellow-100 text-yellow-700' :
                       'bg-red-100 text-red-700'
                     }`}>
-                      {savedFix.confidence}%
+                      {savedFix.confidence <= 1 ? Math.round(savedFix.confidence * 100) : Math.round(savedFix.confidence)}%
                     </span>
                   </div>
                   <div>
@@ -183,7 +183,9 @@ const SaveProposedFixButton = ({ ticket }) => {
                 <div>
                   <h4 className="font-medium text-gray-700 mb-2">Proposed Solution:</h4>
                   <div className="bg-gray-50 p-3 rounded-md">
-                    <p className="text-gray-700 text-sm whitespace-pre-wrap">{savedFix.content}</p>
+                    <div className="text-gray-700 text-sm">
+                      {typeof savedFix.content === 'string' ? renderListOrText(savedFix.content) : savedFix.content}
+                    </div>
                   </div>
                 </div>
                 
@@ -763,7 +765,7 @@ for (const ev of safeEvents) {
 
 function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus, drawerOpen }) {
   return (
-    <div className="composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700" style={{zIndex: 10}}>
+    <div className="composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700" style={{zIndex: 50}}>
       <div className="flex items-center w-full max-w-4xl mx-auto gap-3">
         <input
           ref={textareaRef}
@@ -2649,7 +2651,7 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`flex flex-col min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+      <div className={`flex flex-col h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors overflow-hidden`}>
         <TicketHeader
           ticket={ticket}
           onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
@@ -2666,14 +2668,14 @@ function TicketHistoryCollapsible({
         </div>
 
         {/* Main Content Area - Chat + Right Sidebar */}
-        <div className="flex-1 flex min-h-0" style={{height: 'calc(100vh - 180px)'}}>
+        <div className="flex-1 flex overflow-hidden">
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
                <div
                  ref={scrollRef}
                  className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                 style={{ paddingBottom: '80px', minHeight: '400px' }}
+                 style={{ paddingBottom: '120px', minHeight: '400px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2842,8 +2844,8 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Fixed at bottom */}
-              <div className="flex-shrink-0 mt-auto">
+              {/* Composer - Fixed at bottom with absolute positioning */}
+              <div className="absolute bottom-0 left-0 right-0 z-50">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {

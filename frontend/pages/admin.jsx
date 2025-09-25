@@ -60,6 +60,11 @@ export default function AdminPage() {
     }
   };
 
+  const clearAllActions = () => {
+    // Clear all completed actions from the view
+    setCompletedActions([]);
+  };
+
   // Handle confidence threshold changes with warning for values below 80%
   const handleTriageConfidenceChange = (value) => {
     const floatValue = parseFloat(value);
@@ -328,12 +333,23 @@ export default function AdminPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Recent AI Activity</h2>
-              <button
-                onClick={loadCompletedActions}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                🔄 Refresh
-              </button>
+              <div className="flex items-center space-x-2">
+                {completedActions.length > 0 && (
+                  <button
+                    onClick={clearAllActions}
+                    className="px-4 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                    title="Clear all activity messages"
+                  >
+                    🗑️ Clear All
+                  </button>
+                )}
+                <button
+                  onClick={loadCompletedActions}
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
             </div>
             
             {completedActions.length === 0 ? (
