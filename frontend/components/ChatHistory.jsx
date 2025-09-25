@@ -2524,22 +2524,22 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`flex ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
-        {/* Main Content Area - Left side */}
-        <div className="flex-1 min-w-0" style={{marginRight: '320px'}}>
-          {/* Ticket Header - At top of document */}
+      <div className={`flex flex-col h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+        {/* Ticket Header - Fixed at top */}
+        <div className="flex-shrink-0">
           <TicketHeader
             ticket={ticket}
             onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
-            // onEscalate={() => handleAction('close')}
             onClose={() => handleAction('close')}
             actionLoading={actionLoading}
             darkMode={darkMode}
             setDarkMode={setDarkMode}
           />
+        </div>
 
-          {/* Ticket Info Card - Below header */}
-          {ticket && (
+        {/* Ticket Info Card - Below header */}
+        {ticket && (
+          <div className="flex-shrink-0">
             <TicketInfoCard 
               ticket={ticket} 
               showSavedFixModal={showSavedFixModal} 
@@ -2547,11 +2547,19 @@ function TicketHistoryCollapsible({
               savedFixData={savedFixData} 
               setSavedFixData={setSavedFixData} 
             />
-          )}
+          </div>
+        )}
 
-          <div
-            ref={scrollRef}
-            className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black min-h-screen">
+        {/* Main Content Area - Chat + Right Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Chat Area */}
+          <div className="flex-1 flex flex-col relative bg-[#F9FAFB] dark:bg-black">
+            {/* Messages */}
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3"
+              style={{ paddingBottom: '120px' }}
+            >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
                 if ((msg.sender === 'bot' || msg.sender === 'assistant' || msg.type === 'email') && typeof msg.content === 'string' && msg.content.trim().startsWith('Subject:')) {
@@ -2720,28 +2728,29 @@ function TicketHistoryCollapsible({
                 }}
               />
 
+            </div>
+
+            {/* Composer - Fixed at bottom of chat area */}
+            {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+              <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 z-10">
+                <ChatComposer
+                  value={newMsg}
+                  onChange={v => {
+                    if (typeof v === 'string') setNewMsg(v);
+                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                  }}
+                  onSend={sendMessage}
+                  sending={sending}
+                  textareaRef={textareaRef}
+                  drawerOpen={showDraftEditor}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Composer - At bottom of document */}
-          {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-            <div className="p-4 pb-16">
-              <ChatComposer
-                value={newMsg}
-                onChange={v => {
-                  if (typeof v === 'string') setNewMsg(v);
-                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                }}
-                onSend={sendMessage}
-                sending={sending}
-                textareaRef={textareaRef}
-                drawerOpen={showDraftEditor}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT: Activity Sidebar - Fixed position */}
-        <div className="fixed top-0 right-0 w-80 h-screen bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto z-20" style={{width: '320px'}}>
+          {/* RIGHT: Activity Sidebar */}
+          <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto"
+               style={{width: '320px'}}>
           <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
@@ -2769,10 +2778,12 @@ function TicketHistoryCollapsible({
               <StepProgressBar stepInfo={stepInfo} />
             </div>
           </div>
+        </div>
+      {/* </div> */}
       
       {/* Escalation Popup */}
       <EscalationPopup
-        isOpen={escOpenStable} // ← Only open if deescalation is closed
+        isOpen={escOpenStable}
         onClose={() => {
           setShowEscalationPopup(false);
           setPopupLock(false);
@@ -2784,7 +2795,7 @@ function TicketHistoryCollapsible({
 
       {/* De-escalation Popup */}
       <DeescalationPopup
-        isOpen={deescOpenStable} // ← Only open if escalation is closed
+        isOpen={deescOpenStable}
         onClose={() => {
           setShowDeescalationPopup(false);
           setPopupLock(false);
