@@ -359,7 +359,7 @@ def update_ai_automation_settings():
 @urls.route('/admin/ai-automation/actions', methods=['GET'])
 @require_role("MANAGER")
 def get_ai_actions():
-    """Get pending AI actions for review"""
+    """Get AI actions for review (completed, applied, or skipped)"""
     agent_id = request.agent_ctx.get('id')
     agent_role = request.agent_ctx.get('role')
     if not agent_role in ['MANAGER']:
@@ -367,11 +367,17 @@ def get_ai_actions():
         
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    status = request.args.get('status', 'pending')
+    status = request.args.get('status', 'completed')
     
-    actions = AIAction.query.filter_by(status=status)\
-        .order_by(AIAction.created_at.desc())\
-        .paginate(page=page, per_page=per_page)
+    # Handle 'completed' status to include both 'applied' and 'skipped'
+    if status == 'completed':
+        actions = AIAction.query.filter(AIAction.status.in_(['applied', 'skipped']))\
+            .order_by(AIAction.created_at.desc())\
+            .paginate(page=page, per_page=per_page)
+    else:
+        actions = AIAction.query.filter_by(status=status)\
+            .order_by(AIAction.created_at.desc())\
+            .paginate(page=page, per_page=per_page)
     
     return jsonify({
         'actions': [{
@@ -383,7 +389,9 @@ def get_ai_actions():
             'generated_content': action.generated_content,
             'kb_references': action.kb_references,
             'risk_level': action.risk_level,
+            'status': action.status,
             'created_at': action.created_at.isoformat(),
+            'applied_at': action.applied_at.isoformat() if action.applied_at else action.created_at.isoformat(),
             'ticket_subject': action.ticket.subject if action.ticket else None
         } for action in actions.items],
         'total': actions.total,

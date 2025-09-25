@@ -191,10 +191,7 @@ class TicketLoader:
         for date_col in ['created_at', 'updated_at']:
             if date_col in normalized_df.columns:
                 normalized_df[date_col] = pd.to_datetime(
-                    normalized_df[date_col], 
-                    errors='coerce',
-                    dayfirst=True,  # Handle UK/EU date format
-                    format=None     # Let pandas infer format
+                    normalized_df[date_col], errors='coerce'
                 ).dt.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 normalized_df[date_col] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -251,7 +248,7 @@ class TicketLoader:
                 method='multi'
             )
             
-            logger.info(f"Successfully added {len(new_tickets)} new tickets from {csv_file}")
+            logger.info(f"✅ Successfully added {len(new_tickets)} new tickets from {csv_file}")
             
             # Trigger AI automation for new tickets
             if len(new_tickets) > 0:
@@ -265,7 +262,7 @@ class TicketLoader:
 
     def _trigger_ai_automation(self, new_tickets_df: pd.DataFrame):
         """Trigger AI automation for newly loaded tickets"""
-        logger.info(f"Triggering AI automation for {len(new_tickets_df)} new tickets")
+        logger.info(f"🤖 Triggering AI automation for {len(new_tickets_df)} new tickets")
         
         try:
             # Import Flask app context and models
@@ -281,9 +278,7 @@ class TicketLoader:
                 automation_count = 0
                 for _, row in new_tickets_df.iterrows():
                     try:
-                        # Use modern SQLAlchemy syntax
-                        from app import db
-                        ticket = db.session.get(Ticket, str(row['id']))
+                        ticket = Ticket.query.get(str(row['id']))
                         if ticket:
                             logger.info(f"Processing ticket {ticket.id} for AI automation")
                             
@@ -306,7 +301,7 @@ class TicketLoader:
                         logger.error(f"Error processing ticket {row['id']} for AI automation: {ticket_error}")
                         continue
                 
-                logger.info(f"AI automation triggered successfully! Created {automation_count} AI actions")
+                logger.info(f"✅ AI automation triggered successfully! Created {automation_count} AI actions")
                 
         except ImportError as e:
             logger.warning(f"AI automation service not available: {e}")
@@ -333,7 +328,7 @@ class TicketLoader:
             results[filename] = added_count
             total_added += added_count
         
-        logger.info(f"Ticket loading complete! Total new tickets added: {total_added}")
+        logger.info(f"✅ Ticket loading complete! Total new tickets added: {total_added}")
         return results
 
     def fix_datetime_fields(self):
@@ -342,58 +337,31 @@ class TicketLoader:
         
         try:
             with self.engine.connect() as conn:
-                # Check if we're using MySQL or SQLite
-                db_name = str(conn.engine.url).split(':')[0]
+                # Fix created_at
+                conn.execute(text(f"""
+                    UPDATE {self.table_name}
+                    SET created_at = 
+                        substr(created_at, 1, 10) || 'T' || substr(created_at, 12) || '.000000+00:00'
+                    WHERE created_at IS NOT NULL 
+                      AND instr(created_at, 'T') = 0
+                      AND length(created_at) = 19;
+                """))
                 
-                if 'mysql' in db_name.lower():
-                    # MySQL syntax
-                    # Fix created_at
-                    conn.execute(text(f"""
-                        UPDATE {self.table_name}
-                        SET created_at = 
-                            CONCAT(SUBSTRING(created_at, 1, 10), 'T', SUBSTRING(created_at, 12), '.000000+00:00')
-                        WHERE created_at IS NOT NULL 
-                          AND LOCATE('T', created_at) = 0
-                          AND CHAR_LENGTH(created_at) = 19;
-                    """))
-                    
-                    # Fix updated_at
-                    conn.execute(text(f"""
-                        UPDATE {self.table_name}
-                        SET updated_at = 
-                            CONCAT(SUBSTRING(updated_at, 1, 10), 'T', SUBSTRING(updated_at, 12), '.000000+00:00')
-                        WHERE updated_at IS NOT NULL 
-                          AND LOCATE('T', updated_at) = 0
-                          AND CHAR_LENGTH(updated_at) = 19;
-                    """))
-                else:
-                    # SQLite syntax (original)
-                    # Fix created_at
-                    conn.execute(text(f"""
-                        UPDATE {self.table_name}
-                        SET created_at = 
-                            substr(created_at, 1, 10) || 'T' || substr(created_at, 12) || '.000000+00:00'
-                        WHERE created_at IS NOT NULL 
-                          AND instr(created_at, 'T') = 0
-                          AND length(created_at) = 19;
-                    """))
-                    
-                    # Fix updated_at
-                    conn.execute(text(f"""
-                        UPDATE {self.table_name}
-                        SET updated_at = 
-                            substr(updated_at, 1, 10) || 'T' || substr(updated_at, 12) || '.000000+00:00'
-                        WHERE updated_at IS NOT NULL 
-                          AND instr(updated_at, 'T') = 0
-                          AND length(updated_at) = 19;
-                    """))
+                # Fix updated_at
+                conn.execute(text(f"""
+                    UPDATE {self.table_name}
+                    SET updated_at = 
+                        substr(updated_at, 1, 10) || 'T' || substr(updated_at, 12) || '.000000+00:00'
+                    WHERE updated_at IS NOT NULL 
+                      AND instr(updated_at, 'T') = 0
+                      AND length(created_at) = 19;
+                """))
                 
                 conn.commit()
-                logger.info("Datetime fields fixed")
+                logger.info("✅ Datetime fields fixed")
                 
         except Exception as e:
             logger.error(f"Error fixing datetime fields: {e}")
-            logger.info("Skipping datetime field formatting - dates will work but may not be in optimal format")
 
 
 def main():
@@ -409,34 +377,34 @@ def main():
         
         # Print summary
         print("\n" + "="*70)
-        print("TICKET LOADING & AI AUTOMATION SUMMARY")
+        print("🎫 TICKET LOADING & AI AUTOMATION SUMMARY")
         print("="*70)
         
         if results:
             total_tickets = sum(results.values())
             for filename, count in results.items():
-                status = "NEW TICKETS ADDED" if count > 0 else "NO NEW TICKETS"
-                print(f"File {filename}: {count} tickets | {status}")
+                status = "✅ NEW TICKETS ADDED" if count > 0 else "ℹ️  NO NEW TICKETS"
+                print(f"📁 {filename}: {count} tickets | {status}")
             
             print("-" * 70)
-            print(f"TOTAL NEW TICKETS: {total_tickets}")
+            print(f"🎯 TOTAL NEW TICKETS: {total_tickets}")
             
             if total_tickets > 0:
-                print("AI AUTOMATION: Triggered for all new tickets")
-                print("Check the Admin Panel for completed AI actions")
+                print("🤖 AI AUTOMATION: Triggered for all new tickets")
+                print("📊 Check the Admin Panel for pending AI actions")
             else:
-                print("NO AI AUTOMATION: No new tickets to process")
+                print("🔄 NO AI AUTOMATION: No new tickets to process")
                 
         else:
-            print("No CSV files found or no new tickets to add")
+            print("📁 No CSV files found or no new tickets to add")
         
         print("="*70)
-        print("Process completed successfully!")
-        print("Check 'ticket_loader.log' for detailed logs")
+        print("🚀 Process completed successfully!")
+        print("📖 Check 'ticket_loader.log' for detailed logs")
         
     except Exception as e:
         logger.error(f"Fatal error in main: {e}")
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
         raise
 
 

@@ -29,6 +29,62 @@ class AIAutomationService:
             db.session.commit()
         return settings
     
+    def _log_skipped_action(self, ticket: Ticket, action_type: str, reason: str, 
+                           confidence_score: float = None, threshold: float = None, 
+                           ai_reasoning: str = None, store_in_db: bool = True):
+        """Log detailed information about why an AI action was skipped"""
+        
+        # Create comprehensive log message
+        log_parts = [
+            f"SKIPPED AI ACTION - Ticket {ticket.id}",
+            f"Action: {action_type}",
+            f"Reason: {reason}"
+        ]
+        
+        if confidence_score is not None and threshold is not None:
+            confidence_pct = confidence_score * 100
+            threshold_pct = threshold * 100
+            gap = threshold_pct - confidence_pct
+            log_parts.extend([
+                f"Confidence: {confidence_pct:.1f}%",
+                f"Required: {threshold_pct:.1f}%", 
+                f"Gap: {gap:.1f}%"
+            ])
+        
+        if ai_reasoning:
+            log_parts.append(f"AI Reasoning: {ai_reasoning}")
+            
+        # Add ticket context
+        log_parts.extend([
+            f"Subject: {ticket.subject[:100]}{'...' if len(ticket.subject) > 100 else ''}",
+            f"Department: {ticket.department.name if ticket.department else 'Unknown'}",
+            f"Priority: {ticket.priority}",
+            f"Created: {ticket.created_at}"
+        ])
+        
+        detailed_message = " | ".join(log_parts)
+        logger.info(detailed_message)
+        
+        # Optionally store in database for admin panel visibility
+        if store_in_db and confidence_score is not None:
+            try:
+                ai_action = AIAction(
+                    ticket_id=ticket.id,
+                    action_type=action_type,
+                    confidence_score=confidence_score,
+                    reasoning=f"SKIPPED: {reason}. {ai_reasoning}" if ai_reasoning else f"SKIPPED: {reason}",
+                    status='skipped',
+                    created_at=datetime.now(),
+                    generated_content=f"Action was not performed because {reason.lower()}"
+                )
+                
+                db.session.add(ai_action)
+                db.session.commit()
+                logger.info(f"Stored skipped action {action_type} for ticket {ticket.id} in database")
+                
+            except Exception as e:
+                logger.error(f"Failed to store skipped action in database: {e}")
+
     def should_exclude_ticket(self, ticket: Ticket, settings: AIAutomationSettings) -> Tuple[bool, str]:
         """Check if ticket should be excluded from AI automation"""
         reasons = []
@@ -59,12 +115,21 @@ class AIAutomationService:
         settings = self.get_settings()
         
         if not settings.auto_triage_enabled:
+            self._log_skipped_action(
+                ticket, 'auto_triage', 
+                'Auto-triage is disabled in settings',
+                store_in_db=False
+            )
             return None
             
         # Check exclusions
         excluded, reason = self.should_exclude_ticket(ticket, settings)
         if excluded:
-            logger.info(f"Ticket {ticket.id} excluded from auto-triage: {reason}")
+            self._log_skipped_action(
+                ticket, 'auto_triage', 
+                f'Ticket excluded: {reason}',
+                store_in_db=False
+            )
             return None
         
         try:
@@ -72,7 +137,14 @@ class AIAutomationService:
             department_info = self._predict_department_with_confidence(ticket)
             
             if department_info['confidence'] < settings.triage_confidence_threshold:
-                logger.info(f"Ticket {ticket.id} confidence {department_info['confidence']:.2f} below threshold {settings.triage_confidence_threshold}")
+                self._log_skipped_action(
+                    ticket, 'auto_triage',
+                    'Confidence score below threshold',
+                    confidence_score=department_info['confidence'],
+                    threshold=settings.triage_confidence_threshold,
+                    ai_reasoning=department_info.get('reasoning', 'No reasoning provided'),
+                    store_in_db=True
+                )
                 return None
             
             # Check if department actually needs to change
@@ -80,7 +152,15 @@ class AIAutomationService:
             suggested_dept_id = department_info['department_id']
             
             if current_dept_id == suggested_dept_id:
-                logger.info(f"Ticket {ticket.id} already in correct department")
+                current_dept_name = ticket.department.name if ticket.department else 'Unknown'
+                self._log_skipped_action(
+                    ticket, 'auto_triage',
+                    f'Already in correct department ({current_dept_name})',
+                    confidence_score=department_info['confidence'],
+                    threshold=settings.triage_confidence_threshold,
+                    ai_reasoning=department_info.get('reasoning', 'No reasoning provided'),
+                    store_in_db=True
+                )
                 return None
             
             # Create AI action record
@@ -113,12 +193,21 @@ class AIAutomationService:
         settings = self.get_settings()
         
         if not settings.auto_solution_enabled:
+            self._log_skipped_action(
+                ticket, 'auto_solution',
+                'Auto-solution is disabled in settings',
+                store_in_db=False
+            )
             return None
             
         # Check exclusions
         excluded, reason = self.should_exclude_ticket(ticket, settings)
         if excluded:
-            logger.info(f"Ticket {ticket.id} excluded from auto-solution: {reason}")
+            self._log_skipped_action(
+                ticket, 'auto_solution',
+                f'Ticket excluded: {reason}',
+                store_in_db=False
+            )
             return None
             
         # Check daily limits
@@ -129,7 +218,11 @@ class AIAutomationService:
         ).count()
         
         if today_actions >= settings.max_daily_auto_solutions:
-            logger.info(f"Daily auto-solution limit reached: {today_actions}")
+            self._log_skipped_action(
+                ticket, 'auto_solution',
+                f'Daily limit reached ({today_actions}/{settings.max_daily_auto_solutions})',
+                store_in_db=False
+            )
             return None
         
         # Check cooldown
@@ -140,7 +233,12 @@ class AIAutomationService:
         ).first()
         
         if recent_solution:
-            logger.info(f"Ticket {ticket.id} in cooldown period")
+            hours_remaining = settings.solution_cooldown_hours - (datetime.now() - recent_solution.created_at).total_seconds() / 3600
+            self._log_skipped_action(
+                ticket, 'auto_solution',
+                f'Ticket in cooldown period ({hours_remaining:.1f}h remaining)',
+                store_in_db=False
+            )
             return None
             
         try:
@@ -148,7 +246,14 @@ class AIAutomationService:
             solution_info = self._generate_solution_with_confidence(ticket)
             
             if solution_info['confidence'] < settings.solution_confidence_threshold:
-                logger.info(f"Ticket {ticket.id} solution confidence {solution_info['confidence']:.2f} below threshold")
+                self._log_skipped_action(
+                    ticket, 'auto_solution',
+                    'Confidence score below threshold',
+                    confidence_score=solution_info['confidence'],
+                    threshold=settings.solution_confidence_threshold,
+                    ai_reasoning=solution_info.get('reasoning', 'No reasoning provided'),
+                    store_in_db=True
+                )
                 return None
             
             # Create AI action record

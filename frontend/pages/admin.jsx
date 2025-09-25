@@ -351,9 +351,17 @@ export default function AdminPage() {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                          {action.action_type === 'auto_triage' ? '🎯 Auto-Triage Completed' : '💡 Auto-Solution Sent'}
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            ✅ Applied
+                          {action.status === 'skipped' ? (
+                            action.action_type === 'auto_triage' ? '🎯 Auto-Triage Skipped' : '💡 Auto-Solution Skipped'
+                          ) : (
+                            action.action_type === 'auto_triage' ? '🎯 Auto-Triage Completed' : '💡 Auto-Solution Sent'
+                          )}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            action.status === 'skipped' 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {action.status === 'skipped' ? '⚠️ Skipped' : '✅ Applied'}
                           </span>
                         </h4>
                         <p className="text-sm text-gray-600">
@@ -361,7 +369,7 @@ export default function AdminPage() {
                         </p>
                         <p className="text-sm text-gray-500">
                           Confidence: {(action.confidence_score * 100).toFixed(1)}% | 
-                          Applied: {new Date(action.applied_at || action.created_at).toLocaleString()}
+                          {action.status === 'skipped' ? 'Skipped:' : 'Applied:'} {new Date(action.applied_at || action.created_at).toLocaleString()}
                         </p>
                       </div>
                       
@@ -377,11 +385,19 @@ export default function AdminPage() {
                     </div>
                     
                     <div className="text-sm text-gray-700">
-                      <p><strong>AI Decision:</strong> {action.reasoning}</p>
-                      {action.generated_content && (
+                      <p><strong>{action.status === 'skipped' ? 'Skip Reason:' : 'AI Decision:'}</strong> {action.reasoning}</p>
+                      {action.generated_content && action.status !== 'skipped' && (
                         <div className="mt-3">
                           <strong>Solution Sent to User:</strong>
                           <div className="bg-gray-50 p-3 rounded mt-1 text-xs font-mono border-l-4 border-blue-500">
+                            {action.generated_content}
+                          </div>
+                        </div>
+                      )}
+                      {action.generated_content && action.status === 'skipped' && (
+                        <div className="mt-3">
+                          <strong>Details:</strong>
+                          <div className="bg-yellow-50 p-3 rounded mt-1 text-xs border-l-4 border-yellow-500">
                             {action.generated_content}
                           </div>
                         </div>
