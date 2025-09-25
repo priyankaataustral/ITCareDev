@@ -1488,66 +1488,6 @@ const openDraftEditor = (prefill) => {
     };
   }, []);
 
-  // Add global utility functions for debugging (for debugging)
-  useEffect(() => {
-    window.clearAISuggestionsCache = () => {
-      try {
-        localStorage.removeItem('aiSuggestionsLoaded');
-        setAiSuggestionsLoaded(new Set());
-        console.log('AI suggestions cache cleared');
-      } catch (error) {
-        console.error('Failed to clear AI suggestions cache:', error);
-      }
-    };
-    
-    window.debugMessages = () => {
-      console.log('Current messages:', messages);
-      console.log('Display messages (deduplicated):', displayMessages);
-      
-      // Check for potential duplicates
-      const duplicates = [];
-      const seen = new Map();
-      
-      messages.forEach((msg, index) => {
-        const key = `${msg.sender}-${msg.content}`;
-        if (seen.has(key)) {
-          duplicates.push({ index, message: msg, originalIndex: seen.get(key) });
-        } else {
-          seen.set(key, index);
-        }
-      });
-      
-      if (duplicates.length > 0) {
-        console.warn('Potential duplicates found:', duplicates);
-      } else {
-        console.log('No duplicates detected');
-      }
-    };
-    
-    window.cleanMessages = () => {
-      setMessages(prev => {
-        const unique = [];
-        const seen = new Set();
-        
-        prev.forEach(msg => {
-          const key = msg.id || `${msg.sender}-${msg.timestamp}-${msg.content}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            unique.push(msg);
-          }
-        });
-        
-        console.log(`Cleaned messages: ${prev.length} → ${unique.length}`);
-        return unique;
-      });
-    };
-    
-    return () => {
-      delete window.clearAISuggestionsCache;
-      delete window.debugMessages;
-      delete window.cleanMessages;
-    };
-  }, [messages, displayMessages]);
 
   // Smart scroll to bottom
   useEffect(() => {
@@ -1784,7 +1724,6 @@ function TicketHistoryCollapsible({
 
 
   const handleSuggestedPromptClick = async (prompt) => {
-    console.debug('[DEBUG] Suggested prompt clicked:', prompt);
     const trimmed = (prompt || '').trim();
     setNewMsg('');
 
@@ -2772,9 +2711,9 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Fixed at bottom with absolute positioning - Always show unless modals are open */}
+              {/* Composer - Positioned at bottom of chat area only */}
               {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-                <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
+                <div className="absolute bottom-0 left-0 right-0 z-50">
                   <ChatComposer
                     value={newMsg}
                     onChange={v => {
