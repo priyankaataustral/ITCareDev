@@ -2524,40 +2524,38 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`flex flex-col h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
-        {/* Fixed Header Section - Always visible */}
-        <div className="flex-shrink-0">
-          <TicketHeader
-            ticket={ticket}
-            onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
-            // onEscalate={() => handleAction('escalate')}
-            onClose={() => handleAction('close')}
-            actionLoading={actionLoading}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
+      <div className={`min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors pb-8`}>
+        {/* Ticket Header - At top of document */}
+        <TicketHeader
+          ticket={ticket}
+          onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
+          // onEscalate={() => handleAction('close')}
+          onClose={() => handleAction('close')}
+          actionLoading={actionLoading}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+        />
+
+        {/* Ticket Info Card - Below header */}
+        {ticket && (
+          <TicketInfoCard 
+            ticket={ticket} 
+            showSavedFixModal={showSavedFixModal} 
+            setShowSavedFixModal={setShowSavedFixModal} 
+            savedFixData={savedFixData} 
+            setSavedFixData={setSavedFixData} 
           />
+        )}
 
-          {/* Ticket Info Card - Always visible when ticket exists */}
-          {ticket && (
-            <TicketInfoCard 
-              ticket={ticket} 
-              showSavedFixModal={showSavedFixModal} 
-              setShowSavedFixModal={setShowSavedFixModal} 
-              savedFixData={savedFixData} 
-              setSavedFixData={setSavedFixData} 
-            />
-          )}
-        </div>
-
-        {/* Main Content Area - Chat + Right Sidebar - Takes remaining space */}
-        <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Main Content Area - Chat + Right Sidebar - Natural flow */}
+        <div className="flex">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0 relative">
-              {/* Messages - Scrollable area */}
+            <div className="flex-1 min-w-0">
+              {/* Messages - Natural flow, no fixed height */}
                <div
                  ref={scrollRef}
-                 className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                 style={{ paddingBottom: '120px' }}
+                 className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
+                 style={{ minHeight: '400px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2727,9 +2725,9 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Always show unless modals are open */}
-              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor ? (
-                <div className="absolute bottom-0 left-0 right-0 z-50">
+              {/* Composer - Natural flow at bottom of messages */}
+              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+                <div className="mt-4 mb-8">
                   <ChatComposer
                     value={newMsg}
                     onChange={v => {
@@ -2742,11 +2740,11 @@ function TicketHistoryCollapsible({
                     drawerOpen={showDraftEditor}
                   />
                 </div>
-              ) : null}
+              )}
             </div>
 
-          {/* RIGHT: Collapsibles Sidebar - Always Visible */}
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px'}}>
+          {/* RIGHT: Collapsibles Sidebar - Natural flow */}
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
