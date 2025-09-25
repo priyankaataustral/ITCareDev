@@ -580,8 +580,15 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [confirmLinks, setConfirmLinks] = useState({ confirm: '', notConfirm: '' });
   const [panelOpen, setPanelOpen] = useState(true);
   
-  // AI suggestions state
-  const [aiSuggestionsLoaded, setAiSuggestionsLoaded] = useState(new Set());
+  // AI suggestions state - use localStorage for persistence
+  const [aiSuggestionsLoaded, setAiSuggestionsLoaded] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aiSuggestionsLoaded');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [showProposedFix, setShowProposedFix] = useState(false);
   const [proposedFixData, setProposedFixData] = useState(null);
   
@@ -1224,8 +1231,16 @@ const openDraftEditor = (prefill) => {
         setMessages(prev => [...prev, ...aiMessages]);
       }
 
-      // Mark this ticket as having AI suggestions loaded
-      setAiSuggestionsLoaded(prev => new Set([...prev, ticketId]));
+      // Mark this ticket as having AI suggestions loaded and persist to localStorage
+      setAiSuggestionsLoaded(prev => {
+        const newSet = new Set([...prev, ticketId]);
+        try {
+          localStorage.setItem('aiSuggestionsLoaded', JSON.stringify([...newSet]));
+        } catch (error) {
+          console.warn('Failed to save AI suggestions state to localStorage:', error);
+        }
+        return newSet;
+      });
 
     } catch (error) {
       console.error('Failed to load AI suggestions:', error);
@@ -1237,9 +1252,14 @@ const openDraftEditor = (prefill) => {
     if (!activeThreadId) return;
     setLoading(true);
     setError(null);
+    
+    // Clear existing messages when switching tickets to avoid stale data
+    setMessages([]);
+    
     apiGet(`/threads/${activeThreadId}`)
       .then(data => {
         setTicket(data);
+        
         const normalized = (Array.isArray(data.messages) ? data.messages : []).map((m) => {
           const c = m?.content;
           return {
@@ -1248,6 +1268,7 @@ const openDraftEditor = (prefill) => {
             content: toDisplayString(c),
           };
         });
+        
         setMessages(normalized);
         
         // Load AI suggestions if not already loaded for this ticket
@@ -1255,9 +1276,38 @@ const openDraftEditor = (prefill) => {
           loadAiSuggestions(activeThreadId, data);
         }
       })
-      .catch(() => setError('Failed to load thread'))
+      .catch((error) => {
+        console.error('Failed to load thread:', error);
+        setError('Failed to load thread');
+      })
       .finally(() => setLoading(false));
   }, [activeThreadId]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clear any temporary state when component unmounts
+      setShowProposedFix(false);
+      setProposedFixData(null);
+    };
+  }, []);
+
+  // Add global utility function for clearing AI suggestions cache (for debugging)
+  useEffect(() => {
+    window.clearAISuggestionsCache = () => {
+      try {
+        localStorage.removeItem('aiSuggestionsLoaded');
+        setAiSuggestionsLoaded(new Set());
+        console.log('AI suggestions cache cleared');
+      } catch (error) {
+        console.error('Failed to clear AI suggestions cache:', error);
+      }
+    };
+    
+    return () => {
+      delete window.clearAISuggestionsCache;
+    };
+  }, []);
 
   // Smart scroll to bottom
   useEffect(() => {

@@ -383,13 +383,25 @@ Guidelines:
         content = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', content)
 
         try:
+            # Clean content for JSON parsing
+            content = content.strip()
+            if content.startswith('```json'):
+                content = content[7:]
+            if content.endswith('```'):
+                content = content[:-3]
+            content = content.strip()
+            
             result = json.loads(content)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response JSON: {e}")
             logger.error(f"Raw content: {content}")
-            # Return a fallback response
+            
+            # Try to extract solution text from malformed JSON
+            solution_text = self._extract_solution_from_raw_content(content)
+            
+            # Return a fallback response with extracted text
             result = {
-                "solution_email": content,  # Use raw content as fallback
+                "solution_email": solution_text,
                 "confidence": 0.5,  # Low confidence due to parsing issue
                 "reasoning": "JSON parsing failed, using raw content",
                 "risk_level": "medium",
@@ -399,6 +411,39 @@ Guidelines:
         result['kb_refs'] = [{'id': art.id, 'title': art.title} for art in kb_articles[:3]]
 
         return result
+    
+    def _extract_solution_from_raw_content(self, content: str) -> str:
+        """Extract solution text from malformed JSON content"""
+        try:
+            # Try to find solution_email value in the malformed JSON
+            import re
+            
+            # Look for "solution_email": followed by a string
+            match = re.search(r'"solution_email"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', content)
+            if match:
+                solution = match.group(1)
+                # Unescape JSON string
+                solution = solution.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+                return solution
+            
+            # If that fails, look for any text that looks like solution content
+            # Remove JSON-like syntax and extract meaningful text
+            cleaned = re.sub(r'[{}"\[\],]', '', content)
+            cleaned = re.sub(r'(solution_email|confidence|reasoning|risk_level|kb_articles_used)\s*:', '', cleaned)
+            
+            # Split by key indicators and take the first substantial text
+            lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
+            substantial_lines = [line for line in lines if len(line) > 20 and not line.replace('.', '').replace(' ', '').isdigit()]
+            
+            if substantial_lines:
+                return substantial_lines[0]
+            
+            # Final fallback - return first 200 chars of cleaned content
+            return cleaned[:200].strip() if cleaned.strip() else "Unable to generate solution - please contact support manually."
+            
+        except Exception as e:
+            logger.error(f"Error extracting solution from raw content: {e}")
+            return "Unable to generate solution - please contact support manually."
     
     def _get_relevant_kb_articles(self, ticket: Ticket) -> List[KBArticle]:
         """Get relevant KB articles for ticket"""

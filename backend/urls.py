@@ -3977,6 +3977,40 @@ def get_ai_proposed_fix(ticket_id):
         logger.error(f"Error generating AI proposed fix for ticket {ticket_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+@urls.route('/saved-fixes', methods=['GET', 'POST', 'DELETE'])
+@require_role("L1","L2","L3","MANAGER")
+def manage_saved_fixes():
+    """Manage saved proposed fixes for the current user"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    user = getattr(request, "agent_ctx", {}) or {}
+    user_id = user.get("id")
+    
+    if not user_id:
+        return jsonify({'error': 'User not authenticated'}), 401
+    
+    if request.method == "GET":
+        # Return all saved fixes for the user
+        try:
+            # For now, use a simple approach with localStorage on frontend
+            # In the future, could implement database storage with SavedProposedFix model
+            return jsonify({
+                'message': 'Use localStorage for saved fixes storage',
+                'storage_key': 'savedProposedFixes'
+            }), 200
+        except Exception as e:
+            logger.error(f"Error retrieving saved fixes for user {user_id}: {e}")
+            return jsonify({'error': 'Failed to retrieve saved fixes'}), 500
+    
+    elif request.method == "POST":
+        # Save a new proposed fix (handled via localStorage on frontend)
+        return jsonify({'message': 'Use localStorage for saving fixes'}), 200
+    
+    elif request.method == "DELETE":
+        # Delete a saved fix (handled via localStorage on frontend) 
+        return jsonify({'message': 'Use localStorage for deleting fixes'}), 200
+
 @urls.route('/tickets/unassigned', methods=['GET'])
 @require_role("L2","L3","MANAGER")
 def count_unassigned_tickets():
