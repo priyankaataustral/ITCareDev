@@ -2549,7 +2549,7 @@ function TicketHistoryCollapsible({
         )}
 
         {/* Main Content Area - Chat + Right Sidebar */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-auto">
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
@@ -2752,7 +2752,7 @@ function TicketHistoryCollapsible({
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', maxHeight: '100%'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', height: '100%'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
