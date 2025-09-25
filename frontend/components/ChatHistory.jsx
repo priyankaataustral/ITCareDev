@@ -130,7 +130,7 @@ const SaveProposedFixButton = ({ ticket }) => {
         
         {/* Saved Fix Modal */}
         {showModal && savedFix && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]" onClick={() => setShowModal(false)}>
             <div className="bg-white rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -399,7 +399,9 @@ function TicketInfoCard({ ticket }) {
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
           <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm">Ticket Summary</div>
-          <SaveProposedFixButton ticket={ticket} />
+          {!['closed', 'resolved', 'archived'].includes(ticket?.status?.toLowerCase()) && (
+            <SaveProposedFixButton ticket={ticket} />
+          )}
         </div>
         <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line text-sm">
           {(ticket.created || ticket.created_at) && <div className="text-xs">🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
@@ -1447,6 +1449,26 @@ const openDraftEditor = (prefill) => {
   // Load AI suggestions (department and proposed fix)
   const loadAiSuggestions = async (ticketId, ticketData) => {
     try {
+      // Skip AI suggestions for tickets that are already resolved/closed
+      const ticketStatus = ticketData?.status?.toLowerCase();
+      const isTicketResolved = ['closed', 'resolved', 'archived'].includes(ticketStatus);
+      
+      // Check if there are confirmation messages indicating the ticket is resolved
+      const hasConfirmationMessage = ticketData?.messages?.some(msg => 
+        msg.content && (
+          msg.content.includes('confirmed the solution') ||
+          msg.content.includes('rating:') ||
+          msg.content.includes('solution confirmed') ||
+          msg.content.includes('marked as resolved') ||
+          msg.content.includes('ticket closed')
+        )
+      );
+      
+      if (isTicketResolved || hasConfirmationMessage) {
+        console.log(`Skipping AI suggestions for ticket ${ticketId}: ticket is resolved or has confirmation`);
+        return;
+      }
+      
       // Parallel fetch of department suggestion and proposed fix
       const [deptResponse, fixResponse] = await Promise.all([
         apiGet(`/tickets/${ticketId}/ai-department-suggestion`).catch(e => ({ error: e.message })),
@@ -2748,8 +2770,9 @@ function TicketHistoryCollapsible({
                           </span>
                         </div>
                         
-                        {/* Add "View Proposed Fix" button for AI fix suggestions */}
-                        {msg.type === 'ai_suggestion' && msg.id?.includes('ai-fix-') && proposedFixData && (
+                        {/* Add "View Proposed Fix" button for AI fix suggestions - Only for active tickets */}
+                        {msg.type === 'ai_suggestion' && msg.id?.includes('ai-fix-') && proposedFixData && 
+                         !['closed', 'resolved', 'archived'].includes(ticket?.status?.toLowerCase()) && (
                           <div className="mt-3">
                             <button
                               onClick={() => setShowProposedFix(true)}
@@ -2844,20 +2867,22 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Fixed at bottom with absolute positioning */}
-              <div className="absolute bottom-0 left-0 right-0 z-50">
-                <ChatComposer
-                  value={newMsg}
-                  onChange={v => {
-                    if (typeof v === 'string') setNewMsg(v);
-                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                  }}
-                  onSend={sendMessage}
-                  sending={sending}
-                  textareaRef={textareaRef}
-                  drawerOpen={showDraftEditor}
-                />
-              </div>
+              {/* Composer - Fixed at bottom with absolute positioning - Hidden when modals/popups are open */}
+              {!showModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+                <div className="absolute bottom-0 left-0 right-0 z-50">
+                  <ChatComposer
+                    value={newMsg}
+                    onChange={v => {
+                      if (typeof v === 'string') setNewMsg(v);
+                      else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                    }}
+                    onSend={sendMessage}
+                    sending={sending}
+                    textareaRef={textareaRef}
+                    drawerOpen={showDraftEditor}
+                  />
+                </div>
+              )}
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
@@ -2918,7 +2943,7 @@ function TicketHistoryCollapsible({
 
       {/* Close Confirmation Modal */}
       {showCloseConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900 rounded-full flex items-center justify-center">
@@ -2972,7 +2997,7 @@ function TicketHistoryCollapsible({
 
       {/* Archive Confirmation Modal */}
       {showArchiveConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900 rounded-full flex items-center justify-center">
@@ -3026,7 +3051,7 @@ function TicketHistoryCollapsible({
 
       {/* Proposed Fix Modal */}
       {showProposedFix && proposedFixData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
