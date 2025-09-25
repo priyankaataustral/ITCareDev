@@ -663,7 +663,7 @@ for (const ev of safeEvents) {
 function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus, drawerOpen }) {
   return (
     <div className="composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700" style={{zIndex: 50}}>
-      <div className="flex items-center w-full max-w-4xl mx-auto gap-3">
+      <div className="flex items-center w-full max-w-none gap-3">
         <input
           ref={textareaRef}
           type="text"
@@ -2721,7 +2721,7 @@ function TicketHistoryCollapsible({
             </div>
 
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-6 left-4 right-4 z-50">
+              <div className="absolute bottom-6 left-4 right-4 z-20">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
