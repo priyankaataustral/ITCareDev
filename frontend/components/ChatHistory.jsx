@@ -2524,39 +2524,37 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+      <div className={`w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`} style={{marginRight: '320px'}}>
         {/* Ticket Header - At top of document */}
-        <TicketHeader
-          ticket={ticket}
-          onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
-          // onEscalate={() => handleAction('close')}
-          onClose={() => handleAction('close')}
-          actionLoading={actionLoading}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-        />
-
-        {/* Ticket Info Card - Below header */}
-        {ticket && (
-          <TicketInfoCard 
-            ticket={ticket} 
-            showSavedFixModal={showSavedFixModal} 
-            setShowSavedFixModal={setShowSavedFixModal} 
-            savedFixData={savedFixData} 
-            setSavedFixData={setSavedFixData} 
+        <div className="max-w-4xl mx-auto">
+          <TicketHeader
+            ticket={ticket}
+            onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
+            // onEscalate={() => handleAction('close')}
+            onClose={() => handleAction('close')}
+            actionLoading={actionLoading}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
           />
-        )}
 
-        {/* Main Content Area - Chat + Right Sidebar - Natural flow */}
-        <div className="flex">
-            {/* Main Chat Area */}
-            <div className="flex-1 min-w-0">
-              {/* Messages - Natural flow with proper height */}
-               <div
-                 ref={scrollRef}
-                 className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
-                 style={{ minHeight: '100vh', paddingBottom: '120px' }}
-              >
+          {/* Ticket Info Card - Below header */}
+          {ticket && (
+            <TicketInfoCard 
+              ticket={ticket} 
+              showSavedFixModal={showSavedFixModal} 
+              setShowSavedFixModal={setShowSavedFixModal} 
+              savedFixData={savedFixData} 
+              setSavedFixData={setSavedFixData} 
+            />
+          )}
+        </div>
+
+        {/* Main Content Area - Natural document flow */}
+        <div className="max-w-4xl mx-auto">
+          {/* Messages - Natural document flow */}
+          <div
+            ref={scrollRef}
+            className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black min-h-screen">
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
                 if ((msg.sender === 'bot' || msg.sender === 'assistant' || msg.type === 'email') && typeof msg.content === 'string' && msg.content.trim().startsWith('Subject:')) {
@@ -2725,27 +2723,29 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Natural flow at bottom of messages */}
-              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-                <div className="mt-4 mb-8">
-                  <ChatComposer
-                    value={newMsg}
-                    onChange={v => {
-                      if (typeof v === 'string') setNewMsg(v);
-                      else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                    }}
-                    onSend={sendMessage}
-                    sending={sending}
-                    textareaRef={textareaRef}
-                    drawerOpen={showDraftEditor}
-                  />
-                </div>
-              )}
-            </div>
+          </div>
 
-          {/* RIGHT: Collapsibles Sidebar - Natural flow */}
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px'}}>
-            <div className="p-4 space-y-4">
+          {/* Composer - At bottom of document */}
+          {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+            <div className="max-w-4xl mx-auto p-4 pb-16">
+              <ChatComposer
+                value={newMsg}
+                onChange={v => {
+                  if (typeof v === 'string') setNewMsg(v);
+                  else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                }}
+                onSend={sendMessage}
+                sending={sending}
+                textareaRef={textareaRef}
+                drawerOpen={showDraftEditor}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Activity Sidebar - Fixed position */}
+        <div className="fixed top-0 right-0 w-80 h-screen bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto z-20" style={{maxWidth: '320px'}}>
+          <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
                 loading={timelineLoading}
@@ -2772,8 +2772,6 @@ function TicketHistoryCollapsible({
               <StepProgressBar stepInfo={stepInfo} />
             </div>
           </div>
-        </div>
-      </div>
       
       {/* Escalation Popup */}
       <EscalationPopup
