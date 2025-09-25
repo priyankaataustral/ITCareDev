@@ -399,7 +399,7 @@ function TicketInfoCard({ ticket }) {
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
           <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm">Ticket Summary</div>
-          {!['closed', 'resolved', 'archived'].includes(ticket?.status?.toLowerCase()) && (
+          {!['closed', 'resolved', 'archived'].includes((ticket?.status || '').toLowerCase()) && (
             <SaveProposedFixButton ticket={ticket} />
           )}
         </div>
@@ -1450,7 +1450,7 @@ const openDraftEditor = (prefill) => {
   const loadAiSuggestions = async (ticketId, ticketData) => {
     try {
       // Skip AI suggestions for tickets that are already resolved/closed
-      const ticketStatus = ticketData?.status?.toLowerCase();
+      const ticketStatus = (ticketData?.status || '').toLowerCase();
       const isTicketResolved = ['closed', 'resolved', 'archived'].includes(ticketStatus);
       
       // Check if there are confirmation messages indicating the ticket is resolved
@@ -2772,7 +2772,7 @@ function TicketHistoryCollapsible({
                         
                         {/* Add "View Proposed Fix" button for AI fix suggestions - Only for active tickets */}
                         {msg.type === 'ai_suggestion' && msg.id?.includes('ai-fix-') && proposedFixData && 
-                         !['closed', 'resolved', 'archived'].includes(ticket?.status?.toLowerCase()) && (
+                         !['closed', 'resolved', 'archived'].includes((ticket?.status || '').toLowerCase()) && (
                           <div className="mt-3">
                             <button
                               onClick={() => setShowProposedFix(true)}
