@@ -15,6 +15,225 @@ dayjs.extend(relativeTime);
 // Config & helpers
 // =========================
 
+// Save Proposed Fix Button Component
+const SaveProposedFixButton = ({ ticket }) => {
+  const [isSaved, setIsSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [savedFix, setSavedFix] = useState(null);
+  
+  // Check if this ticket has a saved fix
+  useEffect(() => {
+    try {
+      const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
+      setIsSaved(!!savedFixes[ticket.id]);
+    } catch (error) {
+      console.error('Error checking saved fixes:', error);
+    }
+  }, [ticket.id]);
+  
+  const handleSaveProposedFix = async (e) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    
+    try {
+      // Fetch the proposed fix from the API
+      const response = await apiGet(`/tickets/${ticket.id}/ai-proposed-fix`);
+      
+      if (response.proposed_fix) {
+        // Save to localStorage
+        const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
+        savedFixes[ticket.id] = {
+          ...response.proposed_fix,
+          ticket_subject: ticket.subject,
+          ticket_id: ticket.id,
+          saved_at: new Date().toISOString()
+        };
+        
+        localStorage.setItem('savedProposedFixes', JSON.stringify(savedFixes));
+        setIsSaved(true);
+        
+        // Show quick success message
+        const originalText = e.target.textContent;
+        e.target.textContent = '✅ Saved!';
+        setTimeout(() => {
+          if (e.target) e.target.textContent = originalText;
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to save proposed fix:', error);
+      alert('Failed to save proposed fix. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleViewSavedFix = (e) => {
+    e.stopPropagation();
+    
+    try {
+      const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
+      const fix = savedFixes[ticket.id];
+      
+      if (fix) {
+        setSavedFix(fix);
+        setShowModal(true);
+      }
+    } catch (error) {
+      console.error('Error viewing saved fix:', error);
+      alert('Error loading saved fix.');
+    }
+  };
+  
+  const handleCopyToClipboard = async () => {
+    if (!savedFix) return;
+    
+    const fixText = `Proposed Fix for Ticket #${ticket.id}: ${ticket.subject}\n\n` +
+                   `Confidence: ${savedFix.confidence}%\n` +
+                   `Risk Level: ${savedFix.risk_level}\n\n` +
+                   `AI Analysis:\n${savedFix.reasoning}\n\n` +
+                   `Solution:\n${savedFix.content}`;
+    
+    try {
+      await navigator.clipboard.writeText(fixText);
+      alert('Solution copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      alert('Failed to copy to clipboard');
+    }
+  };
+  
+  const handleRemoveSaved = (e) => {
+    e.stopPropagation();
+    
+    try {
+      const savedFixes = JSON.parse(localStorage.getItem('savedProposedFixes') || '{}');
+      delete savedFixes[ticket.id];
+      localStorage.setItem('savedProposedFixes', JSON.stringify(savedFixes));
+      setIsSaved(false);
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error removing saved fix:', error);
+    }
+  };
+  
+  if (isSaved) {
+    return (
+      <>
+        <button
+          onClick={handleViewSavedFix}
+          className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors flex items-center gap-2 font-medium"
+          title="View saved proposed fix"
+        >
+          🔖 View Saved Fix
+        </button>
+        
+        {/* Saved Fix Modal */}
+        {showModal && savedFix && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+            <div className="bg-white rounded-lg p-6 max-w-2xl max-h-[80vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  💡 Saved Fix for Ticket #{ticket.id}
+                </h3>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-700">Ticket Subject:</h4>
+                  <p className="text-gray-600">{ticket.subject}</p>
+                </div>
+                
+                <div className="flex gap-4">
+                  <div>
+                    <span className="text-sm font-medium">Confidence: </span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      savedFix.confidence >= 80 ? 'bg-green-100 text-green-700' :
+                      savedFix.confidence >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {savedFix.confidence}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Risk Level: </span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      savedFix.risk_level === 'low' ? 'bg-green-100 text-green-700' :
+                      savedFix.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {savedFix.risk_level}
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">AI Analysis:</h4>
+                  <div className="bg-blue-50 p-3 rounded-md">
+                    <p className="text-gray-700 text-sm">{savedFix.reasoning}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Proposed Solution:</h4>
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <p className="text-gray-700 text-sm whitespace-pre-wrap">{savedFix.content}</p>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500">
+                  Saved on: {new Date(savedFix.saved_at).toLocaleString()}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={handleCopyToClipboard}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  📋 Copy Solution
+                </button>
+                <button
+                  onClick={handleRemoveSaved}
+                  className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
+                >
+                  🗑️ Remove
+                </button>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+  
+  return (
+    <button
+      onClick={handleSaveProposedFix}
+      disabled={isLoading}
+      className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2 font-medium ${
+        isLoading 
+          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+          : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+      }`}
+      title="Save proposed fix for later reference"
+    >
+      {isLoading ? '⏳ Saving...' : '🔖 Save Fix'}
+    </button>
+  );
+};
 
 const authHeaders = () => {
   try {
@@ -175,8 +394,11 @@ function TicketInfoCard({ ticket }) {
   return (
     <div className="rounded-xl bg-gradient-to-r from-yellow-50 to-white dark:from-yellow-900 dark:to-black p-3 border-l-4 border-yellow-500 shadow-sm mb-3 mx-4 flex items-start gap-3">
       <span className="text-yellow-500 dark:text-yellow-300 text-2xl">📄</span>
-      <div>
-        <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm mb-1">Ticket Summary</div>
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-semibold text-yellow-800 dark:text-yellow-200 text-sm">Ticket Summary</div>
+          <SaveProposedFixButton ticket={ticket} />
+        </div>
         <div className="text-gray-800 dark:text-gray-100 whitespace-pre-line text-sm">
           {(ticket.created || ticket.created_at) && <div className="text-xs">🕐 <b>Created:</b> {dayjs(ticket.created || ticket.created_at).format('MMM D, h:mm A')}</div>}
           {ticket.level > 1 && <div className="text-xs">⬆️ <b>Level:</b> L{ticket.level}</div>}
@@ -603,25 +825,49 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   const [escOpenStable, setEscOpenStable] = useState(false);
   const [deescOpenStable, setDeescOpenStable] = useState(false);
 
-  // De-duplicate (user/bot/assistant) across entire stream (not just adjacent)
+  // Enhanced De-duplicate logic for ALL message types (user/bot/assistant/system)
   const displayMessages = useMemo(() => {
     const out = [];
+    const seen = new Set(); // Track unique message identifiers
     const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
     for (const cur of messages) {
-      const prev = out[out.length - 1];
-      const curIsAssistant = cur.sender === 'assistant' || cur.sender === 'bot';
-      const prevIsAssistant = prev && (prev.sender === 'assistant' || prev.sender === 'bot');
-
-      // Only suppress if the *previous* assistant bubble is identical
-      if (
-        curIsAssistant &&
-        prevIsAssistant &&
-        norm(toDisplayString(prev.content)) === norm(toDisplayString(cur.content))
-      ) {
+      if (!cur) continue;
+      
+      // Create a unique identifier for each message
+      const messageKey = cur.id || `${cur.sender}-${cur.timestamp}-${norm(toDisplayString(cur.content))}`;
+      
+      // Skip if we've already seen this exact message
+      if (seen.has(messageKey)) {
         continue;
       }
-      out.push(cur);
+      
+      // Advanced content-based deduplication
+      const curContent = norm(toDisplayString(cur.content));
+      const curSender = cur.sender;
+      
+      // Check for content duplicates in the last few messages (prevent spam)
+      const recentMessages = out.slice(-5); // Check last 5 messages
+      const isDuplicate = recentMessages.some(prev => {
+        const prevContent = norm(toDisplayString(prev.content));
+        const prevSender = prev.sender;
+        
+        // Same sender with identical content
+        if (curSender === prevSender && curContent === prevContent && curContent.length > 10) {
+          return true;
+        }
+        
+        // Assistant/bot duplicate suppression (original logic preserved)
+        const curIsAssistant = curSender === 'assistant' || curSender === 'bot';
+        const prevIsAssistant = prevSender === 'assistant' || prevSender === 'bot';
+        
+        return curIsAssistant && prevIsAssistant && curContent === prevContent;
+      });
+      
+      if (!isDuplicate) {
+        seen.add(messageKey);
+        out.push(cur);
+      }
     }
     return out;
   }, [messages]);
@@ -1105,6 +1351,15 @@ const openDraftEditor = (prefill) => {
               if (m?.source === 'suggested' || m?.transient || m?.meta?.transient) continue;
               if (!m?.id || seen.has(m.id)) continue;
               
+              // Additional content-based deduplication for messages without IDs
+              const contentKey = `${m.sender}-${m.content?.substring(0, 50)}-${m.timestamp}`;
+              const hasContentDuplicate = prev.some(existingMsg => {
+                const existingKey = `${existingMsg.sender}-${existingMsg.content?.substring(0, 50)}-${existingMsg.timestamp}`;
+                return contentKey === existingKey && m.sender === existingMsg.sender;
+              });
+              
+              if (hasContentDuplicate) continue;
+              
               // Skip if this is a duplicate temporary message
               if (m.id?.toString().startsWith('temp-') && seenTempIds.has(m.id)) continue;
               
@@ -1226,9 +1481,13 @@ const openDraftEditor = (prefill) => {
         setProposedFixData(fixResponse.proposed_fix);
       }
 
-      // Add AI messages to the chat
+      // Add AI messages to the chat with deduplication
       if (aiMessages.length > 0) {
-        setMessages(prev => [...prev, ...aiMessages]);
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newMessages = aiMessages.filter(msg => !existingIds.has(msg.id));
+          return [...prev, ...newMessages];
+        });
       }
 
       // Mark this ticket as having AI suggestions loaded and persist to localStorage
@@ -1260,16 +1519,30 @@ const openDraftEditor = (prefill) => {
       .then(data => {
         setTicket(data);
         
-        const normalized = (Array.isArray(data.messages) ? data.messages : []).map((m) => {
-          const c = m?.content;
-          return {
-            ...m,
-            sender: (m.sender === 'bot' ? 'assistant' : m.sender),
-            content: toDisplayString(c),
-          };
-        });
+        const normalized = (Array.isArray(data.messages) ? data.messages : [])
+          .filter(m => m && m.content) // Filter out null/empty messages
+          .map((m) => {
+            const c = m?.content;
+            return {
+              ...m,
+              sender: (m.sender === 'bot' ? 'assistant' : m.sender),
+              content: toDisplayString(c),
+            };
+          });
         
-        setMessages(normalized);
+        // Deduplicate messages by ID before setting
+        const uniqueMessages = [];
+        const seenIds = new Set();
+        
+        for (const msg of normalized) {
+          const msgId = msg.id || `${msg.sender}-${msg.timestamp}-${msg.content}`;
+          if (!seenIds.has(msgId)) {
+            seenIds.add(msgId);
+            uniqueMessages.push(msg);
+          }
+        }
+        
+        setMessages(uniqueMessages);
         
         // Load AI suggestions if not already loaded for this ticket
         if (!aiSuggestionsLoaded.has(activeThreadId)) {
@@ -1292,7 +1565,7 @@ const openDraftEditor = (prefill) => {
     };
   }, []);
 
-  // Add global utility function for clearing AI suggestions cache (for debugging)
+  // Add global utility functions for debugging (for debugging)
   useEffect(() => {
     window.clearAISuggestionsCache = () => {
       try {
@@ -1304,10 +1577,54 @@ const openDraftEditor = (prefill) => {
       }
     };
     
+    window.debugMessages = () => {
+      console.log('Current messages:', messages);
+      console.log('Display messages (deduplicated):', displayMessages);
+      
+      // Check for potential duplicates
+      const duplicates = [];
+      const seen = new Map();
+      
+      messages.forEach((msg, index) => {
+        const key = `${msg.sender}-${msg.content}`;
+        if (seen.has(key)) {
+          duplicates.push({ index, message: msg, originalIndex: seen.get(key) });
+        } else {
+          seen.set(key, index);
+        }
+      });
+      
+      if (duplicates.length > 0) {
+        console.warn('Potential duplicates found:', duplicates);
+      } else {
+        console.log('No duplicates detected');
+      }
+    };
+    
+    window.cleanMessages = () => {
+      setMessages(prev => {
+        const unique = [];
+        const seen = new Set();
+        
+        prev.forEach(msg => {
+          const key = msg.id || `${msg.sender}-${msg.timestamp}-${msg.content}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(msg);
+          }
+        });
+        
+        console.log(`Cleaned messages: ${prev.length} → ${unique.length}`);
+        return unique;
+      });
+    };
+    
     return () => {
       delete window.clearAISuggestionsCache;
+      delete window.debugMessages;
+      delete window.cleanMessages;
     };
-  }, []);
+  }, [messages, displayMessages]);
 
   // Smart scroll to bottom
   useEffect(() => {
@@ -1720,10 +2037,25 @@ function TicketHistoryCollapsible({
     setError(null);
     setNewMsg('');
 
-    setMessages(prev => [
-      ...prev,
-      { id: `temp-${tempIdRef.current++}`, sender: 'user', content: text, timestamp: new Date().toISOString() }
-    ]);
+    // Add user message with deduplication check
+    setMessages(prev => {
+      // Check if this exact message already exists
+      const normalizedText = text.trim();
+      const isDuplicate = prev.some(m => 
+        m.sender === 'user' && 
+        m.content === normalizedText && 
+        Math.abs(new Date(m.timestamp).getTime() - Date.now()) < 5000 // Within 5 seconds
+      );
+      
+      if (isDuplicate) {
+        return prev; // Don't add duplicate
+      }
+      
+      return [
+        ...prev,
+        { id: `temp-${tempIdRef.current++}`, sender: 'user', content: text, timestamp: new Date().toISOString() }
+      ];
+    });
 
     // show a typing placeholder to improve perceived latency
     const tempTypingId = `typing-${Date.now()}`;
@@ -2317,7 +2649,7 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`flex flex-col h-full min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+      <div className={`flex flex-col min-h-screen w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
         <TicketHeader
           ticket={ticket}
           onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
@@ -2334,14 +2666,14 @@ function TicketHistoryCollapsible({
         </div>
 
         {/* Main Content Area - Chat + Right Sidebar */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex min-h-0">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)', height: 'calc(100vh - 250px)'}}>
+            <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
                <div
                  ref={scrollRef}
-                 className="flex-1 overflow-y-scroll p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                 style={{ paddingBottom: '120px', maxHeight: 'calc(100vh - 400px)' }}
+                 className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
+                 style={{ paddingBottom: '20px', minHeight: '400px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2504,24 +2836,24 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-               {/* Composer - Positioned slightly higher */}
-               <div className="absolute bottom-6 left-0 right-0 z-50">
-                 <ChatComposer
-                   value={newMsg}
-                   onChange={v => {
-                     if (typeof v === 'string') setNewMsg(v);
-                     else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
-                   }}
-                   onSend={sendMessage}
-                   sending={sending}
-                   textareaRef={textareaRef}
-                   drawerOpen={showDraftEditor}
-                 />
-               </div>
+              {/* Composer - Fixed at bottom */}
+              <div className="flex-shrink-0 mt-auto">
+                <ChatComposer
+                  value={newMsg}
+                  onChange={v => {
+                    if (typeof v === 'string') setNewMsg(v);
+                    else if (v && v.target && typeof v.target.value === 'string') setNewMsg(v.target.value);
+                  }}
+                  onSend={sendMessage}
+                  sending={sending}
+                  textareaRef={textareaRef}
+                  drawerOpen={showDraftEditor}
+                />
+              </div>
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
-          <div className="w-80 bg-white border-l border-gray-200 overflow-y-auto" style={{minWidth: '320px', maxWidth: '320px'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
