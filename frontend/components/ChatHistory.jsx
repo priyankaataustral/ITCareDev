@@ -1298,7 +1298,20 @@ const openDraftEditor = (prefill) => {
     return () => clearTimeout(timeoutId);
   }, [timelineRefresh, activeThreadId]);
 
-  useEffect(() => { setActiveThreadId(threadId); }, [threadId]);
+  useEffect(() => { 
+    setActiveThreadId(threadId); 
+    
+    // Reset modal states when switching tickets to ensure ChatComposer appears
+    if (threadId) {
+      setShowSavedFixModal(false);
+      setShowCloseConfirm(false);
+      setShowArchiveConfirm(false);
+      setShowEscalationPopup(false);
+      setShowDeescalationPopup(false);
+      setShowDraftEditor(false);
+      setShowProposedFix(false);
+    }
+  }, [threadId]);
 
   // Prevent both popups from being open simultaneously
   useEffect(() => {
@@ -2522,16 +2535,18 @@ function TicketHistoryCollapsible({
           setDarkMode={setDarkMode}
         />
 
-        {/* Ticket Info Card */}
-        <div className="flex-shrink-0">
-          <TicketInfoCard 
-            ticket={ticket} 
-            showSavedFixModal={showSavedFixModal} 
-            setShowSavedFixModal={setShowSavedFixModal} 
-            savedFixData={savedFixData} 
-            setSavedFixData={setSavedFixData} 
-          />
-        </div>
+        {/* Ticket Info Card - Always visible when ticket exists */}
+        {ticket && (
+          <div className="flex-shrink-0 w-full" style={{ zIndex: 10 }}>
+            <TicketInfoCard 
+              ticket={ticket} 
+              showSavedFixModal={showSavedFixModal} 
+              setShowSavedFixModal={setShowSavedFixModal} 
+              savedFixData={savedFixData} 
+              setSavedFixData={setSavedFixData} 
+            />
+          </div>
+        )}
 
         {/* Main Content Area - Chat + Right Sidebar */}
         <div className="flex-1 flex overflow-hidden">
@@ -2711,8 +2726,8 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Positioned at bottom of chat area only */}
-              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
+              {/* Composer - Always show unless modals are open */}
+              {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor ? (
                 <div className="absolute bottom-0 left-0 right-0 z-50">
                   <ChatComposer
                     value={newMsg}
@@ -2726,6 +2741,13 @@ function TicketHistoryCollapsible({
                     drawerOpen={showDraftEditor}
                   />
                 </div>
+              ) : (
+                // Debug info when composer is hidden
+                process.env.NODE_ENV === 'development' && (
+                  <div className="absolute bottom-0 left-0 right-0 z-40 bg-yellow-100 p-2 text-xs">
+                    ChatComposer hidden: savedFix={String(showSavedFixModal)}, close={String(showCloseConfirm)}, archive={String(showArchiveConfirm)}, escalate={String(showEscalationPopup)}, deescalate={String(showDeescalationPopup)}, draft={String(showDraftEditor)}
+                  </div>
+                )
               )}
             </div>
 
