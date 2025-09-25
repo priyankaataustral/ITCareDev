@@ -249,7 +249,7 @@ function CollapsibleSection({ title, children, isOpen, onToggle }) {
   );
 }
 
-function TicketInfoCard({ ticket }) {
+function TicketInfoCard({ ticket, showSavedFixModal, setShowSavedFixModal, savedFixData, setSavedFixData }) {
   if (!ticket) return null;
   
   // Enhanced download summary handler
@@ -2585,7 +2585,13 @@ function TicketHistoryCollapsible({
 
         {/* Ticket Info Card */}
         <div className="flex-shrink-0">
-          <TicketInfoCard ticket={ticket} />
+          <TicketInfoCard 
+            ticket={ticket} 
+            showSavedFixModal={showSavedFixModal} 
+            setShowSavedFixModal={setShowSavedFixModal} 
+            savedFixData={savedFixData} 
+            setSavedFixData={setSavedFixData} 
+          />
         </div>
 
         {/* Main Content Area - Chat + Right Sidebar */}
