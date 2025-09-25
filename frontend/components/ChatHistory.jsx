@@ -2772,9 +2772,9 @@ function TicketHistoryCollapsible({
                 }}
               />
 
-              {/* Composer - Fixed at bottom with absolute positioning - Hidden when modals/popups are open */}
+              {/* Composer - Fixed at bottom with absolute positioning - Always show unless modals are open */}
               {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-                <div className="absolute bottom-0 left-0 right-0 z-50">
+                <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg">
                   <ChatComposer
                     value={newMsg}
                     onChange={v => {
@@ -2788,6 +2788,11 @@ function TicketHistoryCollapsible({
                   />
                 </div>
               )}
+              
+              {/* Debug info - remove this after testing */}
+              <div className="fixed top-4 right-4 bg-red-100 p-2 text-xs z-[200]">
+                Debug: showSavedFixModal={String(showSavedFixModal)}, showCloseConfirm={String(showCloseConfirm)}, showArchiveConfirm={String(showArchiveConfirm)}
+              </div>
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
