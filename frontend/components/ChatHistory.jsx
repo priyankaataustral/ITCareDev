@@ -2788,11 +2788,6 @@ function TicketHistoryCollapsible({
                   />
                 </div>
               )}
-              
-              {/* Debug info - remove this after testing */}
-              <div className="fixed top-4 right-4 bg-red-100 p-2 text-xs z-[200]">
-                Debug: showSavedFixModal={String(showSavedFixModal)}, showCloseConfirm={String(showCloseConfirm)}, showArchiveConfirm={String(showArchiveConfirm)}
-              </div>
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
