@@ -2524,9 +2524,10 @@ function TicketHistoryCollapsible({
   return (
     <>
 
-      <div className={`w-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`} style={{marginRight: '320px'}}>
-        {/* Ticket Header - At top of document */}
-        <div className="max-w-4xl mx-auto">
+      <div className={`flex ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+        {/* Main Content Area - Left side */}
+        <div className="flex-1 min-w-0" style={{marginRight: '320px'}}>
+          {/* Ticket Header - At top of document */}
           <TicketHeader
             ticket={ticket}
             onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
@@ -2547,11 +2548,7 @@ function TicketHistoryCollapsible({
               setSavedFixData={setSavedFixData} 
             />
           )}
-        </div>
 
-        {/* Main Content Area - Natural document flow */}
-        <div className="max-w-4xl mx-auto">
-          {/* Messages - Natural document flow */}
           <div
             ref={scrollRef}
             className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black min-h-screen">
@@ -2727,7 +2724,7 @@ function TicketHistoryCollapsible({
 
           {/* Composer - At bottom of document */}
           {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-            <div className="max-w-4xl mx-auto p-4 pb-16">
+            <div className="p-4 pb-16">
               <ChatComposer
                 value={newMsg}
                 onChange={v => {
@@ -2744,7 +2741,7 @@ function TicketHistoryCollapsible({
         </div>
 
         {/* RIGHT: Activity Sidebar - Fixed position */}
-        <div className="fixed top-0 right-0 w-80 h-screen bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto z-20" style={{maxWidth: '320px'}}>
+        <div className="fixed top-0 right-0 w-80 h-screen bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto z-20" style={{width: '320px'}}>
           <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
