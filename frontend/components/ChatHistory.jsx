@@ -763,7 +763,7 @@ for (const ev of safeEvents) {
 
 function ChatComposer({ value, onChange, onSend, sending, textareaRef, autoFocus, drawerOpen }) {
   return (
-    <div className="composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700">
+    <div className="composer-bar w-full px-4 py-3 bg-white dark:bg-gray-900 shadow-xl border-t border-gray-200 dark:border-gray-700" style={{zIndex: 10}}>
       <div className="flex items-center w-full max-w-4xl mx-auto gap-3">
         <input
           ref={textareaRef}
@@ -2666,14 +2666,14 @@ function TicketHistoryCollapsible({
         </div>
 
         {/* Main Content Area - Chat + Right Sidebar */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0" style={{height: 'calc(100vh - 180px)'}}>
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col min-w-0 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
               {/* Messages */}
                <div
                  ref={scrollRef}
                  className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black scroll-smooth"
-                 style={{ paddingBottom: '20px', minHeight: '400px' }}
+                 style={{ paddingBottom: '80px', minHeight: '400px' }}
               >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2704,6 +2704,12 @@ function TicketHistoryCollapsible({
                 ].includes(msg.type);
 
                 let displayContent = toDisplayString(msg.content);
+                
+                // Apply markdown formatting for bot/assistant messages
+                if ((isBot || msg.sender === 'assistant') && typeof displayContent === 'string') {
+                  displayContent = renderListOrText(displayContent);
+                }
+                
                 if (msg.downloadUrl && msg.downloadName) {
                   displayContent = (
                     <a href={msg.downloadUrl} download={msg.downloadName} className="underline text-blue-600">
@@ -2853,7 +2859,7 @@ function TicketHistoryCollapsible({
             </div>
 
           {/* RIGHT: Collapsibles Sidebar - Always Visible */}
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', maxHeight: '100%'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
