@@ -378,8 +378,8 @@ function DraftEmailEditor({
   if (!open) return null;
 
   return (
-    <div className="w-full border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-black/95 backdrop-blur sticky bottom-0 z-[60] pointer-events-auto">
-      <div className="max-w-4xl mx-auto px-4 py-3">
+    <div className="w-full border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-black/95 backdrop-blur sticky bottom-0 z-[50] pointer-events-auto">
+      <div className="max-w-none px-4 py-3">
         <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Draft email</div>
 
         <textarea
@@ -2548,7 +2548,7 @@ function TicketHistoryCollapsible({
             <div
               ref={scrollRef}
               className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
-              style={{ height: 'calc(100vh - 160px)', overflowY: 'auto', paddingBottom: '120px' }}
+              style={{ height: 'calc(100vh - 160px)', overflowY: 'auto', paddingBottom: '140px' }}
             >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2721,7 +2721,7 @@ function TicketHistoryCollapsible({
             </div>
 
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-6 z-50" style={{ left: '12px', right: '12px', maxWidth: 'calc(100% - 24px)' }}>
+              <div className="absolute bottom-6 z-50 left-0 right-0 px-3">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
