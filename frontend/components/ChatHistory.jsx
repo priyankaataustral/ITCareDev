@@ -2724,7 +2724,7 @@ function TicketHistoryCollapsible({
             </div>
 
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-6 z-50 left-4 right-4">
+              <div className="w-full pt-2 pb-4 px-0 bg-transparent">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
