@@ -7003,7 +7003,7 @@ def analytics_ai_insights():
         ai_ticket_categories = db.session.query(
             Ticket.category,
             func.count(Solution.id).label('volume'),
-            func.avg(case([(Solution.status.in_(['confirmed_by_user', 'published']), 1.0)], else_=0.0)).label('success_rate')
+            func.avg(case((Solution.status.in_(['confirmed_by_user', 'published']), 1.0), else_=0.0)).label('success_rate')
         ).join(Solution, Ticket.id == Solution.ticket_id).filter(
             Solution.generated_by == 'ai',
             Solution.created_at >= since

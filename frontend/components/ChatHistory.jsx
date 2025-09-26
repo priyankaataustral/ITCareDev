@@ -2737,7 +2737,7 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)', minHeight: '400px'}}>
+          <div className="w-80 bg-blue-100 border-l border-blue-500 border-4 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)', minHeight: '400px'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
