@@ -2543,12 +2543,12 @@ function TicketHistoryCollapsible({
           />
         )}
 
-        <div className="flex" style={{ height: 'calc(100vh - 200px)' }}>
+        <div className="flex" style={{ height: 'calc(100vh - 160px)' }}>
           <div className="flex-1 relative">
             <div
               ref={scrollRef}
               className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
-              style={{ height: 'calc(100vh - 200px)', overflowY: 'auto', paddingBottom: '120px' }}
+              style={{ height: 'calc(100vh - 160px)', overflowY: 'auto', paddingBottom: '120px' }}
             >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2721,7 +2721,7 @@ function TicketHistoryCollapsible({
             </div>
 
             {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="absolute bottom-6 left-6 right-6 z-50" style={{ maxWidth: '600px', left: '24px' }}>
+              <div className="absolute bottom-6 z-50" style={{ left: '12px', right: '12px', maxWidth: 'calc(100% - 24px)' }}>
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
@@ -2737,7 +2737,7 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 200px)'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
