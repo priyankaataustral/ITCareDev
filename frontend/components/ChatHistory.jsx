@@ -2723,8 +2723,6 @@ function TicketHistoryCollapsible({
 
             </div>
 
-            {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="w-full pt-2 pb-4 px-0 bg-transparent">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
@@ -2737,8 +2735,6 @@ function TicketHistoryCollapsible({
                   drawerOpen={showDraftEditor}
                 />
               </div>
-            )}
-          </div>
 
           <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', height: '100%'}}>
             <div className="p-4 space-y-4">
