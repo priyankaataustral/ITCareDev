@@ -2693,7 +2693,6 @@ function TicketHistoryCollapsible({
                 </div>
 
                 <div ref={scrollBottomRef} />
-              </div>
 
               {/* Draft Email Editor */}
               <DraftEmailEditor
@@ -2740,6 +2739,7 @@ function TicketHistoryCollapsible({
                   drawerOpen={showDraftEditor}
                 />
               </div>
+          </div>
           </div>
 
           <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', height: '100%'}}>
