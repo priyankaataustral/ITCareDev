@@ -704,8 +704,6 @@ function ChatHistory({ threadId, onBack, className = '' }) {
   // AI suggestions state - use localStorage for persistence
   const [aiSuggestionsLoaded, setAiSuggestionsLoaded] = useState(() => {
     try {
-      // Clear cache to force refresh during debugging
-      localStorage.removeItem('aiSuggestionsLoaded');
       const saved = localStorage.getItem('aiSuggestionsLoaded');
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
@@ -1482,10 +1480,11 @@ const openDraftEditor = (prefill) => {
         
         setMessages(uniqueMessages);
         
+        // DISABLED FOR DEMO STABILITY
         // Load AI suggestions if not already loaded for this ticket
-        if (!aiSuggestionsLoaded.has(activeThreadId)) {
-          loadAiSuggestions(activeThreadId, data);
-        }
+        // if (!aiSuggestionsLoaded.has(activeThreadId)) {
+        //   loadAiSuggestions(activeThreadId, data);
+        // }
       })
       .catch((error) => {
         console.error('Failed to load thread:', error);
@@ -2739,18 +2738,8 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          <div className="w-80 bg-yellow-100 border-l border-red-500 border-4 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)', minHeight: '400px'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)', minHeight: '400px'}}>
             <div className="p-4 space-y-4">
-              {console.log('DEBUG: Sidebar rendering with:', { 
-                timeline: timeline?.length, 
-                timelineLoading, 
-                timelineError,
-                suggestedPrompts: suggestedPrompts?.length,
-                relatedTickets: relatedTickets?.length
-              })}
-              <div style={{background: 'red', color: 'white', padding: '10px'}}>
-                DEBUG: Sidebar is rendering! Timeline: {timeline?.length || 0} events
-              </div>
               <TimelinePanel
                 events={timeline}
                 loading={timelineLoading}

@@ -3935,7 +3935,7 @@ def get_ai_department_suggestion(ticket_id):
                 },
                 'confidence': department_info.get('confidence', 0.5),
                 'reasoning': department_info.get('reasoning', 'AI analysis completed'),
-                'should_change': current_dept.id != suggested_dept.id if (current_dept and suggested_dept) else True
+                'should_change': (current_dept.id != suggested_dept.id) if (current_dept and suggested_dept) else True
             })
         except Exception as ai_error:
             logger.warning(f"AI department prediction failed for ticket {ticket_id}: {ai_error}")
