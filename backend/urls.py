@@ -3913,36 +3913,56 @@ def get_ai_department_suggestion(ticket_id):
     
     try:
         ticket = Ticket.query.get_or_404(ticket_id)
-        
-        # Import AI automation service
-        from services.ai_automation_service import ai_automation
-        
-        # Get AI department prediction
-        department_info = ai_automation._predict_department_with_confidence(ticket)
-        
-        # Get department name
-        suggested_dept = Department.query.get(department_info['department_id'])
         current_dept = ticket.department
         
-        return jsonify({
-            'success': True,
-            'ticket_id': ticket_id,
-            'current_department': {
-                'id': current_dept.id if current_dept else None,
-                'name': current_dept.name if current_dept else 'Unassigned'
-            },
-            'suggested_department': {
-                'id': suggested_dept.id if suggested_dept else None,
-                'name': suggested_dept.name if suggested_dept else 'Unknown'
-            },
-            'confidence': department_info['confidence'],
-            'reasoning': department_info['reasoning'],
-            'should_change': current_dept.id != suggested_dept.id if (current_dept and suggested_dept) else True
-        })
+        # Try to get AI prediction with fallback
+        try:
+            # Import AI automation service
+            from services.ai_automation_service import ai_automation
+            department_info = ai_automation._predict_department_with_confidence(ticket)
+            suggested_dept = Department.query.get(department_info['department_id'])
+            
+            return jsonify({
+                'success': True,
+                'ticket_id': ticket_id,
+                'current_department': {
+                    'id': current_dept.id if current_dept else None,
+                    'name': current_dept.name if current_dept else 'Unassigned'
+                },
+                'suggested_department': {
+                    'id': suggested_dept.id if suggested_dept else None,
+                    'name': suggested_dept.name if suggested_dept else 'Unknown'
+                },
+                'confidence': department_info.get('confidence', 0.5),
+                'reasoning': department_info.get('reasoning', 'AI analysis completed'),
+                'should_change': current_dept.id != suggested_dept.id if (current_dept and suggested_dept) else True
+            })
+        except Exception as ai_error:
+            logger.warning(f"AI department prediction failed for ticket {ticket_id}: {ai_error}")
+            # Return fallback response
+            return jsonify({
+                'success': True,
+                'ticket_id': ticket_id,
+                'current_department': {
+                    'id': current_dept.id if current_dept else None,
+                    'name': current_dept.name if current_dept else 'Unassigned'
+                },
+                'suggested_department': {
+                    'id': current_dept.id if current_dept else 1,
+                    'name': current_dept.name if current_dept else 'Help Desk'
+                },
+                'confidence': 0.5,
+                'reasoning': 'AI service temporarily unavailable - keeping current assignment',
+                'should_change': False
+            })
         
     except Exception as e:
         logger.error(f"Error getting AI department suggestion for ticket {ticket_id}: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': 'Unable to get department suggestion',
+            'ticket_id': ticket_id
+        }), 500
 
 @urls.route('/tickets/<ticket_id>/ai-proposed-fix', methods=['GET'])
 @require_role("L1","L2","L3","MANAGER")
