@@ -2524,9 +2524,11 @@ function TicketHistoryCollapsible({
   // =========================
   // Render
   // =========================
+ 
+
   return (
     <>
-      <div className={`h-full ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
+      <div className={`h-screen ${darkMode ? 'dark' : ''} ${className} bg-white dark:bg-black transition-colors`}>
         <TicketHeader
           ticket={ticket}
           onBack={parentThreadId ? () => { setActiveThreadId(parentThreadId); setParentThreadId(null); } : onBack}
@@ -2537,21 +2539,23 @@ function TicketHistoryCollapsible({
         />
 
         {ticket && (
-          <TicketInfoCard 
-            ticket={ticket} 
-            showSavedFixModal={showSavedFixModal} 
-            setShowSavedFixModal={setShowSavedFixModal} 
-            savedFixData={savedFixData} 
-            setSavedFixData={setSavedFixData} 
-          />
+          <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <TicketInfoCard 
+              ticket={ticket} 
+              showSavedFixModal={showSavedFixModal} 
+              setShowSavedFixModal={setShowSavedFixModal} 
+              savedFixData={savedFixData} 
+              setSavedFixData={setSavedFixData} 
+            />
+          </div>
         )}
 
         <div className="flex" style={{ height: 'calc(100vh - 160px)' }}>
-          <div className="flex-1 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
+          <div className="flex-1 min-w-0 flex flex-col">
             <div
               ref={scrollRef}
-              className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
-              style={{ height: 'calc(100vh - 160px)', overflowY: 'auto', paddingBottom: '140px' }}
+              className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
+              style={{ paddingBottom: '140px' }}
             >
                 {displayMessages.map((msg, i) => {
                 // Suppress bot message bubble if it looks like a draft email (starts with 'Subject:')
@@ -2723,8 +2727,7 @@ function TicketHistoryCollapsible({
 
             </div>
 
-            {!showSavedFixModal && !showCloseConfirm && !showArchiveConfirm && !showEscalationPopup && !showDeescalationPopup && !showDraftEditor && (
-              <div className="pb-4 px-4 bg-transparent" style={{maxWidth: '900px'}}>
+              <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4">
                 <ChatComposer
                   value={newMsg}
                   onChange={v => {
@@ -2737,7 +2740,6 @@ function TicketHistoryCollapsible({
                   drawerOpen={showDraftEditor}
                 />
               </div>
-            )}
           </div>
 
           <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', height: '100%'}}>
