@@ -2547,7 +2547,7 @@ function TicketHistoryCollapsible({
         )}
 
         <div className="flex" style={{ height: 'calc(100vh - 160px)' }}>
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" style={{maxWidth: 'calc(100% - 320px)'}}>
             <div
               ref={scrollRef}
               className="p-3 lg:p-4 space-y-3 bg-[#F9FAFB] dark:bg-black"
@@ -2740,7 +2740,7 @@ function TicketHistoryCollapsible({
             )}
           </div>
 
-          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{width: '320px', height: 'calc(100vh - 160px)', minHeight: '400px'}}>
+          <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 overflow-y-auto flex-shrink-0" style={{minWidth: '320px', maxWidth: '320px', height: '100%'}}>
             <div className="p-4 space-y-4">
               <TimelinePanel
                 events={timeline}
