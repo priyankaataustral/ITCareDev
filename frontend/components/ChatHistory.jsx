@@ -1255,9 +1255,11 @@ const openDraftEditor = (prefill) => {
               if (!m?.id || seen.has(m.id)) continue;
               
               // Additional content-based deduplication for messages without IDs
-              const contentKey = `${m.sender}-${m.content?.substring(0, 50)}-${m.timestamp}`;
+              const contentString = typeof m.content === 'string' ? m.content : String(m.content || '');
+              const contentKey = `${m.sender}-${contentString.substring(0, 50)}-${m.timestamp}`;
               const hasContentDuplicate = prev.some(existingMsg => {
-                const existingKey = `${existingMsg.sender}-${existingMsg.content?.substring(0, 50)}-${existingMsg.timestamp}`;
+                const existingContentString = typeof existingMsg.content === 'string' ? existingMsg.content : String(existingMsg.content || '');
+                const existingKey = `${existingMsg.sender}-${existingContentString.substring(0, 50)}-${existingMsg.timestamp}`;
                 return contentKey === existingKey && m.sender === existingMsg.sender;
               });
               
@@ -1282,8 +1284,8 @@ const openDraftEditor = (prefill) => {
                   // Exact match or very similar content (accounting for timestamps)
                   return pContent === mContent || 
                          (pContent.length > 10 && mContent.length > 10 && 
-                          pContent.substring(0, Math.min(pContent.length, 50)) === 
-                          mContent.substring(0, Math.min(mContent.length, 50)));
+                          String(pContent).substring(0, Math.min(pContent.length, 50)) === 
+                          String(mContent).substring(0, Math.min(mContent.length, 50)));
                 });
                 
               if (existsByText) continue;
