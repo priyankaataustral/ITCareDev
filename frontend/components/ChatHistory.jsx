@@ -2419,7 +2419,7 @@ function TicketHistoryCollapsible({
                 }}
                 disabled={actionLoading || popupLock || showEscalationPopup} // ← Disable if other popup open
                 className="flex items-center gap-1 px-3 py-1 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition disabled:opacity-50 text-sm shadow-sm"
-              >↩️ De-escalate</button>
+              >↩️ De-escalate 2</button>
             )}
           </Gate>
 
